@@ -1,9 +1,12 @@
+import Persist from "./persist.ts"
 import Queue from "./queue.ts"
 
 export default class Manager<T> {
     private queues: Map<string, Queue<T>>;
+    private persist: Persist;
 
-    constructor() {
+    constructor(persist: Persist) {
+        this.persist = persist;
         this.queues = new Map;
     }
 
@@ -41,5 +44,21 @@ export default class Manager<T> {
         }
 
         return queue.dequeue();
+    }
+
+    public length(name: string): number {
+        let queue = this.find(name) || new Queue([]);
+
+        if (this.registered(name) === false) {
+            this.register(name, queue);
+        }
+
+        return queue.length();
+    }
+
+    public load(): void {
+        const all = this.persist.load();
+
+        this.persist.clear();
     }
 }

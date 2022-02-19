@@ -14,7 +14,7 @@ export default class Queue<T> {
     }
 
     public dequeue(): string | undefined {
-        return this.messages.pop();
+        return this.messages.shift();
     }
 
     public is_empty(): boolean {
