@@ -1,8 +1,8 @@
 # Queue server
 
-[![CircleCI](https://circleci.com/gh/jonbaldie/queue/tree/main.svg?style=shield)](https://circleci.com/gh/jonbaldie/queue/tree/main)
-
 Fast, portable queue server written in Typescript and built with Deno.
+
+[![CircleCI](https://circleci.com/gh/jonbaldie/queue/tree/main.svg?style=shield)](https://circleci.com/gh/jonbaldie/queue/tree/main)
 
 ## Introduction
 
@@ -15,6 +15,10 @@ It is ideal as a simple, fast work queue, for dispatching time-consuming tasks t
 ## How to install
 
 Download the latest executable for your OS.
+
+* [Linux](https://d22pgfyez1vmkm.cloudfront.net/x86_64-unknown-linux-gnu/queue)
+* [Apple (Intel)](https://d22pgfyez1vmkm.cloudfront.net/x86_64-apple-darwin/queue)
+* [Apple (Silicon)](https://d22pgfyez1vmkm.cloudfront.net/aarch64-apple-darwin/queue)
 
 It might be easier to use the Docker image like so:
 
