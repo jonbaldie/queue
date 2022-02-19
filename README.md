@@ -14,7 +14,7 @@ It is ideal as a simple, fast work queue, for dispatching time-consuming tasks t
 
 ## How to install
 
-Download the latest executable for your OS.
+Download the latest executable for your OS, and then `mv` it to a directory within your `$PATH`.
 
 * [Linux](https://d22pgfyez1vmkm.cloudfront.net/x86_64-unknown-linux-gnu/queue)
 * [Apple (Intel)](https://d22pgfyez1vmkm.cloudfront.net/x86_64-apple-darwin/queue)
