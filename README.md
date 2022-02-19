@@ -20,7 +20,7 @@ Download the latest executable for your OS, and then `mv` it to a directory with
 * [Apple (Intel)](https://d22pgfyez1vmkm.cloudfront.net/x86_64-apple-darwin/queue)
 * [Apple (Silicon)](https://d22pgfyez1vmkm.cloudfront.net/aarch64-apple-darwin/queue)
 
-Simply run `queue` and will start up the server, listening on http://127.0.0.1:3000 by default.
+Simply run `queue` to start up the server, listening on http://127.0.0.1:3000 by default.
 
 It might be easier to use the Docker image like so:
 
