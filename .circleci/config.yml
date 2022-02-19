@@ -1,0 +1,13 @@
+version: 2.1
+
+jobs:
+  test:
+    docker:
+      - image: jonbaldie/queue:1.19.0
+    steps:
+      - run: cd queue && deno test --allow-read --allow-write --allow-net
+
+workflows:
+  test:
+    jobs:
+      - test
