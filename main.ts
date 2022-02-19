@@ -31,7 +31,7 @@ const dequeue = new URLPattern({ pathname: "/dequeue/:queue" });
 const length = new URLPattern({ pathname: "/length/:queue" });
 
 // This function controls how the application responds to requests
-async function handler(request: Request)/*: Response*/ {
+async function handler(request: Request): Promise<Response> {
     const is_enqueue = enqueue.exec(request.url);
     const is_dequeue = dequeue.exec(request.url);
     const is_length = length.exec(request.url);

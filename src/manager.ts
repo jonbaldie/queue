@@ -40,7 +40,12 @@ export default class Manager<T> {
 
         queue.enqueue(payload);
 
-        this.persist.append(`{ "queue": "{$name}", "payload": "{$payload}", "enqueue": true, "dequeue": false}`);
+        this.persist.append(JSON.stringify({
+            queue: name,
+            payload: payload,
+            enqueue: true,
+            dequeue: false
+        }));
 
         return this;
     }
@@ -54,7 +59,12 @@ export default class Manager<T> {
 
         const payload = queue.dequeue();
 
-        this.persist.append(`{ "queue": "{$name}", "payload": "{$payload}", "enqueue": false, "dequeue": true}`);
+        this.persist.append(JSON.stringify({
+            queue: name,
+            payload: payload,
+            enqueue: false,
+            dequeue: true
+        }));
 
         return payload;
     }
