@@ -4,6 +4,11 @@ import Queue from "./src/queue.ts";
 import QueueManager from "./src/manager.ts";
 import { serve } from "https://deno.land/std@0.114.0/http/server.ts";
 
+// Environment variables
+const HOST = Deno.env.get("HOST") || "localhost";
+const PORT = Deno.env.get("PORT") || 3000;
+const PERSIST = Deno.env.get("PERSIST") || Deno.cwd();
+
 // Persistency of queue data is opt-in with the --persist flag
 const flags = parse(Deno.args, {
     boolean: ["persist"],
@@ -14,6 +19,8 @@ const flags = parse(Deno.args, {
 const persist = flags.persist
     ? new Persistency.File
     : new Persistency.None;
+
+persist.dir(PERSIST);
 
 // Set up the manager, which will handle our queues for us
 const mgr = new QueueManager(persist);
