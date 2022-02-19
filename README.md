@@ -25,7 +25,7 @@ Simply run `queue` to start up the server, listening on http://127.0.0.1:3000 by
 It might be easier to use the Docker image like so:
 
 ```
-docker run -d -e HOST=127.0.0.1 -e PORT=1991 jonbaldie/queue:1.19.0
+docker run -d -e HOST=127.0.0.1 -e PORT=1991 jonbaldie/queue
 ```
 
 It will then listen to http://127.0.0.1:1991.
@@ -77,7 +77,7 @@ Persistency is opt-in. That means that by default this server will not remember 
 To get persistency, simply add the `--persist` option when starting up the server, and it will write changes to a binary log file:
 
 ```
-docker run -d -e PORT=1991 -e HOST=0.0.0.0 -e PERSIST=/mnt/ jonbaldie/queue:1.19.0 /usr/bin/queue --persist
+docker run -d -e PORT=1991 -e HOST=0.0.0.0 -e PERSIST=/mnt/ jonbaldie/queue /usr/bin/queue --persist
 ```
 
 If the server sees that the `persist.dat` file exists on startup, it will run the binary log from the beginning and then clear the file down.
