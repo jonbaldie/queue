@@ -5,7 +5,7 @@ jobs:
     docker:
       - image: jonbaldie/queue:1.19.0
     steps:
-      - run: deno test --allow-read --allow-write --allow-net
+      - run: deno test --allow-read --allow-write --allow-net tests/test.ts
 
 workflows:
   test:
