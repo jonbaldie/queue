@@ -96,6 +96,21 @@ Deno.test("manager persistency", () => {
     assertEquals("gat", mgr.dequeue("fee"));
 });
 
+Deno.test("json persistency", () => {
+    const persist = new Persistency.File;
+    const mgr = new QueueManager(persist);
+    const payload = "php /var/www/html/index.php";
+
+    persist.clear();
+    persist.append(JSON.stringify({ queue: "foo", payload: payload, enqueue: true, dequeue: false }));
+
+    mgr.load();
+
+    assertEquals("", persist.load());
+    assertEquals(1, mgr.length("foo"));
+    assertEquals(payload, mgr.dequeue("foo"));
+});
+
 Deno.test("persistency", () => {
     const persist = new Persistency.File;
     
