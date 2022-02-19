@@ -66,8 +66,8 @@ async function handler(request: Request): Promise<Response> {
     return new Response("Not found.", { status: 404 });
 }
 
-console.log(`Listening on localhost:3000`);
+console.log(`Listening on ${HOST}:${PORT}`);
 
 // Start up the application
-serve(handler, { addr: "localhost:3000" });
+serve(handler, { addr: `${HOST}:${PORT}` });
 

@@ -17,10 +17,10 @@ Download the latest executable for your OS.
 It might be easier to use the Docker image like so:
 
 ```
-docker run -d -e PORT=1991 -e HOST=0.0.0.0 jonbaldie/queue:1.19.0
+docker run -d -e PORT=1991 -e HOST=127.0.0.1 jonbaldie/queue:1.19.0
 ```
 
-It will then listen to http://0.0.0.0:1991.
+It will then listen to http://127.0.0.1:1991.
 
 ## Usage
 
