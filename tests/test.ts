@@ -81,8 +81,9 @@ Deno.test("manager persistency", () => {
     const persist = new Persistency.File;
     const mgr = new QueueManager(persist);
 
-    persist.append("foo");
-    
+    persist.clear();
+    persist.append(`{ "queue": "foo", "payload": "bar" }`);
+
     mgr.load();
 
     assertEquals("", persist.load());

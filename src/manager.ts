@@ -1,6 +1,13 @@
 import Persist from "./persist.ts"
 import Queue from "./queue.ts"
 
+interface LoadLine {
+    queue: string;
+    payload: string;
+    enqueue: boolean;
+    dequeue: boolean;
+}
+
 export default class Manager<T> {
     private queues: Map<string, Queue<T>>;
     private persist: Persist;
@@ -33,6 +40,8 @@ export default class Manager<T> {
 
         queue.enqueue(payload);
 
+        this.persist.append(`{ "queue": "{$name}", "payload": "{$payload}", "enqueue": true, "dequeue": false}`);
+
         return this;
     }
 
@@ -43,7 +52,11 @@ export default class Manager<T> {
             this.register(name, queue);
         }
 
-        return queue.dequeue();
+        const payload = queue.dequeue();
+
+        this.persist.append(`{ "queue": "{$name}", "payload": "{$payload}", "enqueue": false, "dequeue": true}`);
+
+        return payload;
     }
 
     public length(name: string): number {
@@ -57,7 +70,22 @@ export default class Manager<T> {
     }
 
     public load(): void {
-        const all = this.persist.load();
+        const all = this.persist.load().split("\n");
+
+        all.forEach((line: string) => {
+            let decoded: LoadLine = JSON.parse(line);
+            let queue = this.find(decoded.queue) || new Queue([]);
+
+            if (this.registered(decoded.queue) === false) {
+                this.register(decoded.queue, queue);
+            }
+
+            if (decoded.enqueue) {
+                queue.enqueue(decoded.payload);
+            } else if (decoded.dequeue) {
+                queue.dequeue();
+            }
+        });
 
         this.persist.clear();
     }
