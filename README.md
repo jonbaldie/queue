@@ -86,5 +86,7 @@ When using Docker, it might be useful to add `persist.dat` as a persistent volum
 
 It should go without saying, but try not to edit `persist.dat`, because it might result in weird behaviour.
 
-Maintained by Jonathan Baldie <jon@jonbaldie.com>
+---
+
+Maintained by Jonathan Baldie <jon@jonbaldie.com>.
 
