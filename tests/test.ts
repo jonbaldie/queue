@@ -82,26 +82,32 @@ Deno.test("manager persistency", () => {
     const mgr = new QueueManager(persist);
 
     persist.clear();
-    persist.append(`{ "queue": "foo", "payload": "bar" }`);
+    persist.append(`{ "queue": "foo", "payload": "bar", "enqueue": true, "dequeue": false }`);
+    persist.append(`{ "queue": "fee", "payload": "bat", "enqueue": true, "dequeue": false }`);
+    persist.append(`{ "queue": "fee", "payload": "gat", "enqueue": true, "dequeue": false }`);
+    persist.append(`{ "queue": "fee", "payload": "bat", "enqueue": false, "dequeue": true }`);
 
     mgr.load();
 
     assertEquals("", persist.load());
+    assertEquals(1, mgr.length("foo"));
+    assertEquals("bar", mgr.dequeue("foo"));
+    assertEquals(1, mgr.length("fee"));
+    assertEquals("gat", mgr.dequeue("fee"));
 });
 
 Deno.test("persistency", () => {
     const persist = new Persistency.File;
-
-    persist.append("foo");
+    
     persist.clear();
 
     const load = (): string => new TextDecoder().decode(Deno.readFileSync("persist.dat"));
 
     assertEquals("", load());
 
-    persist.append("foo");
+    persist.append(`{ "queue": "foo", "payload": "bar", "enqueue": true, "dequeue": false }`);
 
-    assertEquals("foo", load());
+    assertEquals(`{ "queue": "foo", "payload": "bar", "enqueue": true, "dequeue": false }` + "\n", load());
     assertEquals(load(), persist.load());
 
     persist.clear();

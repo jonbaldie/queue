@@ -70,7 +70,7 @@ export default class Manager<T> {
     }
 
     public load(): void {
-        const all = this.persist.load().split("\n");
+        const all = this.persist.load().split("\n").filter((line: string) => line.length);
 
         all.forEach((line: string) => {
             let decoded: LoadLine = JSON.parse(line);

@@ -6,7 +6,7 @@ export default interface Persist {
 
 export class File implements Persist {
     public append(line: string): void {
-        Deno.writeFileSync("persist.dat", new TextEncoder().encode(line), {append: true});
+        Deno.writeFileSync("persist.dat", new TextEncoder().encode(line + "\n"), {append: true});
     }
 
     public clear(): void {
