@@ -36,7 +36,7 @@ Note the use of environment variables to change the listening address - these al
 
 Once started, you interact with the server using HTTP requests.
 
-To queue up your first payload, send a post request to `/enqueue/:queue` with the payload in your request's JSON body:
+To queue up your first payload, send a post request to `/enqueue/:queue` with the payload in your request's JSON body
 
 ```
 curl -X POST -H "Content-Type: application/json" -d '{"payload": "bar"}' http://127.0.0.1:1991/enqueue/foo
@@ -46,7 +46,7 @@ The server has also just created the `foo` queue for you, if it didn't already e
 
 You're best setting up a publisher script in your application to write payloads using the enqueue endpoint, and then subscriber scripts in your application can read those payloads using the dequeue endpoint.
 
-To get the next payload from the `foo` queue, send a get request to `/dequeue/:queue`:
+To get the next payload from the `foo` queue, send a get request to `/dequeue/:queue`
 
 ```
 curl -X GET http://127.0.0.1:1991/dequeue/foo
@@ -56,7 +56,7 @@ This returns the oldest added payload on queue `foo` and removes it, guaranteein
 
 That's all you need to get started! 😎
 
-To get the number of payloads pending on a queue, send a get request to `/length/:queue`:
+To get the number of payloads pending on a queue, send a get request to `/length/:queue`
 
 ```
 curl -X GET http://127.0.0.1:1991/length/foo
