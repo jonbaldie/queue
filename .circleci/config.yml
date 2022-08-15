@@ -5,7 +5,7 @@ jobs:
     docker:
       - image: denoland/deno:1.19.0
     steps:
-      - run: apt-get update -yqq && apt-get install git -yqq && git clone -b ${CIRCLE_BRANCH} https://github.com/jonbaldie/queue.git && cd queue && touch persist.dat && deno compile --allow-read --allow-write --allow-net --allow-env main.ts && cp ./queue /usr/bin/ && deno test --allow-read --allow-write --allow-net 
+      - run: apt-get update -yqq && apt-get install git -yqq && git clone -b ${CIRCLE_BRANCH} https://github.com/jonbaldie/queue.git && cd queue && touch persist.dat && deno compile --allow-read --allow-write --allow-net --allow-env main.ts && cp ./queue /usr/bin/ && deno test --allow-read --allow-write --allow-net
 
 workflows:
   test:
