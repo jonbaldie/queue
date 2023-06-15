@@ -62,6 +62,10 @@ To get the number of payloads pending on a queue, send a get request to `/length
 curl -X GET http://127.0.0.1:1991/length/foo
 ```
 
+## Demo
+
+![h11pcanjwrm8khsyu4w4](https://github.com/jonbaldie/queue/assets/8376953/c9271432-e739-4dfe-8d39-269fa593297a)
+
 ## FIFO
 
 This is a FIFO ("First-in, First-out") queue server, meaning that the oldest payload is processed first.
