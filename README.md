@@ -64,8 +64,6 @@ curl -X GET http://127.0.0.1:1991/length/foo
 
 ## Demo
 
-Here's an example with the queue server set up to listen on port 3000, which is the default. 
-
 ![h11pcanjwrm8khsyu4w4](https://github.com/jonbaldie/queue/assets/8376953/c9271432-e739-4dfe-8d39-269fa593297a)
 
 ## FIFO
