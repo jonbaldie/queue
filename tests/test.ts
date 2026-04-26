@@ -227,7 +227,7 @@ Deno.test("json persistency", () => {
 
 Deno.test("persistency", () => {
     const persist = new Persistency.File;
-    
+
     persist.clear();
 
     const load = (): string => new TextDecoder().decode(Deno.readFileSync("persist.dat"));
@@ -242,4 +242,21 @@ Deno.test("persistency", () => {
     persist.clear();
 
     assertEquals("", load());
+});
+
+Deno.test("queue peek returns value not index", () => {
+    const queue = new Queue([]);
+
+    queue.enqueue("first_message");
+
+    const peeked = queue.peek();
+    assertEquals("first_message", peeked);
+});
+
+Deno.test("manager dequeue from empty queue returns undefined", () => {
+    const mgr = new QueueManager(new Persistency.None);
+
+    const result = mgr.dequeue("nonexistent");
+
+    assertEquals(undefined, result);
 });

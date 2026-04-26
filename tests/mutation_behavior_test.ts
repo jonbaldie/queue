@@ -86,10 +86,12 @@ Deno.test("Queue: is_empty reflects actual state (catches negation mutation)", (
     assertEquals(queue.is_empty(), false);
 });
 
-Deno.test("Queue: peek returns first element index (current behavior)", () => {
+Deno.test("Queue: peek returns first element value", () => {
     const queue = new Queue(["first", "second", "third"]);
     const peeked = queue.peek();
-    assertEquals(peeked, "0");
+    assertEquals(peeked, "first");
+
+    // Verify items are still in queue
     assertEquals(queue.length(), 3);
 });
 
@@ -261,16 +263,15 @@ Deno.test("API: enqueue stores payload and dequeue retrieves it (catches data lo
     assertEquals(retrieved, payload);
 });
 
-Deno.test("API: dequeue empty queue returns empty string (catches crash)", async () => {
+Deno.test("API: dequeue empty queue returns 204 (catches crash)", async () => {
     const handler = makeHandler();
     const res = await handler(
         new Request("http://localhost/dequeue/empty-queue", {
             headers: { "Authorization": `Bearer ${TEST_TOKEN}` },
         })
     );
-    assertEquals(res.status, 200);
-    const text = await res.text();
-    assertEquals(text, "");
+    assertEquals(res.status, 204);
+    // Mutation check: if dequeue crashes or returns wrong value
 });
 
 Deno.test("API: length returns numeric string (catches type mutation)", async () => {
