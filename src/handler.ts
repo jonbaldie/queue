@@ -23,21 +23,21 @@ export function createHandler(mgr: QueueManager<any>, apiToken: string) {
                 const queue = enqueueMatch[1];
                 const json = JSON.parse(await request.text());
 
-                await mgr.enqueue(queue, json.payload);
+                mgr.enqueue(queue, json.payload);
 
                 return new Response(`Payload successfully queued onto ${queue}.`);
             }
 
             if (dequeueMatch) {
                 const queue = dequeueMatch[1];
-                let item = await mgr.dequeue(queue);
+                let item = mgr.dequeue(queue);
 
                 return new Response(item);
             }
 
             if (lengthMatch) {
                 const queue = lengthMatch[1];
-                let len = await mgr.length(queue);
+                let len = mgr.length(queue);
 
                 return new Response(`${len}`);
             }
