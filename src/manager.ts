@@ -11,10 +11,14 @@ interface LoadLine {
 export default class Manager<T> {
     private queues: Map<string, Queue<T>>;
     private persist: Persist;
+    private queueDepthLimit: number;
+    private queueCountLimit: number;
 
-    constructor(persist: Persist) {
+    constructor(persist: Persist, queueDepthLimit?: number, queueCountLimit?: number) {
         this.persist = persist;
         this.queues = new Map;
+        this.queueDepthLimit = queueDepthLimit ?? 10000;
+        this.queueCountLimit = queueCountLimit ?? 1000;
     }
 
     private register(name: string, queue: Queue<T>): Manager<T> {
@@ -25,6 +29,20 @@ export default class Manager<T> {
 
     private registered(name: string): boolean {
         return this.queues.has(name);
+    }
+
+    public canCreateQueue(): boolean {
+        return this.queues.size < this.queueCountLimit;
+    }
+
+    public canEnqueue(name: string): boolean {
+        const queue = this.find(name);
+        if (!queue) {
+            // Creating a new queue - check if we have room
+            return this.canCreateQueue();
+        }
+        // Existing queue - check if it has room
+        return queue.length() < this.queueDepthLimit;
     }
 
     private find(name: string): Queue<T> | undefined {
@@ -67,6 +85,16 @@ export default class Manager<T> {
         }));
 
         return payload;
+    }
+
+    public peek(name: string): string | undefined {
+        let queue = this.find(name);
+
+        if (queue === undefined) {
+            return undefined;
+        }
+
+        return queue.peek();
     }
 
     public length(name: string): number {
