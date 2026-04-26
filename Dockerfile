@@ -1,4 +1,4 @@
-FROM denoland/deno:1.19.0
+FROM denoland/deno:2.7.6
 
 ADD . /queue
 

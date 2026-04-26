@@ -13,7 +13,7 @@ export class File implements Persist {
     }
 
     public clear(): void {
-        Deno.truncateSync(this.directory + "persist.dat");
+        Deno.writeFileSync(this.directory + "persist.dat", new Uint8Array());
     }
 
     public load(): string {
