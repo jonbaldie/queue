@@ -1,4 +1,4 @@
-import { assertEquals } from "https://deno.land/std@0.126.0/testing/asserts.ts";
+import { assertEquals } from "jsr:@std/assert";
 import * as Persistency from "../src/persist.ts";
 import QueueManager from "../src/manager.ts";
 import { createHandler } from "../src/handler.ts";
