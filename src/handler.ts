@@ -1,8 +1,11 @@
 import QueueManager from "./manager.ts";
 
-const enqueuePattern = /^\/enqueue\/(.+)$/;
-const dequeuePattern = /^\/dequeue\/(.+)$/;
-const lengthPattern = /^\/length\/(.+)$/;
+const MAX_BODY_SIZE = 1024 * 1024; // 1 MB
+const MAX_QUEUE_NAME_LENGTH = 128;
+
+const enqueuePattern = new URLPattern({ pathname: "/enqueue/:queue" });
+const dequeuePattern = new URLPattern({ pathname: "/dequeue/:queue" });
+const lengthPattern = new URLPattern({ pathname: "/length/:queue" });
 
 class RateLimiter {
     private requestTimestamps: Map<string, number[]> = new Map();
@@ -60,39 +63,64 @@ export function createHandler(mgr: QueueManager<any>, apiToken: string, rateLimi
             return new Response("Unauthorized", { status: 401 });
         }
 
-        const url = new URL(request.url);
-        const pathname = url.pathname;
+        const url = request.url;
+        const is_enqueue = enqueuePattern.exec(url);
+        const is_dequeue = dequeuePattern.exec(url);
+        const is_length = lengthPattern.exec(url);
 
-        const enqueueMatch = pathname.match(enqueuePattern);
-        const dequeueMatch = pathname.match(dequeuePattern);
-        const lengthMatch = pathname.match(lengthPattern);
+        if (is_enqueue) {
+            if (request.method !== "POST") {
+                return new Response("Method not allowed", { status: 405 });
+            }
 
-        if (enqueueMatch && request.method === "POST") {
-            const queue = enqueueMatch[1];
+            const queueName = is_enqueue.pathname.groups.queue as string;
+            if (queueName.length > MAX_QUEUE_NAME_LENGTH) {
+                return new Response("Queue name too long", { status: 400 });
+            }
 
-            // Check if we can enqueue
-            if (!mgr.canEnqueue(queue)) {
+            if (!mgr.canEnqueue(queueName)) {
                 return new Response("Queue full or too many queues", { status: 507 });
             }
 
-            const json = JSON.parse(await request.text());
+            const contentLength = request.headers.get("content-length");
+            if (contentLength && parseInt(contentLength) > MAX_BODY_SIZE) {
+                return new Response("Payload too large", { status: 413 });
+            }
 
-            mgr.enqueue(queue, json.payload);
-
-            return new Response(`Payload successfully queued onto ${queue}.`);
+            try {
+                const json = JSON.parse(await request.text());
+                mgr.enqueue(queueName, json.payload);
+                return new Response(`Payload successfully queued onto ${queueName}.`);
+            } catch {
+                return new Response("Invalid JSON", { status: 400 });
+            }
         }
 
-        if (dequeueMatch) {
-            const queue = dequeueMatch[1];
-            let item = mgr.dequeue(queue);
+        if (is_dequeue) {
+            if (request.method !== "GET") {
+                return new Response("Method not allowed", { status: 405 });
+            }
 
+            const queueName = is_dequeue.pathname.groups.queue as string;
+            if (queueName.length > MAX_QUEUE_NAME_LENGTH) {
+                return new Response("Queue name too long", { status: 400 });
+            }
+
+            let item = mgr.dequeue(queueName);
             return new Response(item);
         }
 
-        if (lengthMatch) {
-            const queue = lengthMatch[1];
-            let len = mgr.length(queue);
+        if (is_length) {
+            if (request.method !== "GET") {
+                return new Response("Method not allowed", { status: 405 });
+            }
 
+            const queueName = is_length.pathname.groups.queue as string;
+            if (queueName.length > MAX_QUEUE_NAME_LENGTH) {
+                return new Response("Queue name too long", { status: 400 });
+            }
+
+            let len = mgr.length(queueName);
             return new Response(`${len}`);
         }
 
