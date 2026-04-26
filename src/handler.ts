@@ -86,7 +86,6 @@ export function createHandler(mgr: QueueManager<any>, apiToken: string, rateLimi
             if (contentLength && parseInt(contentLength) > MAX_BODY_SIZE) {
                 return new Response("Payload too large", { status: 413 });
             }
-
             try {
                 const json = JSON.parse(await request.text());
                 mgr.enqueue(queueName, json.payload);
