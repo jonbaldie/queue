@@ -1,8 +1,8 @@
 import QueueManager from "./manager.ts";
 
-const enqueue = new URLPattern({ pathname: "/enqueue/:queue" });
-const dequeue = new URLPattern({ pathname: "/dequeue/:queue" });
-const length = new URLPattern({ pathname: "/length/:queue" });
+const enqueuePattern = /^\/enqueue\/(.+)$/;
+const dequeuePattern = /^\/dequeue\/(.+)$/;
+const lengthPattern = /^\/length\/(.+)$/;
 
 export function createHandler(mgr: QueueManager<any>, apiToken: string) {
     return async function handler(request: Request): Promise<Response> {
@@ -11,26 +11,32 @@ export function createHandler(mgr: QueueManager<any>, apiToken: string) {
             return new Response("Unauthorized", { status: 401 });
         }
 
-        const is_enqueue = enqueue.exec(request.url);
-        const is_dequeue = dequeue.exec(request.url);
-        const is_length = length.exec(request.url);
+        const url = new URL(request.url);
+        const pathname = url.pathname;
 
-        if (is_enqueue && request.method === "POST") {
+        const enqueueMatch = pathname.match(enqueuePattern);
+        const dequeueMatch = pathname.match(dequeuePattern);
+        const lengthMatch = pathname.match(lengthPattern);
+
+        if (enqueueMatch && request.method === "POST") {
+            const queue = enqueueMatch[1];
             const json = JSON.parse(await request.text());
 
-            mgr.enqueue(is_enqueue.pathname.groups.queue!, json.payload);
+            mgr.enqueue(queue, json.payload);
 
-            return new Response(`Payload successfully queued onto ${is_enqueue.pathname.groups.queue}.`);
+            return new Response(`Payload successfully queued onto ${queue}.`);
         }
 
-        if (is_dequeue) {
-            let item = mgr.dequeue(is_dequeue.pathname.groups.queue!);
+        if (dequeueMatch) {
+            const queue = dequeueMatch[1];
+            let item = mgr.dequeue(queue);
 
             return new Response(item);
         }
 
-        if (is_length) {
-            let len = mgr.length(is_length.pathname.groups.queue!);
+        if (lengthMatch) {
+            const queue = lengthMatch[1];
+            let len = mgr.length(queue);
 
             return new Response(`${len}`);
         }
