@@ -107,6 +107,9 @@ export function createHandler(mgr: QueueManager<any>, apiToken: string, rateLimi
             }
 
             let item = mgr.dequeue(queueName);
+            if (item === undefined) {
+                return new Response(null, { status: 204 });
+            }
             return new Response(item);
         }
 

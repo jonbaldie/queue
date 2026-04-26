@@ -87,6 +87,16 @@ export default class Manager<T> {
         return payload;
     }
 
+    public peek(name: string): string | undefined {
+        let queue = this.find(name);
+
+        if (queue === undefined) {
+            return undefined;
+        }
+
+        return queue.peek();
+    }
+
     public length(name: string): number {
         let queue = this.find(name) || new Queue([]);
 

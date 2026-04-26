@@ -22,8 +22,6 @@ export default class Queue<T> {
     }
 
     public peek(): string | undefined {
-        for (let x in this.messages) {
-            return x;
-        }
+        return this.messages[0];
     }
 }
