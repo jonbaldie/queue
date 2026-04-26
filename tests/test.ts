@@ -2,6 +2,120 @@ import { assertEquals } from "jsr:@std/assert";
 import * as Persistency from "../src/persist.ts";
 import Queue from "../src/queue.ts";
 import QueueManager from "../src/manager.ts";
+import { createHandler } from "../src/handler.ts";
+
+const API_TOKEN = "test-token";
+const mgr = new QueueManager(new Persistency.None);
+const handler = createHandler(mgr, API_TOKEN);
+const authHeaders = { "Authorization": `Bearer ${API_TOKEN}` };
+
+// Fix 1: JSON parse safety - malformed JSON should return 400
+Deno.test("malformed JSON returns 400", async () => {
+    const request = new Request("http://localhost:3000/enqueue/testqueue", {
+        method: "POST",
+        body: "{invalid json}",
+        headers: { ...authHeaders, "content-length": "14" },
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 400);
+});
+
+// Fix 2: Body size limit - oversized body should return 413
+Deno.test("oversized body returns 413", async () => {
+    const oversizeLength = 1024 * 1024 + 1;
+    const request = new Request("http://localhost:3000/enqueue/testqueue", {
+        method: "POST",
+        body: '{"payload": "test"}',
+        headers: { ...authHeaders, "content-length": oversizeLength.toString() },
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 413);
+});
+
+// Fix 3: HTTP method enforcement - POST to dequeue should return 405
+Deno.test("POST to dequeue returns 405", async () => {
+    const request = new Request("http://localhost:3000/dequeue/testqueue", {
+        method: "POST",
+        headers: authHeaders,
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 405);
+});
+
+// Fix 3: HTTP method enforcement - POST to length should return 405
+Deno.test("POST to length returns 405", async () => {
+    const request = new Request("http://localhost:3000/length/testqueue", {
+        method: "POST",
+        headers: authHeaders,
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 405);
+});
+
+// Fix 4: Queue name validation - long queue name should return 400
+Deno.test("long queue name returns 400 on enqueue", async () => {
+    const longName = "a".repeat(129);
+    const request = new Request(`http://localhost:3000/enqueue/${longName}`, {
+        method: "POST",
+        body: '{"payload": "test"}',
+        headers: { ...authHeaders, "content-length": "18" },
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 400);
+});
+
+// Fix 4: Queue name validation - long queue name on dequeue
+Deno.test("long queue name returns 400 on dequeue", async () => {
+    const longName = "a".repeat(129);
+    const request = new Request(`http://localhost:3000/dequeue/${longName}`, {
+        method: "GET",
+        headers: authHeaders,
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 400);
+});
+
+// Fix 4: Queue name validation - long queue name on length
+Deno.test("long queue name returns 400 on length", async () => {
+    const longName = "a".repeat(129);
+    const request = new Request(`http://localhost:3000/length/${longName}`, {
+        method: "GET",
+        headers: authHeaders,
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 400);
+});
+
+// Happy path: valid enqueue should succeed
+Deno.test("valid enqueue succeeds", async () => {
+    const request = new Request("http://localhost:3000/enqueue/testqueue", {
+        method: "POST",
+        body: '{"payload": "test"}',
+        headers: { ...authHeaders, "content-length": "18" },
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 200);
+});
+
+// Happy path: GET dequeue should succeed
+Deno.test("GET dequeue succeeds", async () => {
+    const request = new Request("http://localhost:3000/dequeue/testqueue", {
+        method: "GET",
+        headers: authHeaders,
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 200);
+});
+
+// Happy path: GET length should succeed
+Deno.test("GET length succeeds", async () => {
+    const request = new Request("http://localhost:3000/length/testqueue", {
+        method: "GET",
+        headers: authHeaders,
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 200);
+});
 
 Deno.test("queue enqueue and dequeue", () => {
     const queue = new Queue([]);
