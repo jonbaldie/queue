@@ -244,6 +244,86 @@ Deno.test("persistency", () => {
     assertEquals("", load());
 });
 
+Deno.test("concurrent enqueue writes to file", async () => {
+    const persist = new Persistency.File;
+    persist.clear();
+
+    const mgr = new QueueManager(persist);
+
+    // Fire 10 concurrent enqueue operations
+    const promises = [];
+    for (let i = 0; i < 10; i++) {
+        promises.push(
+            mgr.enqueue("test_queue", `item_${i}`)
+        );
+    }
+
+    await Promise.all(promises);
+
+    // Read the file and verify all items were persisted
+    const content = persist.load();
+    const lines = content.split("\n").filter((line: string) => line.length);
+
+    // Should have exactly 10 enqueue operations
+    assertEquals(10, lines.length);
+
+    // All lines should be valid JSON with enqueue=true
+    lines.forEach((line: string) => {
+        const obj = JSON.parse(line);
+        assertEquals(true, obj.enqueue);
+        assertEquals("test_queue", obj.queue);
+    });
+
+    persist.clear();
+});
+
+Deno.test("concurrent manager operations maintain data integrity", async () => {
+    const persist = new Persistency.File;
+    persist.clear();
+
+    const mgr = new QueueManager(persist);
+
+    // Fire multiple concurrent enqueue operations
+    const promises = [];
+    for (let i = 0; i < 5; i++) {
+        promises.push(
+            mgr.enqueue("q1", `item_${i}`)
+        );
+    }
+
+    await Promise.all(promises);
+
+    // All items should be in the queue
+    assertEquals(5, mgr.length("q1"));
+
+    // Read back all items
+    const items = [];
+    for (let i = 0; i < 5; i++) {
+        const item = mgr.dequeue("q1");
+        if (item) items.push(item);
+    }
+
+    assertEquals(5, items.length);
+    assertEquals(0, mgr.length("q1"));
+
+    persist.clear();
+});
+
+Deno.test("persist operations handle I/O errors gracefully", () => {
+    const persist = new Persistency.File;
+    // Set an invalid directory to trigger an I/O error
+    persist.dir("/nonexistent/invalid/path");
+
+    let errorThrown = false;
+    try {
+        persist.append(`{ "queue": "foo", "payload": "bar", "enqueue": true, "dequeue": false }`);
+    } catch (e) {
+        errorThrown = true;
+    }
+
+    assertEquals(true, errorThrown);
+});
+
 Deno.test("queue peek returns value not index", () => {
     const queue = new Queue([]);
 
