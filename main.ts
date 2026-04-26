@@ -8,6 +8,9 @@ const HOST = Deno.env.get("HOST") || "localhost";
 const PORT = Deno.env.get("PORT") || 3000;
 const PERSIST = Deno.env.get("PERSIST") || Deno.cwd();
 const QUEUE_API_TOKEN = Deno.env.get("QUEUE_API_TOKEN") || "";
+const QUEUE_DEPTH_LIMIT = Deno.env.get("QUEUE_DEPTH_LIMIT") ? parseInt(Deno.env.get("QUEUE_DEPTH_LIMIT")!) : 10000;
+const QUEUE_COUNT_LIMIT = Deno.env.get("QUEUE_COUNT_LIMIT") ? parseInt(Deno.env.get("QUEUE_COUNT_LIMIT")!) : 1000;
+const RATE_LIMIT_REQUESTS = Deno.env.get("RATE_LIMIT_REQUESTS") ? parseInt(Deno.env.get("RATE_LIMIT_REQUESTS")!) : 100;
 
 // Persistency of queue data is opt-in with the --persist flag
 const flags = parseArgs(Deno.args, {
@@ -23,7 +26,7 @@ const persist = flags.persist
 persist.dir(PERSIST);
 
 // Set up the manager, which will handle our queues for us
-const mgr = new QueueManager(persist);
+const mgr = new QueueManager(persist, QUEUE_DEPTH_LIMIT, QUEUE_COUNT_LIMIT);
 
 // Load up any existing queue data, if we're persisting
 if (persist instanceof Persistency.File) {
@@ -32,7 +35,7 @@ if (persist instanceof Persistency.File) {
     mgr.load();
 }
 
-const handler = createHandler(mgr, QUEUE_API_TOKEN);
+const handler = createHandler(mgr, QUEUE_API_TOKEN, RATE_LIMIT_REQUESTS);
 
 // Start up the application
 Deno.serve({ hostname: HOST, port: Number(PORT), onListen: ({ hostname, port }) => console.log(`Listening on ${hostname}:${port}`) }, handler);
