@@ -18,29 +18,35 @@ export function createHandler(mgr: QueueManager<any>, apiToken: string) {
         const dequeueMatch = pathname.match(dequeuePattern);
         const lengthMatch = pathname.match(lengthPattern);
 
-        if (enqueueMatch && request.method === "POST") {
-            const queue = enqueueMatch[1];
-            const json = JSON.parse(await request.text());
+        try {
+            if (enqueueMatch && request.method === "POST") {
+                const queue = enqueueMatch[1];
+                const json = JSON.parse(await request.text());
 
-            mgr.enqueue(queue, json.payload);
+                await mgr.enqueue(queue, json.payload);
 
-            return new Response(`Payload successfully queued onto ${queue}.`);
+                return new Response(`Payload successfully queued onto ${queue}.`);
+            }
+
+            if (dequeueMatch) {
+                const queue = dequeueMatch[1];
+                let item = await mgr.dequeue(queue);
+
+                return new Response(item);
+            }
+
+            if (lengthMatch) {
+                const queue = lengthMatch[1];
+                let len = await mgr.length(queue);
+
+                return new Response(`${len}`);
+            }
+
+            return new Response("Not found.", { status: 404 });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            console.error(`Error handling request: ${message}`);
+            return new Response("Internal Server Error", { status: 500 });
         }
-
-        if (dequeueMatch) {
-            const queue = dequeueMatch[1];
-            let item = mgr.dequeue(queue);
-
-            return new Response(item);
-        }
-
-        if (lengthMatch) {
-            const queue = lengthMatch[1];
-            let len = mgr.length(queue);
-
-            return new Response(`${len}`);
-        }
-
-        return new Response("Not found.", { status: 404 });
     };
 }

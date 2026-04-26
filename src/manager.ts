@@ -8,13 +8,34 @@ interface LoadLine {
     dequeue: boolean;
 }
 
+class AsyncMutex {
+    private locked = false;
+    private waiters: Array<(value?: unknown) => void> = [];
+
+    async lock(): Promise<() => void> {
+        while (this.locked) {
+            await new Promise(resolve => this.waiters.push(resolve));
+        }
+        this.locked = true;
+        return () => this.unlock();
+    }
+
+    private unlock(): void {
+        this.locked = false;
+        const next = this.waiters.shift();
+        if (next) next();
+    }
+}
+
 export default class Manager<T> {
     private queues: Map<string, Queue<T>>;
     private persist: Persist;
+    private mutex: AsyncMutex;
 
     constructor(persist: Persist) {
         this.persist = persist;
         this.queues = new Map;
+        this.mutex = new AsyncMutex();
     }
 
     private register(name: string, queue: Queue<T>): Manager<T> {
@@ -31,52 +52,65 @@ export default class Manager<T> {
         return this.queues.get(name);
     }
 
-    public enqueue(name: string, payload: string): Manager<T> {
-        let queue = this.find(name) || new Queue([]);
+    public async enqueue(name: string, payload: string): Promise<void> {
+        const unlock = await this.mutex.lock();
+        try {
+            let queue = this.find(name) || new Queue([]);
 
-        if (this.registered(name) === false) {
-            this.register(name, queue);
+            if (this.registered(name) === false) {
+                this.register(name, queue);
+            }
+
+            queue.enqueue(payload);
+
+            this.persist.append(JSON.stringify({
+                queue: name,
+                payload: payload,
+                enqueue: true,
+                dequeue: false
+            }));
+        } finally {
+            unlock();
         }
-
-        queue.enqueue(payload);
-
-        this.persist.append(JSON.stringify({
-            queue: name,
-            payload: payload,
-            enqueue: true,
-            dequeue: false
-        }));
-
-        return this;
     }
 
-    public dequeue(name: string): string | undefined {
-        let queue = this.find(name) || new Queue([]);
+    public async dequeue(name: string): Promise<string | undefined> {
+        const unlock = await this.mutex.lock();
+        try {
+            let queue = this.find(name) || new Queue([]);
 
-        if (this.registered(name) === false) {
-            this.register(name, queue);
+            if (this.registered(name) === false) {
+                this.register(name, queue);
+            }
+
+            const payload = queue.dequeue();
+
+            this.persist.append(JSON.stringify({
+                queue: name,
+                payload: payload,
+                enqueue: false,
+                dequeue: true
+            }));
+
+            return payload;
+        } finally {
+            unlock();
         }
-
-        const payload = queue.dequeue();
-
-        this.persist.append(JSON.stringify({
-            queue: name,
-            payload: payload,
-            enqueue: false,
-            dequeue: true
-        }));
-
-        return payload;
     }
 
-    public length(name: string): number {
-        let queue = this.find(name) || new Queue([]);
+    public async length(name: string): Promise<number> {
+        const unlock = await this.mutex.lock();
+        try {
+            let queue = this.find(name) || new Queue([]);
 
-        if (this.registered(name) === false) {
-            this.register(name, queue);
+            if (this.registered(name) === false) {
+                this.register(name, queue);
+            }
+
+            return queue.length();
+        } finally {
+            unlock();
         }
-
-        return queue.length();
     }
 
     public load(): void {
