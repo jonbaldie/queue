@@ -1,12 +1,13 @@
 import { parseArgs } from "jsr:@std/cli/parse-args";
 import * as Persistency from "./src/persist.ts";
-import Queue from "./src/queue.ts";
 import QueueManager from "./src/manager.ts";
+import { createHandler } from "./src/handler.ts";
 
 // Environment variables
 const HOST = Deno.env.get("HOST") || "localhost";
 const PORT = Deno.env.get("PORT") || 3000;
 const PERSIST = Deno.env.get("PERSIST") || Deno.cwd();
+const QUEUE_API_TOKEN = Deno.env.get("QUEUE_API_TOKEN") || "";
 
 // Persistency of queue data is opt-in with the --persist flag
 const flags = parseArgs(Deno.args, {
@@ -31,39 +32,7 @@ if (persist instanceof Persistency.File) {
     mgr.load();
 }
 
-// Set up our routes, defining how users will interact with us
-const enqueue = new URLPattern({ pathname: "/enqueue/:queue" });
-const dequeue = new URLPattern({ pathname: "/dequeue/:queue" });
-const length = new URLPattern({ pathname: "/length/:queue" });
-
-// This function controls how the application responds to requests
-async function handler(request: Request): Promise<Response> {
-    const is_enqueue = enqueue.exec(request.url);
-    const is_dequeue = dequeue.exec(request.url);
-    const is_length = length.exec(request.url);
-
-    if (is_enqueue && request.method === "POST") {
-        const json = JSON.parse(await request.text());
-
-        mgr.enqueue(is_enqueue.pathname.groups.queue!, json.payload);
-
-        return new Response(`Payload successfully queued onto ${is_enqueue.pathname.groups.queue!}.`);
-    }
-
-    if (is_dequeue) {
-        let item = mgr.dequeue(is_dequeue.pathname.groups.queue!);
-
-        return new Response(item);
-    }
-
-    if (is_length) {
-        let length = mgr.length(is_length.pathname.groups.queue!);
-
-        return new Response(`${length}`);
-    }
-
-    return new Response("Not found.", { status: 404 });
-}
+const handler = createHandler(mgr, QUEUE_API_TOKEN);
 
 // Start up the application
 Deno.serve({ hostname: HOST, port: Number(PORT), onListen: ({ hostname, port }) => console.log(`Listening on ${hostname}:${port}`) }, handler);
