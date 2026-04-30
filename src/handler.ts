@@ -52,7 +52,7 @@ class RateLimiter {
 export function createHandler(mgr: QueueManager<any>, apiToken: string, rateLimitRequests?: number) {
     const rateLimiter = new RateLimiter(rateLimitRequests ?? 100);
 
-    return async function handler(request: Request): Promise<Response> {
+    const innerHandler = async function(request: Request): Promise<Response> {
         // Check rate limit first (before auth)
         if (!rateLimiter.isAllowed(request)) {
             return new Response("Too many requests", { status: 429 });
@@ -127,5 +127,19 @@ export function createHandler(mgr: QueueManager<any>, apiToken: string, rateLimi
         }
 
         return new Response("Not found.", { status: 404 });
+    };
+
+    return async function handler(request: Request): Promise<Response> {
+        const start = performance.now();
+        try {
+            const response = await innerHandler(request);
+            const duration = performance.now() - start;
+            console.log(`${request.method} ${request.url} ${response.status} ${duration.toFixed(2)}ms`);
+            return response;
+        } catch (error) {
+            const duration = performance.now() - start;
+            console.error(`${request.method} ${request.url} 500 ${duration.toFixed(2)}ms`);
+            throw error;
+        }
     };
 }
