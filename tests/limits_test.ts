@@ -2,6 +2,7 @@ import { assertEquals } from "jsr:@std/assert";
 import * as Persistency from "../src/persist.ts";
 import QueueManager from "../src/manager.ts";
 import { createHandler } from "../src/handler.ts";
+import { RateLimiter } from "../src/rate_limiter.ts";
 
 const TEST_TOKEN = "test-secret-token";
 
@@ -132,4 +133,60 @@ Deno.test("limits: rate limit is per-IP", async () => {
     });
     const ip2Res = await handler(ip2Req);
     assertEquals(200, ip2Res.status, "IP2 should not be rate limited");
+});
+
+// Memory leak fix tests for RateLimiter cleanup
+Deno.test("limits: per-IP stale entries are removed on revisit", async () => {
+    const limiter = new RateLimiter(3, 100); // 3 requests per 100ms window
+
+    const req = new Request("http://localhost/length/test-queue", {
+        headers: { "x-forwarded-for": "10.0.0.1" },
+    });
+
+    assertEquals(limiter.isAllowed(req), true);
+    assertEquals((limiter as any).requestTimestamps.size, 1);
+
+    // Wait for window to expire
+    await new Promise(resolve => setTimeout(resolve, 150));
+
+    const req2 = new Request("http://localhost/length/test-queue", {
+        headers: { "x-forwarded-for": "10.0.0.1" },
+    });
+    assertEquals(limiter.isAllowed(req2), true);
+    // Entry count should still be 1, not accumulate stale entries
+    assertEquals((limiter as any).requestTimestamps.size, 1);
+});
+
+Deno.test("limits: periodic sweep removes stale entries", async () => {
+    // cleanupInterval=3 sweeps every 3rd request
+    const limiter = new RateLimiter(100, 100, 3);
+
+    const req1 = new Request("http://localhost/length/q", {
+        headers: { "x-forwarded-for": "10.0.0.1" },
+    });
+    const req2 = new Request("http://localhost/length/q", {
+        headers: { "x-forwarded-for": "10.0.0.2" },
+    });
+    const req3 = new Request("http://localhost/length/q", {
+        headers: { "x-forwarded-for": "10.0.0.3" },
+    });
+
+    limiter.isAllowed(req1);
+    limiter.isAllowed(req2);
+    limiter.isAllowed(req3);
+    assertEquals((limiter as any).requestTimestamps.size, 3);
+
+    // Wait for window to expire
+    await new Promise(resolve => setTimeout(resolve, 150));
+
+    // 3 more requests to trigger sweep on the 3rd
+    const req4 = new Request("http://localhost/length/q", {
+        headers: { "x-forwarded-for": "10.0.0.4" },
+    });
+    limiter.isAllowed(req4);
+    limiter.isAllowed(req4);
+    limiter.isAllowed(req4);
+
+    // Old entries should be swept; only the fresh IP remains
+    assertEquals((limiter as any).requestTimestamps.size, 1);
 });
