@@ -8,7 +8,7 @@
  * 4. Test error conditions and malformed inputs
  */
 
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "jsr:@std/assert@1.0";
 import * as Persistency from "../src/persist.ts";
 import Queue from "../src/queue.ts";
 import QueueManager from "../src/manager.ts";

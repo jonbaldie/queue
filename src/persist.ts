@@ -52,11 +52,11 @@ export class File implements Persist {
                 file.unlockSync();
                 file.close();
             }
-        } catch (e) {
-            if (e instanceof Deno.errors.NotFound) {
+        } catch (_e) {
+            if (_e instanceof Deno.errors.NotFound) {
                 return "";
             }
-            throw e;
+            throw _e;
         }
     }
 
@@ -66,13 +66,11 @@ export class File implements Persist {
 }
 
 export class None implements Persist {
-    public append(line: string): void {}
+    public append(_line: string): void {}
 
     public clear(): void {}
 
     public load(): string { return ""; }
 
-    public save(data: string): void {}
-
-    public dir(dir: string): void {}
+    public dir(_dir: string): void {}
 }

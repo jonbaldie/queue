@@ -1,4 +1,4 @@
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "jsr:@std/assert@1.0";
 import * as Persistency from "../src/persist.ts";
 import Queue from "../src/queue.ts";
 import QueueManager from "../src/manager.ts";
@@ -345,7 +345,7 @@ Deno.test("persist operations handle I/O errors gracefully", () => {
     let errorThrown = false;
     try {
         persist.append(`{ "queue": "foo", "payload": "bar", "enqueue": true, "dequeue": false }`);
-    } catch (e) {
+    } catch (_e) {
         errorThrown = true;
     }
 
