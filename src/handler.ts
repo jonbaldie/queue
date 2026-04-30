@@ -6,6 +6,7 @@ const MAX_QUEUE_NAME_LENGTH = 128;
 
 const enqueuePattern = new URLPattern({ pathname: "/enqueue/:queue" });
 const dequeuePattern = new URLPattern({ pathname: "/dequeue/:queue" });
+const peekPattern = new URLPattern({ pathname: "/peek/:queue" });
 const lengthPattern = new URLPattern({ pathname: "/length/:queue" });
 const healthPattern = new URLPattern({ pathname: "/health" });
 
@@ -37,6 +38,7 @@ export function createHandler(mgr: QueueManager<string>, apiToken: string, rateL
 
         const isEnqueue = enqueuePattern.exec(url);
         const isDequeue = dequeuePattern.exec(url);
+        const isPeek = peekPattern.exec(url);
         const isLength = lengthPattern.exec(url);
 
         if (isEnqueue) {
@@ -77,6 +79,23 @@ export function createHandler(mgr: QueueManager<string>, apiToken: string, rateL
             }
 
             const item = mgr.dequeue(queueName);
+            if (item === undefined) {
+                return new Response(null, { status: 204 });
+            }
+            return new Response(item);
+        }
+
+        if (isPeek) {
+            if (request.method !== "GET") {
+                return new Response("Method not allowed", { status: 405 });
+            }
+
+            const queueName = isPeek.pathname.groups.queue as string;
+            if (queueName.length > MAX_QUEUE_NAME_LENGTH) {
+                return new Response("Queue name too long", { status: 400 });
+            }
+
+            const item = mgr.peek(queueName);
             if (item === undefined) {
                 return new Response(null, { status: 204 });
             }

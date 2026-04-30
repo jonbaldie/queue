@@ -52,6 +52,16 @@ Deno.test("POST to length returns 405", async () => {
     assertEquals(response.status, 405);
 });
 
+// Peek endpoint: POST returns 405
+Deno.test("POST to peek returns 405", async () => {
+    const request = new Request("http://localhost:3000/peek/testqueue", {
+        method: "POST",
+        headers: authHeaders,
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 405);
+});
+
 // Health endpoint: returns 200 without authentication
 Deno.test("health endpoint returns 200 without auth", async () => {
     const request = new Request("http://localhost:3000/health", {
@@ -114,6 +124,17 @@ Deno.test("long queue name returns 400 on length", async () => {
     assertEquals(response.status, 400);
 });
 
+// Fix 4: Queue name validation - long queue name on peek
+Deno.test("long queue name returns 400 on peek", async () => {
+    const longName = "a".repeat(129);
+    const request = new Request(`http://localhost:3000/peek/${longName}`, {
+        method: "GET",
+        headers: authHeaders,
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 400);
+});
+
 // Happy path: valid enqueue should succeed
 Deno.test("valid enqueue succeeds", async () => {
     const request = new Request("http://localhost:3000/enqueue/testqueue", {
@@ -143,6 +164,36 @@ Deno.test("GET length succeeds", async () => {
     });
     const response = await handler(request);
     assertEquals(response.status, 200);
+});
+
+// Happy path: GET peek returns 200 with payload when queue has items
+Deno.test("GET peek returns 200 with payload when queue has items", async () => {
+    // First enqueue something to peek at
+    const enqueueReq = new Request("http://localhost:3000/enqueue/peektest", {
+        method: "POST",
+        body: JSON.stringify({ payload: "peekable" }),
+        headers: { ...authHeaders, "content-length": "28" },
+    });
+    await handler(enqueueReq);
+
+    const request = new Request("http://localhost:3000/peek/peektest", {
+        method: "GET",
+        headers: authHeaders,
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 200);
+    const body = await response.text();
+    assertEquals(body, "peekable");
+});
+
+// Happy path: GET peek returns 204 when queue is empty
+Deno.test("GET peek returns 204 when queue is empty", async () => {
+    const request = new Request("http://localhost:3000/peek/emptyqueue", {
+        method: "GET",
+        headers: authHeaders,
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 204);
 });
 
 Deno.test("queue enqueue and dequeue", () => {
