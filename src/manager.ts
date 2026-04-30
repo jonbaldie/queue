@@ -71,11 +71,19 @@ export default class Manager<T> {
     public dequeue(name: string): string | undefined {
         let queue = this.find(name) || new Queue([]);
 
-        if (this.registered(name) === false) {
+        const wasRegistered = this.registered(name);
+
+        if (wasRegistered === false) {
             this.register(name, queue);
         }
 
+        const wasNonEmpty = queue.length() > 0;
         const payload = queue.dequeue();
+
+        // Clean up empty queues to prevent memory leak (queue-18u)
+        if (wasRegistered && wasNonEmpty && queue.length() === 0) {
+            this.queues.delete(name);
+        }
 
         this.persist.append(JSON.stringify({
             queue: name,
@@ -121,7 +129,13 @@ export default class Manager<T> {
             if (decoded.enqueue) {
                 queue.enqueue(decoded.payload);
             } else if (decoded.dequeue) {
+                const wasNonEmpty = queue.length() > 0;
                 queue.dequeue();
+
+                // Clean up empty queues to prevent memory leak (queue-18u)
+                if (this.registered(decoded.queue) && wasNonEmpty && queue.length() === 0) {
+                    this.queues.delete(decoded.queue);
+                }
             }
         });
 

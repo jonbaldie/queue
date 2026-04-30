@@ -333,10 +333,76 @@ Deno.test("queue peek returns value not index", () => {
     assertEquals("first_message", peeked);
 });
 
-Deno.test("manager dequeue from empty queue returns undefined", () => {
+    Deno.test("manager dequeue from empty queue returns undefined", () => {
     const mgr = new QueueManager(new Persistency.None);
 
     const result = mgr.dequeue("nonexistent");
 
     assertEquals(undefined, result);
+});
+
+Deno.test("manager cleans up empty queues to prevent unbounded growth", () => {
+    const mgr = new QueueManager(new Persistency.None, 10000, 1);
+
+    mgr.enqueue("transient", "foo");
+    assertEquals(false, mgr.canCreateQueue()); // At limit
+
+    mgr.dequeue("transient");
+    assertEquals(true, mgr.canCreateQueue()); // Freed up by cleanup
+
+    mgr.enqueue("another", "bar");
+    assertEquals("bar", mgr.dequeue("another"));
+});
+
+Deno.test("dequeue from empty unknown queue does not remove auto-created queue", () => {
+    const mgr = new QueueManager(new Persistency.None, 10000, 1);
+
+    // Auto-creates an empty queue; was never non-empty so stays registered
+    mgr.dequeue("never-existed");
+    assertEquals(false, mgr.canCreateQueue());
+});
+
+Deno.test("enqueue after cleanup restores queue", () => {
+    const mgr = new QueueManager(new Persistency.None);
+
+    mgr.enqueue("queue", "foo");
+    mgr.dequeue("queue"); // cleanup
+
+    mgr.enqueue("queue", "bar");
+    assertEquals(1, mgr.length("queue"));
+    assertEquals("bar", mgr.dequeue("queue"));
+});
+
+Deno.test("queue is removed only after last item is dequeued", () => {
+    const mgr = new QueueManager(new Persistency.None, 10000, 1);
+
+    mgr.enqueue("queue", "a");
+    mgr.enqueue("queue", "b");
+
+    // Still has one item, should still exist
+    mgr.dequeue("queue");
+    mgr.enqueue("queue", "c"); // must succeed on existing queue
+    assertEquals(2, mgr.length("queue"));
+
+    // Now empty it out completely
+    mgr.dequeue("queue");
+    mgr.dequeue("queue");
+    assertEquals(true, mgr.canCreateQueue()); // freed by cleanup
+});
+
+Deno.test("manager load cleans up empty queues from persistence", () => {
+    const persist = new Persistency.File;
+    persist.clear();
+
+    persist.append(JSON.stringify({ queue: "tmp", payload: "data", enqueue: true, dequeue: false }));
+    persist.append(JSON.stringify({ queue: "tmp", payload: "data", enqueue: false, dequeue: true }));
+
+    const mgr = new QueueManager(persist, 10000, 1);
+    mgr.load();
+
+    // After load, "tmp" was enqueued then dequeued -> empty -> removed
+    assertEquals(true, mgr.canCreateQueue());
+
+    mgr.enqueue("other", "value");
+    assertEquals("value", mgr.dequeue("other"));
 });
