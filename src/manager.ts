@@ -1,14 +1,14 @@
 import Persist from "./persist.ts"
 import Queue from "./queue.ts"
 
-interface LoadLine {
+interface LoadLine<T> {
     queue: string;
-    payload: string;
+    payload: T;
     enqueue: boolean;
     dequeue: boolean;
 }
 
-export default class Manager<T> {
+export default class Manager<T = string> {
     private queues: Map<string, Queue<T>>;
     private persist: Persist;
     private queueDepthLimit: number;
@@ -49,8 +49,8 @@ export default class Manager<T> {
         return this.queues.get(name);
     }
 
-    public enqueue(name: string, payload: string): Manager<T> {
-        let queue = this.find(name) || new Queue([]);
+    public enqueue(name: string, payload: T): Manager<T> {
+        const queue = this.find(name) || new Queue([]);
 
         if (this.registered(name) === false) {
             this.register(name, queue);
@@ -68,8 +68,8 @@ export default class Manager<T> {
         return this;
     }
 
-    public dequeue(name: string): string | undefined {
-        let queue = this.find(name) || new Queue([]);
+    public dequeue(name: string): T | undefined {
+        const queue = this.find(name) || new Queue([]);
 
         if (this.registered(name) === false) {
             this.register(name, queue);
@@ -87,8 +87,8 @@ export default class Manager<T> {
         return payload;
     }
 
-    public peek(name: string): string | undefined {
-        let queue = this.find(name);
+    public peek(name: string): T | undefined {
+        const queue = this.find(name);
 
         if (queue === undefined) {
             return undefined;
@@ -98,7 +98,7 @@ export default class Manager<T> {
     }
 
     public length(name: string): number {
-        let queue = this.find(name) || new Queue([]);
+        const queue = this.find(name) || new Queue([]);
 
         if (this.registered(name) === false) {
             this.register(name, queue);
@@ -111,8 +111,8 @@ export default class Manager<T> {
         const all = this.persist.load().split("\n").filter((line: string) => line.length);
 
         all.forEach((line: string) => {
-            let decoded: LoadLine = JSON.parse(line);
-            let queue = this.find(decoded.queue) || new Queue([]);
+            const decoded: LoadLine<T> = JSON.parse(line);
+            const queue = this.find(decoded.queue) || new Queue([]);
 
             if (this.registered(decoded.queue) === false) {
                 this.register(decoded.queue, queue);

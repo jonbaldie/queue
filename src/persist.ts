@@ -72,5 +72,7 @@ export class None implements Persist {
 
     public load(): string { return ""; }
 
+    public save(data: string): void {}
+
     public dir(dir: string): void {}
 }

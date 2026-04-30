@@ -8,7 +8,7 @@ const enqueuePattern = new URLPattern({ pathname: "/enqueue/:queue" });
 const dequeuePattern = new URLPattern({ pathname: "/dequeue/:queue" });
 const lengthPattern = new URLPattern({ pathname: "/length/:queue" });
 
-export function createHandler(mgr: QueueManager<any>, apiToken: string, rateLimitRequests?: number) {
+export function createHandler(mgr: QueueManager<string>, apiToken: string, rateLimitRequests?: number) {
     const rateLimiter = new RateLimiter(rateLimitRequests ?? 100);
 
     const innerHandler = async function(request: Request): Promise<Response> {
@@ -23,16 +23,16 @@ export function createHandler(mgr: QueueManager<any>, apiToken: string, rateLimi
         }
 
         const url = request.url;
-        const is_enqueue = enqueuePattern.exec(url);
-        const is_dequeue = dequeuePattern.exec(url);
-        const is_length = lengthPattern.exec(url);
+        const isEnqueue = enqueuePattern.exec(url);
+        const isDequeue = dequeuePattern.exec(url);
+        const isLength = lengthPattern.exec(url);
 
-        if (is_enqueue) {
+        if (isEnqueue) {
             if (request.method !== "POST") {
                 return new Response("Method not allowed", { status: 405 });
             }
 
-            const queueName = is_enqueue.pathname.groups.queue as string;
+            const queueName = isEnqueue.pathname.groups.queue as string;
             if (queueName.length > MAX_QUEUE_NAME_LENGTH) {
                 return new Response("Queue name too long", { status: 400 });
             }
@@ -54,34 +54,34 @@ export function createHandler(mgr: QueueManager<any>, apiToken: string, rateLimi
             }
         }
 
-        if (is_dequeue) {
+        if (isDequeue) {
             if (request.method !== "GET") {
                 return new Response("Method not allowed", { status: 405 });
             }
 
-            const queueName = is_dequeue.pathname.groups.queue as string;
+            const queueName = isDequeue.pathname.groups.queue as string;
             if (queueName.length > MAX_QUEUE_NAME_LENGTH) {
                 return new Response("Queue name too long", { status: 400 });
             }
 
-            let item = mgr.dequeue(queueName);
+            const item = mgr.dequeue(queueName);
             if (item === undefined) {
                 return new Response(null, { status: 204 });
             }
             return new Response(item);
         }
 
-        if (is_length) {
+        if (isLength) {
             if (request.method !== "GET") {
                 return new Response("Method not allowed", { status: 405 });
             }
 
-            const queueName = is_length.pathname.groups.queue as string;
+            const queueName = isLength.pathname.groups.queue as string;
             if (queueName.length > MAX_QUEUE_NAME_LENGTH) {
                 return new Response("Queue name too long", { status: 400 });
             }
 
-            let len = mgr.length(queueName);
+            const len = mgr.length(queueName);
             return new Response(`${len}`);
         }
 

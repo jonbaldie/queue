@@ -1,19 +1,21 @@
-export default class Queue<T> {
-    private messages: Array<string>;
+export default class Queue<T = string> {
+    private messages: Array<T>;
 
-    constructor(messages: Array<string>) {
-        this.messages = messages;
+    constructor(messages: []);
+    constructor(messages: Array<T>);
+    constructor(messages: Array<T> | []) {
+        this.messages = messages as Array<T>;
     }
 
     public length(): number {
         return this.messages.length;
     }
 
-    public enqueue(payload: string): void {
+    public enqueue(payload: T): void {
         this.messages.push(payload);
     }
 
-    public dequeue(): string | undefined {
+    public dequeue(): T | undefined {
         return this.messages.shift();
     }
 
@@ -21,7 +23,11 @@ export default class Queue<T> {
         return this.length() === 0;
     }
 
-    public peek(): string | undefined {
+    public peek(): T | undefined {
         return this.messages[0];
+    }
+
+    public all(): Array<T> {
+        return [...this.messages];
     }
 }
