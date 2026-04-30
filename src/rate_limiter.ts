@@ -11,13 +11,16 @@ export class RateLimiter {
         this.cleanupInterval = cleanupInterval;
     }
 
-    private getClientIp(request: Request): string {
+    private getClientIp(request: Request, remoteAddr?: string): string {
         // Check for x-forwarded-for header first (proxy/CDN)
         const forwardedFor = request.headers.get("x-forwarded-for");
         if (forwardedFor) {
             return forwardedFor.split(",")[0].trim();
         }
-        // Fall back to trying to get from request (may not be available in all environments)
+        // Fall back to connection remote address
+        if (remoteAddr) {
+            return remoteAddr;
+        }
         return "unknown";
     }
 
@@ -33,8 +36,8 @@ export class RateLimiter {
         }
     }
 
-    public isAllowed(request: Request): boolean {
-        const ip = this.getClientIp(request);
+    public isAllowed(request: Request, remoteAddr?: string): boolean {
+        const ip = this.getClientIp(request, remoteAddr);
         const now = Date.now();
         const cutoff = now - this.windowMs;
 
