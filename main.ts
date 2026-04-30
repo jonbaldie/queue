@@ -1,4 +1,4 @@
-import { parseArgs } from "jsr:@std/cli/parse-args@1.0";
+import { parseArgs } from "jsr:@std/cli@1.0/parse-args";
 import * as Persistency from "./src/persist.ts";
 import QueueManager from "./src/manager.ts";
 import { createHandler } from "./src/handler.ts";

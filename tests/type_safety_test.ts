@@ -1,4 +1,4 @@
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "jsr:@std/assert@1.0";
 import Queue from "../src/queue.ts";
 import QueueManager from "../src/manager.ts";
 import * as Persistency from "../src/persist.ts";
