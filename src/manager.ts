@@ -50,7 +50,7 @@ export default class Manager<T> {
     }
 
     public enqueue(name: string, payload: string): Manager<T> {
-        let queue = this.find(name) || new Queue([]);
+        const queue = this.find(name) || new Queue([]);
 
         if (this.registered(name) === false) {
             this.register(name, queue);
@@ -69,7 +69,7 @@ export default class Manager<T> {
     }
 
     public dequeue(name: string): string | undefined {
-        let queue = this.find(name) || new Queue([]);
+        const queue = this.find(name) || new Queue([]);
 
         const wasRegistered = this.registered(name);
 
@@ -96,7 +96,7 @@ export default class Manager<T> {
     }
 
     public peek(name: string): string | undefined {
-        let queue = this.find(name);
+        const queue = this.find(name);
 
         if (queue === undefined) {
             return undefined;
@@ -106,7 +106,7 @@ export default class Manager<T> {
     }
 
     public length(name: string): number {
-        let queue = this.find(name) || new Queue([]);
+        const queue = this.find(name) || new Queue([]);
 
         if (this.registered(name) === false) {
             this.register(name, queue);
@@ -119,8 +119,8 @@ export default class Manager<T> {
         const all = this.persist.load().split("\n").filter((line: string) => line.length);
 
         all.forEach((line: string) => {
-            let decoded: LoadLine = JSON.parse(line);
-            let queue = this.find(decoded.queue) || new Queue([]);
+            const decoded: LoadLine = JSON.parse(line);
+            const queue = this.find(decoded.queue) || new Queue([]);
 
             if (this.registered(decoded.queue) === false) {
                 this.register(decoded.queue, queue);

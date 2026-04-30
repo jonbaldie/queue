@@ -66,11 +66,11 @@ export class File implements Persist {
 }
 
 export class None implements Persist {
-    public append(line: string): void {}
+    public append(_line: string): void {}
 
     public clear(): void {}
 
     public load(): string { return ""; }
 
-    public dir(dir: string): void {}
+    public dir(_dir: string): void {}
 }

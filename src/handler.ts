@@ -9,7 +9,7 @@ const dequeuePattern = new URLPattern({ pathname: "/dequeue/:queue" });
 const lengthPattern = new URLPattern({ pathname: "/length/:queue" });
 const healthPattern = new URLPattern({ pathname: "/health" });
 
-export function createHandler(mgr: QueueManager<any>, apiToken: string, rateLimitRequests?: number) {
+export function createHandler(mgr: QueueManager<string>, apiToken: string, rateLimitRequests?: number) {
     const rateLimiter = new RateLimiter(rateLimitRequests ?? 100);
 
     const innerHandler = async function(request: Request, remoteAddr?: string): Promise<Response> {
@@ -76,7 +76,7 @@ export function createHandler(mgr: QueueManager<any>, apiToken: string, rateLimi
                 return new Response("Queue name too long", { status: 400 });
             }
 
-            let item = mgr.dequeue(queueName);
+            const item = mgr.dequeue(queueName);
             if (item === undefined) {
                 return new Response(null, { status: 204 });
             }
@@ -93,7 +93,7 @@ export function createHandler(mgr: QueueManager<any>, apiToken: string, rateLimi
                 return new Response("Queue name too long", { status: 400 });
             }
 
-            let len = mgr.length(queueName);
+            const len = mgr.length(queueName);
             return new Response(`${len}`);
         }
 

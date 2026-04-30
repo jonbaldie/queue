@@ -1,4 +1,4 @@
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "jsr:@std/assert@1.0";
 import * as Persistency from "../src/persist.ts";
 import QueueManager from "../src/manager.ts";
 import { createHandler } from "../src/handler.ts";
@@ -144,7 +144,7 @@ Deno.test("limits: per-IP stale entries are removed on revisit", async () => {
     });
 
     assertEquals(limiter.isAllowed(req), true);
-    assertEquals((limiter as any).requestTimestamps.size, 1);
+    assertEquals((limiter as unknown as { requestTimestamps: Map<string, number[]> }).requestTimestamps.size, 1);
 
     // Wait for window to expire
     await new Promise(resolve => setTimeout(resolve, 150));
@@ -154,7 +154,7 @@ Deno.test("limits: per-IP stale entries are removed on revisit", async () => {
     });
     assertEquals(limiter.isAllowed(req2), true);
     // Entry count should still be 1, not accumulate stale entries
-    assertEquals((limiter as any).requestTimestamps.size, 1);
+    assertEquals((limiter as unknown as { requestTimestamps: Map<string, number[]> }).requestTimestamps.size, 1);
 });
 
 Deno.test("limits: periodic sweep removes stale entries", async () => {
@@ -174,7 +174,7 @@ Deno.test("limits: periodic sweep removes stale entries", async () => {
     limiter.isAllowed(req1);
     limiter.isAllowed(req2);
     limiter.isAllowed(req3);
-    assertEquals((limiter as any).requestTimestamps.size, 3);
+    assertEquals((limiter as unknown as { requestTimestamps: Map<string, number[]> }).requestTimestamps.size, 3);
 
     // Wait for window to expire
     await new Promise(resolve => setTimeout(resolve, 150));
@@ -188,7 +188,7 @@ Deno.test("limits: periodic sweep removes stale entries", async () => {
     limiter.isAllowed(req4);
 
     // Old entries should be swept; only the fresh IP remains
-    assertEquals((limiter as any).requestTimestamps.size, 1);
+    assertEquals((limiter as unknown as { requestTimestamps: Map<string, number[]> }).requestTimestamps.size, 1);
 });
 
 // Non-proxied requests should use remote address for rate limiting
