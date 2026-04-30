@@ -52,6 +52,34 @@ Deno.test("POST to length returns 405", async () => {
     assertEquals(response.status, 405);
 });
 
+// Health endpoint: returns 200 without authentication
+Deno.test("health endpoint returns 200 without auth", async () => {
+    const request = new Request("http://localhost:3000/health", {
+        method: "GET",
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 200);
+});
+
+// Health endpoint: returns JSON body with status ok
+Deno.test("health endpoint returns JSON status ok", async () => {
+    const request = new Request("http://localhost:3000/health", {
+        method: "GET",
+    });
+    const response = await handler(request);
+    const body = await response.json();
+    assertEquals(body, { status: "ok" });
+});
+
+// Health endpoint: POST returns 405
+Deno.test("health endpoint returns 405 on POST", async () => {
+    const request = new Request("http://localhost:3000/health", {
+        method: "POST",
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 405);
+});
+
 // Fix 4: Queue name validation - long queue name should return 400
 Deno.test("long queue name returns 400 on enqueue", async () => {
     const longName = "a".repeat(129);

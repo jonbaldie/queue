@@ -7,6 +7,7 @@ const MAX_QUEUE_NAME_LENGTH = 128;
 const enqueuePattern = new URLPattern({ pathname: "/enqueue/:queue" });
 const dequeuePattern = new URLPattern({ pathname: "/dequeue/:queue" });
 const lengthPattern = new URLPattern({ pathname: "/length/:queue" });
+const healthPattern = new URLPattern({ pathname: "/health" });
 
 export function createHandler(mgr: QueueManager<any>, apiToken: string, rateLimitRequests?: number) {
     const rateLimiter = new RateLimiter(rateLimitRequests ?? 100);
@@ -17,12 +18,23 @@ export function createHandler(mgr: QueueManager<any>, apiToken: string, rateLimi
             return new Response("Too many requests", { status: 429 });
         }
 
+        const url = request.url;
+
+        if (healthPattern.exec(url)) {
+            if (request.method !== "GET") {
+                return new Response("Method not allowed", { status: 405 });
+            }
+            return new Response(JSON.stringify({ status: "ok" }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+            });
+        }
+
         const authHeader = request.headers.get("Authorization");
         if (!authHeader || authHeader !== `Bearer ${apiToken}`) {
             return new Response("Unauthorized", { status: 401 });
         }
 
-        const url = request.url;
         const is_enqueue = enqueuePattern.exec(url);
         const is_dequeue = dequeuePattern.exec(url);
         const is_length = lengthPattern.exec(url);
