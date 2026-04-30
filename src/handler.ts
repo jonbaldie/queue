@@ -8,6 +8,8 @@ const enqueuePattern = new URLPattern({ pathname: "/enqueue/:queue" });
 const dequeuePattern = new URLPattern({ pathname: "/dequeue/:queue" });
 const lengthPattern = new URLPattern({ pathname: "/length/:queue" });
 const healthPattern = new URLPattern({ pathname: "/health" });
+const queuesPattern = new URLPattern({ pathname: "/queues" });
+
 
 export function createHandler(mgr: QueueManager<string>, apiToken: string, rateLimitRequests?: number) {
     const rateLimiter = new RateLimiter(rateLimitRequests ?? 100);
@@ -38,6 +40,18 @@ export function createHandler(mgr: QueueManager<string>, apiToken: string, rateL
         const isEnqueue = enqueuePattern.exec(url);
         const isDequeue = dequeuePattern.exec(url);
         const isLength = lengthPattern.exec(url);
+        const isQueues = queuesPattern.exec(url);
+
+        if (isQueues) {
+            if (request.method !== "GET") {
+                return new Response("Method not allowed", { status: 405 });
+            }
+            const queueNames = mgr.listQueues();
+            return new Response(JSON.stringify(queueNames), {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+            });
+        }
 
         if (isEnqueue) {
             if (request.method !== "POST") {

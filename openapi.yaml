@@ -34,6 +34,44 @@ paths:
           description: Method not allowed
         '429':
           description: Too many requests (Rate limit exceeded)
+  /queues:
+    get:
+      summary: List all queues
+      description: Returns a JSON array of all active queue names.
+      responses:
+        '200':
+          description: Array of queue names
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        '401':
+          description: Unauthorized
+        '405':
+          description: Method not allowed
+        '429':
+          description: Too many requests (Rate limit exceeded)
+  /queues:
+    get:
+      summary: List all queues
+      description: Returns a JSON array of all active queue names.
+      responses:
+        '200':
+          description: Array of queue names
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        '401':
+          description: Unauthorized
+        '405':
+          description: Method not allowed
+        '429':
+          description: Too many requests (Rate limit exceeded)
   /enqueue/{queue}:
     post:
       summary: Enqueue an item

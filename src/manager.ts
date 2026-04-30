@@ -115,6 +115,10 @@ export default class Manager<T = string> {
         return queue.length();
     }
 
+    public listQueues(): string[] {
+        return Array.from(this.queues.keys());
+    }
+
     public load(): void {
         const all = this.persist.load().split("\n").filter((line: string) => line.length);
 
