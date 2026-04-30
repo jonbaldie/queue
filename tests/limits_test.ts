@@ -2,6 +2,7 @@ import { assertEquals } from "jsr:@std/assert";
 import * as Persistency from "../src/persist.ts";
 import QueueManager from "../src/manager.ts";
 import { createHandler } from "../src/handler.ts";
+import { RateLimiter } from "../src/rate_limiter.ts";
 
 const TEST_TOKEN = "test-secret-token";
 
@@ -132,4 +133,127 @@ Deno.test("limits: rate limit is per-IP", async () => {
     });
     const ip2Res = await handler(ip2Req);
     assertEquals(200, ip2Res.status, "IP2 should not be rate limited");
+});
+
+// Memory leak fix tests for RateLimiter cleanup
+Deno.test("limits: per-IP stale entries are removed on revisit", async () => {
+    const limiter = new RateLimiter(3, 100); // 3 requests per 100ms window
+
+    const req = new Request("http://localhost/length/test-queue", {
+        headers: { "x-forwarded-for": "10.0.0.1" },
+    });
+
+    assertEquals(limiter.isAllowed(req), true);
+    assertEquals((limiter as any).requestTimestamps.size, 1);
+
+    // Wait for window to expire
+    await new Promise(resolve => setTimeout(resolve, 150));
+
+    const req2 = new Request("http://localhost/length/test-queue", {
+        headers: { "x-forwarded-for": "10.0.0.1" },
+    });
+    assertEquals(limiter.isAllowed(req2), true);
+    // Entry count should still be 1, not accumulate stale entries
+    assertEquals((limiter as any).requestTimestamps.size, 1);
+});
+
+Deno.test("limits: periodic sweep removes stale entries", async () => {
+    // cleanupInterval=3 sweeps every 3rd request
+    const limiter = new RateLimiter(100, 100, 3);
+
+    const req1 = new Request("http://localhost/length/q", {
+        headers: { "x-forwarded-for": "10.0.0.1" },
+    });
+    const req2 = new Request("http://localhost/length/q", {
+        headers: { "x-forwarded-for": "10.0.0.2" },
+    });
+    const req3 = new Request("http://localhost/length/q", {
+        headers: { "x-forwarded-for": "10.0.0.3" },
+    });
+
+    limiter.isAllowed(req1);
+    limiter.isAllowed(req2);
+    limiter.isAllowed(req3);
+    assertEquals((limiter as any).requestTimestamps.size, 3);
+
+    // Wait for window to expire
+    await new Promise(resolve => setTimeout(resolve, 150));
+
+    // 3 more requests to trigger sweep on the 3rd
+    const req4 = new Request("http://localhost/length/q", {
+        headers: { "x-forwarded-for": "10.0.0.4" },
+    });
+    limiter.isAllowed(req4);
+    limiter.isAllowed(req4);
+    limiter.isAllowed(req4);
+
+    // Old entries should be swept; only the fresh IP remains
+    assertEquals((limiter as any).requestTimestamps.size, 1);
+});
+
+// Non-proxied requests should use remote address for rate limiting
+Deno.test("limits: rate limit is per-remote-address for non-proxied requests", async () => {
+    const RATE_LIMIT = 2;
+    const handler = makeHandler(undefined, undefined, RATE_LIMIT);
+
+    // Make 2 requests from client1 without x-forwarded-for
+    for (let i = 0; i < RATE_LIMIT; i++) {
+        const req = new Request("http://localhost/length/test-queue", {
+            headers: { "Authorization": `Bearer ${TEST_TOKEN}` },
+        });
+        const res = await handler(req, { remoteAddr: { hostname: "192.168.1.10", port: 12345, transport: "tcp" }, completed: Promise.resolve() });
+        assertEquals(200, res.status, `Client1 request ${i} should succeed`);
+    }
+
+    // Client1 is now rate limited
+    const client1LimitedReq = new Request("http://localhost/length/test-queue", {
+        headers: { "Authorization": `Bearer ${TEST_TOKEN}` },
+    });
+    const client1LimitedRes = await handler(client1LimitedReq, { remoteAddr: { hostname: "192.168.1.10", port: 12345, transport: "tcp" }, completed: Promise.resolve() });
+    assertEquals(429, client1LimitedRes.status, "Client1 should be rate limited");
+
+    // But client2 should still be able to make requests
+    const client2Req = new Request("http://localhost/length/test-queue", {
+        headers: { "Authorization": `Bearer ${TEST_TOKEN}` },
+    });
+    const client2Res = await handler(client2Req, { remoteAddr: { hostname: "192.168.1.11", port: 12346, transport: "tcp" }, completed: Promise.resolve() });
+    assertEquals(200, client2Res.status, "Client2 should not be rate limited");
+});
+
+// x-forwarded-for should take precedence over remote address
+Deno.test("limits: x-forwarded-for takes precedence over remote address", async () => {
+    const RATE_LIMIT = 2;
+    const handler = makeHandler(undefined, undefined, RATE_LIMIT);
+
+    // Make 2 requests with x-forwarded-for
+    for (let i = 0; i < RATE_LIMIT; i++) {
+        const req = new Request("http://localhost/length/test-queue", {
+            headers: {
+                "Authorization": `Bearer ${TEST_TOKEN}`,
+                "x-forwarded-for": "10.0.0.1",
+            },
+        });
+        const res = await handler(req, { remoteAddr: { hostname: "192.168.1.1", port: 12345, transport: "tcp" }, completed: Promise.resolve() });
+        assertEquals(200, res.status, `Forwarded request ${i} should succeed`);
+    }
+
+    // Rate limited based on x-forwarded-for, not remoteAddr
+    const limitedReq = new Request("http://localhost/length/test-queue", {
+        headers: {
+            "Authorization": `Bearer ${TEST_TOKEN}`,
+            "x-forwarded-for": "10.0.0.1",
+        },
+    });
+    const limitedRes = await handler(limitedReq, { remoteAddr: { hostname: "192.168.1.99", port: 12345, transport: "tcp" }, completed: Promise.resolve() });
+    assertEquals(429, limitedRes.status, "Should be rate limited by x-forwarded-for");
+
+    // Different x-forwarded-for should not be rate limited even with same remoteAddr
+    const otherReq = new Request("http://localhost/length/test-queue", {
+        headers: {
+            "Authorization": `Bearer ${TEST_TOKEN}`,
+            "x-forwarded-for": "10.0.0.2",
+        },
+    });
+    const otherRes = await handler(otherReq, { remoteAddr: { hostname: "192.168.1.1", port: 12345, transport: "tcp" }, completed: Promise.resolve() });
+    assertEquals(200, otherRes.status, "Different forwarded IP should not be rate limited");
 });

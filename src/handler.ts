@@ -7,14 +7,27 @@ const MAX_QUEUE_NAME_LENGTH = 128;
 const enqueuePattern = new URLPattern({ pathname: "/enqueue/:queue" });
 const dequeuePattern = new URLPattern({ pathname: "/dequeue/:queue" });
 const lengthPattern = new URLPattern({ pathname: "/length/:queue" });
+const healthPattern = new URLPattern({ pathname: "/health" });
 
 export function createHandler(mgr: QueueManager<any>, apiToken: string, rateLimitRequests?: number) {
     const rateLimiter = new RateLimiter(rateLimitRequests ?? 100);
 
-    const innerHandler = async function(request: Request): Promise<Response> {
+    const innerHandler = async function(request: Request, remoteAddr?: string): Promise<Response> {
         // Check rate limit first (before auth)
-        if (!rateLimiter.isAllowed(request)) {
+        if (!rateLimiter.isAllowed(request, remoteAddr)) {
             return new Response("Too many requests", { status: 429 });
+        }
+
+        const url = request.url;
+
+        if (healthPattern.exec(url)) {
+            if (request.method !== "GET") {
+                return new Response("Method not allowed", { status: 405 });
+            }
+            return new Response(JSON.stringify({ status: "ok" }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+            });
         }
 
         const authHeader = request.headers.get("Authorization");
@@ -22,7 +35,6 @@ export function createHandler(mgr: QueueManager<any>, apiToken: string, rateLimi
             return new Response("Unauthorized", { status: 401 });
         }
 
-        const url = request.url;
         const is_enqueue = enqueuePattern.exec(url);
         const is_dequeue = dequeuePattern.exec(url);
         const is_length = lengthPattern.exec(url);
@@ -88,10 +100,13 @@ export function createHandler(mgr: QueueManager<any>, apiToken: string, rateLimi
         return new Response("Not found.", { status: 404 });
     };
 
-    return async function handler(request: Request): Promise<Response> {
+    return async function handler(request: Request, info?: Deno.ServeHandlerInfo): Promise<Response> {
         const start = performance.now();
         try {
-            const response = await innerHandler(request);
+            const remoteAddr = info?.remoteAddr && info.remoteAddr.transport === "tcp"
+                ? info.remoteAddr.hostname
+                : undefined;
+            const response = await innerHandler(request, remoteAddr);
             const duration = performance.now() - start;
             console.log(`${request.method} ${request.url} ${response.status} ${duration.toFixed(2)}ms`);
             return response;
