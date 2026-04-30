@@ -11,3 +11,4 @@ CLAUDE.md
 .dolt/
 *.db
 .beads-credential-key
+.worktrees/
