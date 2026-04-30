@@ -62,6 +62,8 @@ Test HTTP handler behaviour with real requests, not internal implementation deta
 
 **Merge blocked?** `gh api repos/jonbaldie/queue/branches/main/protection --jq '.enforce_admins.enabled'` — if true, disable with DELETE before merging with --admin
 
+Critical: If the CI fails in remote after your push, then you MUST follow-up even if the cause seems pre-existing.  
+
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
 ## Beads Issue Tracker
 
