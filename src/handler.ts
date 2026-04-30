@@ -11,9 +11,9 @@ const lengthPattern = new URLPattern({ pathname: "/length/:queue" });
 export function createHandler(mgr: QueueManager<any>, apiToken: string, rateLimitRequests?: number) {
     const rateLimiter = new RateLimiter(rateLimitRequests ?? 100);
 
-    const innerHandler = async function(request: Request): Promise<Response> {
+    const innerHandler = async function(request: Request, remoteAddr?: string): Promise<Response> {
         // Check rate limit first (before auth)
-        if (!rateLimiter.isAllowed(request)) {
+        if (!rateLimiter.isAllowed(request, remoteAddr)) {
             return new Response("Too many requests", { status: 429 });
         }
 
@@ -88,10 +88,13 @@ export function createHandler(mgr: QueueManager<any>, apiToken: string, rateLimi
         return new Response("Not found.", { status: 404 });
     };
 
-    return async function handler(request: Request): Promise<Response> {
+    return async function handler(request: Request, info?: Deno.ServeHandlerInfo): Promise<Response> {
         const start = performance.now();
         try {
-            const response = await innerHandler(request);
+            const remoteAddr = info?.remoteAddr && info.remoteAddr.transport === "tcp"
+                ? info.remoteAddr.hostname
+                : undefined;
+            const response = await innerHandler(request, remoteAddr);
             const duration = performance.now() - start;
             console.log(`${request.method} ${request.url} ${response.status} ${duration.toFixed(2)}ms`);
             return response;
