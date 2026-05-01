@@ -119,6 +119,20 @@ export default class Manager<T = string> {
         return Array.from(this.queues.keys());
     }
 
+    public save(): void {
+        this.persist.clear();
+        for (const [name, queue] of this.queues) {
+            for (const item of queue.all()) {
+                this.persist.append(JSON.stringify({
+                    queue: name,
+                    payload: item,
+                    enqueue: true,
+                    dequeue: false
+                }));
+            }
+        }
+    }
+
     public load(): void {
         const all = this.persist.load().split("\n").filter((line: string) => line.length);
 
