@@ -10,7 +10,6 @@ const lengthPattern = new URLPattern({ pathname: "/length/:queue" });
 const healthPattern = new URLPattern({ pathname: "/health" });
 const queuesPattern = new URLPattern({ pathname: "/queues" });
 
-
 export function createHandler(mgr: QueueManager<string>, apiToken: string, rateLimitRequests?: number) {
     const rateLimiter = new RateLimiter(rateLimitRequests ?? 100);
 
