@@ -38,5 +38,24 @@ if (persist instanceof Persistency.File) {
 const handler = createHandler(mgr, QUEUE_API_TOKEN, RATE_LIMIT_REQUESTS);
 
 // Start up the application
-Deno.serve({ hostname: HOST, port: Number(PORT), onListen: ({ hostname, port }) => console.log(`Listening on ${hostname}:${port}`) }, handler);
+const server = Deno.serve({ hostname: HOST, port: Number(PORT), onListen: ({ hostname, port }) => console.log(`Listening on ${hostname}:${port}`) }, handler);
 
+const shutdown = async (signal: string) => {
+    console.log(`Received ${signal}, shutting down gracefully...`);
+
+    // Stop accepting new connections
+    await server.shutdown();
+
+    // If we're using file persistency, save all current state to persistant storage
+    if (persist instanceof Persistency.File) {
+        console.log("Flushing data to persist.dat...\n");
+        mgr.save();
+    }
+
+    console.log("Goodbye!");
+
+    Deno.exit(0);
+};
+
+Deno.addSignalListener("SIGINT", () => shutdown("SIGINT"));
+Deno.addSignalListener("SIGTERM", () => shutdown("SIGTERM"));
