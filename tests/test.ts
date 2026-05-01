@@ -567,3 +567,110 @@ Deno.test("manager load cleans up empty queues from persistence", () => {
     mgr.enqueue("other", "value");
     assertEquals("value", mgr.dequeue("other"));
 });
+
+Deno.test("dequeue returns application/json for object payload", async () => {
+    const mgr = new QueueManager(new Persistency.None);
+    const handler = createHandler(mgr, API_TOKEN);
+
+    const enqueueReq = new Request("http://localhost:3000/enqueue/jsonqueue", {
+        method: "POST",
+        body: JSON.stringify({ payload: { foo: "bar" } }),
+        headers: authHeaders,
+    });
+    await handler(enqueueReq);
+
+    const request = new Request("http://localhost:3000/dequeue/jsonqueue", {
+        method: "GET",
+        headers: authHeaders,
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 200);
+    assertEquals(response.headers.get("content-type"), "application/json");
+    const body = await response.json();
+    assertEquals(body, { foo: "bar" });
+});
+
+Deno.test("dequeue returns application/json for array payload", async () => {
+    const mgr = new QueueManager(new Persistency.None);
+    const handler = createHandler(mgr, API_TOKEN);
+
+    const enqueueReq = new Request("http://localhost:3000/enqueue/jsonqueue", {
+        method: "POST",
+        body: JSON.stringify({ payload: [1, 2, 3] }),
+        headers: authHeaders,
+    });
+    await handler(enqueueReq);
+
+    const request = new Request("http://localhost:3000/dequeue/jsonqueue", {
+        method: "GET",
+        headers: authHeaders,
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 200);
+    assertEquals(response.headers.get("content-type"), "application/json");
+    const body = await response.json();
+    assertEquals(body, [1, 2, 3]);
+});
+
+Deno.test("dequeue returns text/plain for number payload", async () => {
+    const mgr = new QueueManager(new Persistency.None);
+    const handler = createHandler(mgr, API_TOKEN);
+
+    const enqueueReq = new Request("http://localhost:3000/enqueue/jsonqueue", {
+        method: "POST",
+        body: JSON.stringify({ payload: 42 }),
+        headers: authHeaders,
+    });
+    await handler(enqueueReq);
+
+    const request = new Request("http://localhost:3000/dequeue/jsonqueue", {
+        method: "GET",
+        headers: authHeaders,
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 200);
+    const body = await response.text();
+    assertEquals(body, "42");
+});
+
+Deno.test("dequeue returns text/plain for boolean payload", async () => {
+    const mgr = new QueueManager(new Persistency.None);
+    const handler = createHandler(mgr, API_TOKEN);
+
+    const enqueueReq = new Request("http://localhost:3000/enqueue/jsonqueue", {
+        method: "POST",
+        body: JSON.stringify({ payload: true }),
+        headers: authHeaders,
+    });
+    await handler(enqueueReq);
+
+    const request = new Request("http://localhost:3000/dequeue/jsonqueue", {
+        method: "GET",
+        headers: authHeaders,
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 200);
+    const body = await response.text();
+    assertEquals(body, "true");
+});
+
+Deno.test("dequeue returns text/plain for string payload", async () => {
+    const mgr = new QueueManager(new Persistency.None);
+    const handler = createHandler(mgr, API_TOKEN);
+
+    const enqueueReq = new Request("http://localhost:3000/enqueue/jsonqueue", {
+        method: "POST",
+        body: JSON.stringify({ payload: "hello world" }),
+        headers: authHeaders,
+    });
+    await handler(enqueueReq);
+
+    const request = new Request("http://localhost:3000/dequeue/jsonqueue", {
+        method: "GET",
+        headers: authHeaders,
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 200);
+    const body = await response.text();
+    assertEquals(body, "hello world");
+});

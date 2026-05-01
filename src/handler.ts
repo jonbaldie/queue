@@ -95,6 +95,11 @@ export function createHandler(mgr: QueueManager<string>, apiToken: string, rateL
             if (item === undefined) {
                 return new Response(null, { status: 204 });
             }
+            if (typeof item === "object" && item !== null) {
+                return new Response(JSON.stringify(item), {
+                    headers: { "Content-Type": "application/json" },
+                });
+            }
             return new Response(item);
         }
 
@@ -111,6 +116,11 @@ export function createHandler(mgr: QueueManager<string>, apiToken: string, rateL
             const item = mgr.peek(queueName);
             if (item === undefined) {
                 return new Response(null, { status: 204 });
+            }
+            if (typeof item === "object" && item !== null) {
+                return new Response(JSON.stringify(item), {
+                    headers: { "Content-Type": "application/json" },
+                });
             }
             return new Response(item);
         }
