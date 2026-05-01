@@ -85,12 +85,14 @@ export default class Manager<T = string> {
             this.queues.delete(name);
         }
 
-        this.persist.append(JSON.stringify({
-            queue: name,
-            payload: payload,
-            enqueue: false,
-            dequeue: true
-        }));
+        if (payload !== undefined) {
+            this.persist.append(JSON.stringify({
+                queue: name,
+                payload: payload,
+                enqueue: false,
+                dequeue: true
+            }));
+        }
 
         return payload;
     }

@@ -774,3 +774,37 @@ Deno.test("dequeue returns text/plain for string payload", async () => {
     const body = await response.text();
     assertEquals(body, "hello world");
 });
+
+Deno.test("empty dequeue does not add entry to persistence log", () => {
+    const persist = new Persistency.File;
+    persist.clear();
+
+    const mgr = new QueueManager(persist);
+    mgr.dequeue("empty-queue");
+
+    const content = persist.load();
+    assertEquals("", content);
+
+    persist.clear();
+});
+
+Deno.test("non-empty dequeue still adds entry to persistence log", () => {
+    const persist = new Persistency.File;
+    persist.clear();
+
+    const mgr = new QueueManager(persist);
+    mgr.enqueue("myqueue", "item1");
+    mgr.dequeue("myqueue");
+
+    const content = persist.load();
+    const lines = content.split("\n").filter((line: string) => line.length);
+    assertEquals(2, lines.length);
+
+    const deqEntry = JSON.parse(lines[1]);
+    assertEquals(deqEntry.queue, "myqueue");
+    assertEquals(deqEntry.payload, "item1");
+    assertEquals(deqEntry.dequeue, true);
+    assertEquals(deqEntry.enqueue, false);
+
+    persist.clear();
+});

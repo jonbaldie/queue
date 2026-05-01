@@ -3,12 +3,14 @@ export class RateLimiter {
     private requestsPerMinute: number;
     private windowMs: number;
     private cleanupInterval: number;
+    private maxTrackedIPs: number;
     private requestCount: number = 0;
 
-    constructor(requestsPerMinute: number = 100, windowMs: number = 60000, cleanupInterval: number = 100) {
+    constructor(requestsPerMinute: number = 100, windowMs: number = 60000, cleanupInterval: number = 100, maxTrackedIPs: number = 10000) {
         this.requestsPerMinute = requestsPerMinute;
         this.windowMs = windowMs;
         this.cleanupInterval = cleanupInterval;
+        this.maxTrackedIPs = maxTrackedIPs;
     }
 
     private getClientIp(request: Request, remoteAddr?: string): string {
@@ -32,6 +34,19 @@ export class RateLimiter {
                 this.requestTimestamps.delete(ip);
             } else if (fresh.length !== timestamps.length) {
                 this.requestTimestamps.set(ip, fresh);
+            }
+        }
+
+        if (this.requestTimestamps.size > this.maxTrackedIPs) {
+            const entries = Array.from(this.requestTimestamps.entries());
+            entries.sort((a, b) => {
+                const aMax = Math.max(...a[1]);
+                const bMax = Math.max(...b[1]);
+                return aMax - bMax;
+            });
+            const toEvict = this.requestTimestamps.size - this.maxTrackedIPs;
+            for (let i = 0; i < toEvict; i++) {
+                this.requestTimestamps.delete(entries[i][0]);
             }
         }
     }
