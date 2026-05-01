@@ -11,22 +11,19 @@ const lengthPattern = new URLPattern({ pathname: "/length/:queue" });
 const healthPattern = new URLPattern({ pathname: "/health" });
 const queuesPattern = new URLPattern({ pathname: "/queues" });
 
-function detectContentType(body: string): string {
+function isJson(value: string): boolean {
     try {
-        const parsed = JSON.parse(body);
-        if (Array.isArray(parsed) || (parsed !== null && typeof parsed === "object")) {
-            return "application/json";
-        }
+        const parsed = JSON.parse(value);
+        return parsed !== null && typeof parsed === "object";
     } catch {
-        // Not JSON
+        return false;
     }
-    return "text/plain";
 }
 
-function makeResponse(body: BodyInit | null, status: number = 200, contentType?: string): Response {
+function createResponse(body: BodyInit | null, status: number, extraHeaders?: Record<string, string>): Response {
     const headers: Record<string, string> = { "Cache-Control": "no-store" };
-    if (contentType) {
-        headers["Content-Type"] = contentType;
+    if (extraHeaders) {
+        Object.assign(headers, extraHeaders);
     }
     return new Response(body, { status, headers });
 }
@@ -37,21 +34,21 @@ export function createHandler(mgr: QueueManager<string>, apiToken: string, rateL
     const innerHandler = async function(request: Request, remoteAddr?: string): Promise<Response> {
         // Check rate limit first (before auth)
         if (!rateLimiter.isAllowed(request, remoteAddr)) {
-            return makeResponse("Too many requests", 429);
+            return createResponse("Too many requests", 429);
         }
 
         const url = request.url;
 
         if (healthPattern.exec(url)) {
             if (request.method !== "GET") {
-                return makeResponse("Method not allowed", 405);
+                return createResponse("Method not allowed", 405);
             }
-            return makeResponse(JSON.stringify({ status: "ok" }), 200, "application/json");
+            return createResponse(JSON.stringify({ status: "ok" }), 200, { "Content-Type": "application/json" });
         }
 
         const authHeader = request.headers.get("Authorization");
         if (!authHeader || authHeader !== `Bearer ${apiToken}`) {
-            return makeResponse("Unauthorized", 401);
+            return createResponse("Unauthorized", 401);
         }
 
         const isEnqueue = enqueuePattern.exec(url);
@@ -62,88 +59,90 @@ export function createHandler(mgr: QueueManager<string>, apiToken: string, rateL
 
         if (isQueues) {
             if (request.method !== "GET") {
-                return makeResponse("Method not allowed", 405);
+                return createResponse("Method not allowed", 405);
             }
             const queueNames = mgr.listQueues();
-            return makeResponse(JSON.stringify(queueNames), 200, "application/json");
+            return createResponse(JSON.stringify(queueNames), 200, { "Content-Type": "application/json" });
         }
 
         if (isEnqueue) {
             if (request.method !== "POST") {
-                return makeResponse("Method not allowed", 405);
+                return createResponse("Method not allowed", 405);
             }
 
             const queueName = isEnqueue.pathname.groups.queue as string;
             if (queueName.length > MAX_QUEUE_NAME_LENGTH) {
-                return makeResponse("Queue name too long", 400);
+                return createResponse("Queue name too long", 400);
             }
 
             if (!mgr.canEnqueue(queueName)) {
-                return makeResponse("Queue full or too many queues", 507);
+                return createResponse("Queue full or too many queues", 507);
             }
 
             const contentLength = request.headers.get("content-length");
             if (contentLength && parseInt(contentLength) > MAX_BODY_SIZE) {
-                return makeResponse("Payload too large", 413);
+                return createResponse("Payload too large", 413);
             }
             try {
                 const json = JSON.parse(await request.text());
                 mgr.enqueue(queueName, json.payload);
-                return makeResponse(`Payload successfully queued onto ${queueName}.`, 200, "text/plain");
+                return createResponse(`Payload successfully queued onto ${queueName}.`, 200, { "Content-Type": "text/plain" });
             } catch {
-                return makeResponse("Invalid JSON", 400);
+                return createResponse("Invalid JSON", 400);
             }
         }
 
         if (isDequeue) {
             if (request.method !== "GET") {
-                return makeResponse("Method not allowed", 405);
+                return createResponse("Method not allowed", 405);
             }
 
             const queueName = isDequeue.pathname.groups.queue as string;
             if (queueName.length > MAX_QUEUE_NAME_LENGTH) {
-                return makeResponse("Queue name too long", 400);
+                return createResponse("Queue name too long", 400);
             }
 
             const item = mgr.dequeue(queueName);
             if (item === undefined) {
-                return makeResponse(null, 204);
+                return createResponse(null, 204);
             }
-            return makeResponse(item, 200, detectContentType(item));
+            const contentType = isJson(item) ? "application/json" : "text/plain";
+            return createResponse(item, 200, { "Content-Type": contentType });
         }
 
         if (isPeek) {
             if (request.method !== "GET") {
-                return makeResponse("Method not allowed", 405);
+                return createResponse("Method not allowed", 405);
             }
 
             const queueName = isPeek.pathname.groups.queue as string;
             if (queueName.length > MAX_QUEUE_NAME_LENGTH) {
-                return makeResponse("Queue name too long", 400);
+                return createResponse("Queue name too long", 400);
             }
 
             const item = mgr.peek(queueName);
             if (item === undefined) {
-                return makeResponse(null, 204);
+                return createResponse(null, 204);
             }
-            return makeResponse(item, 200, detectContentType(item));
+            const contentType = isJson(item) ? "application/json" : "text/plain";
+            return createResponse(item, 200, { "Content-Type": contentType });
         }
 
         if (isLength) {
             if (request.method !== "GET") {
-                return makeResponse("Method not allowed", 405);
+                return createResponse("Method not allowed", 405);
             }
 
             const queueName = isLength.pathname.groups.queue as string;
             if (queueName.length > MAX_QUEUE_NAME_LENGTH) {
-                return makeResponse("Queue name too long", 400);
+                return createResponse("Queue name too long", 400);
             }
 
             const len = mgr.length(queueName);
-            return makeResponse(`${len}`, 200, "text/plain");
+            return createResponse(`${len}`, 200, { "Content-Type": "text/plain" });
         }
 
-        return makeResponse("Not found.", 404);
+        return createResponse("Not found.", 404);
     };
 
     return async function handler(request: Request, info?: Deno.ServeHandlerInfo): Promise<Response> {
