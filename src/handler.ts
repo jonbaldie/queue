@@ -72,14 +72,22 @@ export function createHandler(mgr: QueueManager<string>, apiToken: string, rateL
             if (contentLength && parseInt(contentLength) > MAX_BODY_SIZE) {
                 return new Response("Payload too large", { status: 413 });
             }
+            let body: string;
             try {
-                const body = await request.text();
-                if (body.length > MAX_BODY_SIZE) {
-                    return new Response("Payload too large", { status: 413 });
-                }
+                body = await request.text();
+            } catch {
+                return new Response("Payload too large", { status: 413 });
+            }
+            if (body.length > MAX_BODY_SIZE) {
+                return new Response("Payload too large", { status: 413 });
+            }
+            try {
                 const json = JSON.parse(body);
                 if (!("payload" in json)) {
                     return new Response("Missing payload key", { status: 400 });
+                }
+                if (json.payload === null) {
+                    return new Response("Null payload not allowed", { status: 400 });
                 }
                 mgr.enqueue(queueName, json.payload);
                 return new Response(`Payload successfully queued onto ${queueName}.`);

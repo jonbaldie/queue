@@ -667,8 +667,8 @@ Deno.test("missing payload key returns 400", async () => {
     assertEquals(response.status, 400);
 });
 
-// queue-nyc: Null payload is valid and returns 200
-Deno.test("null payload returns 200", async () => {
+// queue-w37: Null payload is rejected with 400
+Deno.test("null payload returns 400", async () => {
     const mgr = new QueueManager(new Persistency.None);
     const handler = createHandler(mgr, API_TOKEN);
     const request = new Request("http://localhost:3000/enqueue/testqueue", {
@@ -677,7 +677,7 @@ Deno.test("null payload returns 200", async () => {
         headers: authHeaders,
     });
     const response = await handler(request);
-    assertEquals(response.status, 200);
+    assertEquals(response.status, 400);
 });
 
 // queue-nyc: Valid payload returns 200
@@ -749,6 +749,24 @@ Deno.test("body exceeding limit rejected with fake Content-Length", async () => 
         method: "POST",
         body: bigBody,
         headers: { ...authHeaders, "content-length": "10" }, // lied
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 413);
+});
+
+// queue-02t: Body read error returns 413 not 400
+Deno.test("body read error returns 413 not 400", async () => {
+    const mgr = new QueueManager(new Persistency.None);
+    const handler = createHandler(mgr, API_TOKEN);
+    const bodyStream = new ReadableStream({
+        start(controller) {
+            controller.error(new Error("stream error"));
+        },
+    });
+    const request = new Request("http://localhost:3000/enqueue/testqueue", {
+        method: "POST",
+        body: bodyStream,
+        headers: authHeaders,
     });
     const response = await handler(request);
     assertEquals(response.status, 413);
