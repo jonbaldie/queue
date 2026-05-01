@@ -15,11 +15,6 @@ export function createHandler(mgr: QueueManager<string>, apiToken: string, rateL
     const rateLimiter = new RateLimiter(rateLimitRequests ?? 100);
 
     const innerHandler = async function(request: Request, remoteAddr?: string): Promise<Response> {
-        // Check rate limit first (before auth)
-        if (!rateLimiter.isAllowed(request, remoteAddr)) {
-            return new Response("Too many requests", { status: 429 });
-        }
-
         const url = request.url;
 
         if (healthPattern.exec(url)) {
@@ -30,6 +25,11 @@ export function createHandler(mgr: QueueManager<string>, apiToken: string, rateL
                 status: 200,
                 headers: { "Content-Type": "application/json" },
             });
+        }
+
+        // Check rate limit after health check (health is exempt)
+        if (!rateLimiter.isAllowed(request, remoteAddr)) {
+            return new Response("Too many requests", { status: 429 });
         }
 
         const authHeader = request.headers.get("Authorization");
@@ -73,11 +73,21 @@ export function createHandler(mgr: QueueManager<string>, apiToken: string, rateL
                 return new Response("Payload too large", { status: 413 });
             }
             try {
-                const json = JSON.parse(await request.text());
+                const body = await request.text();
+                if (body.length > MAX_BODY_SIZE) {
+                    return new Response("Payload too large", { status: 413 });
+                }
+                const json = JSON.parse(body);
+                if (!("payload" in json)) {
+                    return new Response("Missing payload key", { status: 400 });
+                }
                 mgr.enqueue(queueName, json.payload);
                 return new Response(`Payload successfully queued onto ${queueName}.`);
-            } catch {
-                return new Response("Invalid JSON", { status: 400 });
+            } catch (e) {
+                if (e instanceof SyntaxError) {
+                    return new Response("Invalid JSON", { status: 400 });
+                }
+                throw e;
             }
         }
 

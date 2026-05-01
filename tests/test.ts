@@ -654,6 +654,106 @@ Deno.test("dequeue returns text/plain for boolean payload", async () => {
     assertEquals(body, "true");
 });
 
+// queue-nyc: Missing payload key returns 400
+Deno.test("missing payload key returns 400", async () => {
+    const mgr = new QueueManager(new Persistency.None);
+    const handler = createHandler(mgr, API_TOKEN);
+    const request = new Request("http://localhost:3000/enqueue/testqueue", {
+        method: "POST",
+        body: '{"data": "foo"}',
+        headers: authHeaders,
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 400);
+});
+
+// queue-nyc: Null payload is valid and returns 200
+Deno.test("null payload returns 200", async () => {
+    const mgr = new QueueManager(new Persistency.None);
+    const handler = createHandler(mgr, API_TOKEN);
+    const request = new Request("http://localhost:3000/enqueue/testqueue", {
+        method: "POST",
+        body: '{"payload": null}',
+        headers: authHeaders,
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 200);
+});
+
+// queue-nyc: Valid payload returns 200
+Deno.test("valid payload key returns 200", async () => {
+    const mgr = new QueueManager(new Persistency.None);
+    const handler = createHandler(mgr, API_TOKEN);
+    const request = new Request("http://localhost:3000/enqueue/testqueue", {
+        method: "POST",
+        body: '{"payload": "test"}',
+        headers: authHeaders,
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 200);
+});
+
+// queue-o3b: Health check works even when rate limit is exhausted
+Deno.test("health check exempt from rate limiting", async () => {
+    const mgr = new QueueManager(new Persistency.None);
+    const handler = createHandler(mgr, API_TOKEN, 1); // 1 request per minute
+
+    // Exhaust rate limit with a non-health request
+    const apiReq = new Request("http://localhost:3000/queues", {
+        method: "GET",
+        headers: authHeaders,
+    });
+    await handler(apiReq);
+
+    // Rate limit is now exhausted for this IP — health check should still work
+    const healthReq = new Request("http://localhost:3000/health", {
+        method: "GET",
+    });
+    const response = await handler(healthReq);
+    assertEquals(response.status, 200);
+});
+
+// queue-zla: Body within limit is accepted
+Deno.test("body within limit is accepted", async () => {
+    const mgr = new QueueManager(new Persistency.None);
+    const handler = createHandler(mgr, API_TOKEN);
+    const request = new Request("http://localhost:3000/enqueue/testqueue", {
+        method: "POST",
+        body: '{"payload": "small body"}',
+        headers: authHeaders,
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 200);
+});
+
+// queue-zla: Body exceeding limit is rejected without Content-Length header
+Deno.test("body exceeding limit rejected without Content-Length", async () => {
+    const mgr = new QueueManager(new Persistency.None);
+    const handler = createHandler(mgr, API_TOKEN);
+    const bigBody = '{"payload": "' + "x".repeat(1024 * 1024) + '"}';
+    const request = new Request("http://localhost:3000/enqueue/testqueue", {
+        method: "POST",
+        body: bigBody,
+        headers: authHeaders,
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 413);
+});
+
+// queue-zla: Body exceeding limit rejected with fake Content-Length
+Deno.test("body exceeding limit rejected with fake Content-Length", async () => {
+    const mgr = new QueueManager(new Persistency.None);
+    const handler = createHandler(mgr, API_TOKEN);
+    const bigBody = '{"payload": "' + "x".repeat(1024 * 1024) + '"}';
+    const request = new Request("http://localhost:3000/enqueue/testqueue", {
+        method: "POST",
+        body: bigBody,
+        headers: { ...authHeaders, "content-length": "10" }, // lied
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 413);
+});
+
 Deno.test("dequeue returns text/plain for string payload", async () => {
     const mgr = new QueueManager(new Persistency.None);
     const handler = createHandler(mgr, API_TOKEN);
