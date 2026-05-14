@@ -63,6 +63,7 @@ jobs:
           command: npm install --save-dev @stryker-mutator/core
       - run:
           name: Run StrykerJS mutation testing
+          no_output_timeout: 25m
           command: |
             touch persist.dat
             source $BASH_ENV
