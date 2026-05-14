@@ -1,0 +1,20 @@
+{
+  "$schema": "../node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "mutate": ["src/**/*.ts"],
+  "testRunner": "command",
+  "commandRunner": {
+    "command": "deno test --allow-read --allow-write --allow-net --allow-env --allow-run --allow-sys --allow-ffi --no-check tests/test.ts tests/auth_test.ts tests/limits_test.ts tests/rate_limiter_test.ts tests/type_safety_test.ts tests/mutation_behavior_test.ts tests/response_body_test.ts tests/persist_coverage_test.ts tests/rate_limiter_coverage_test.ts"
+  },
+  "reporters": ["json", "clear-text"],
+  "jsonReporter": {
+    "fileName": "mutation/stryker-report.json"
+  },
+  "coverageAnalysis": "off",
+  "timeoutMS": 30000,
+  "concurrency": 2,
+  "thresholds": {
+    "high": 80,
+    "low": 70,
+    "break": null
+  }
+}

@@ -39,13 +39,19 @@ export class File implements Persist {
             const file = Deno.openSync(this.path, { read: true });
             file.lockSync(false);
             try {
-                const stat = file.statSync();
-                const buf = new Uint8Array(stat.size);
+                const chunks: Uint8Array[] = [];
+                const chunk = new Uint8Array(4096);
                 let totalRead = 0;
-                while (totalRead < stat.size) {
-                    const read = file.readSync(buf.subarray(totalRead));
-                    if (read === null || read === 0) break;
+                let read: number | null;
+                while ((read = file.readSync(chunk)) !== null && read > 0) {
+                    chunks.push(chunk.slice(0, read));
                     totalRead += read;
+                }
+                const buf = new Uint8Array(totalRead);
+                let offset = 0;
+                for (const c of chunks) {
+                    buf.set(c, offset);
+                    offset += c.length;
                 }
                 return new TextDecoder().decode(buf);
             } finally {

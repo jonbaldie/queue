@@ -20,7 +20,62 @@ jobs:
             deno compile --allow-read --allow-write=./persist.dat --allow-net=0.0.0.0:3000 --allow-env=HOST,PORT,PERSIST,QUEUE_API_TOKEN main.ts
             deno test --allow-read --allow-write --allow-net --allow-env --allow-run
 
+  mutation-mutasaurus:
+    docker:
+      - image: denoland/deno:2.7.6
+    steps:
+      - run:
+          name: Install git
+          command: apt-get update -yqq && apt-get install -yqq git
+      - run:
+          name: Checkout code via HTTPS
+          command: |
+            git clone https://github.com/jonbaldie/queue.git .
+            git checkout "${CIRCLE_SHA1}"
+      - run:
+          name: Run mutasaurus mutation testing
+          command: |
+            touch persist.dat
+            deno run \
+              --allow-read --allow-write --allow-net --allow-env \
+              --allow-run --allow-sys --allow-ffi \
+              --node-modules-dir=auto \
+              mutation/mutasaurus_ci.ts
+
+  mutation-stryker:
+    docker:
+      - image: node:22-slim
+    steps:
+      - run:
+          name: Install git and Deno
+          command: |
+            apt-get update -yqq && apt-get install -yqq git curl unzip
+            curl -fsSL https://deno.land/install.sh | sh
+            echo 'export DENO_INSTALL="/root/.deno"' >> $BASH_ENV
+            echo 'export PATH="$DENO_INSTALL/bin:$PATH"' >> $BASH_ENV
+      - run:
+          name: Checkout code via HTTPS
+          command: |
+            git clone https://github.com/jonbaldie/queue.git .
+            git checkout "${CIRCLE_SHA1}"
+      - run:
+          name: Install StrykerJS
+          command: npm install --save-dev @stryker-mutator/core
+      - run:
+          name: Run StrykerJS mutation testing
+          command: |
+            touch persist.dat
+            source $BASH_ENV
+            npx stryker run mutation/stryker.config.json
+            node mutation/stryker_check.js
+
 workflows:
   test:
     jobs:
       - test
+      - mutation-mutasaurus:
+          requires:
+            - test
+      - mutation-stryker:
+          requires:
+            - mutation-mutasaurus
