@@ -49,7 +49,7 @@ jobs:
       - run:
           name: Install git and Deno
           command: |
-            apt-get update -yqq && apt-get install -yqq git curl unzip
+            apt-get update -yqq && apt-get install -yqq git curl unzip procps
             curl -fsSL https://deno.land/install.sh | sh
             echo 'export DENO_INSTALL="/root/.deno"' >> $BASH_ENV
             echo 'export PATH="$DENO_INSTALL/bin:$PATH"' >> $BASH_ENV
