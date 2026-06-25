@@ -1,5 +1,6 @@
 import QueueManager from "./manager.ts";
 import { RateLimiter } from "./rate_limiter.ts";
+import { withAuth, withRateLimit, HttpHandler } from "./middleware.ts";
 
 const MAX_BODY_SIZE = 1024 * 1024; // 1 MB
 const MAX_QUEUE_NAME_LENGTH = 128;
@@ -14,7 +15,7 @@ const queuesPattern = new URLPattern({ pathname: "/queues" });
 export function createHandler(mgr: QueueManager<string>, apiToken: string, rateLimitRequests?: number) {
     const rateLimiter = new RateLimiter(rateLimitRequests ?? 100);
 
-    const innerHandler = async function(request: Request, remoteAddr?: string): Promise<Response> {
+    const coreHandler: HttpHandler = async function(request: Request, info?: Deno.ServeHandlerInfo): Promise<Response> {
         const url = request.url;
 
         if (healthPattern.exec(url)) {
@@ -27,15 +28,7 @@ export function createHandler(mgr: QueueManager<string>, apiToken: string, rateL
             });
         }
 
-        // Check rate limit after health check (health is exempt)
-        if (!rateLimiter.isAllowed(request, remoteAddr)) {
-            return new Response("Too many requests", { status: 429 });
-        }
 
-        const authHeader = request.headers.get("Authorization");
-        if (!authHeader || authHeader !== `Bearer ${apiToken}`) {
-            return new Response("Unauthorized", { status: 401 });
-        }
 
         const isEnqueue = enqueuePattern.exec(url);
         const isDequeue = dequeuePattern.exec(url);
@@ -160,13 +153,13 @@ export function createHandler(mgr: QueueManager<string>, apiToken: string, rateL
         return new Response("Not found.", { status: 404 });
     };
 
+    const handlerWithAuth = withAuth(apiToken)(coreHandler);
+    const handlerWithRateLimit = withRateLimit(rateLimiter)(handlerWithAuth);
+
     return async function handler(request: Request, info?: Deno.ServeHandlerInfo): Promise<Response> {
         const start = performance.now();
         try {
-            const remoteAddr = info?.remoteAddr && info.remoteAddr.transport === "tcp"
-                ? info.remoteAddr.hostname
-                : undefined;
-            const response = await innerHandler(request, remoteAddr);
+            const response = await handlerWithRateLimit(request, info);
             const duration = performance.now() - start;
             console.log(`${request.method} ${request.url} ${response.status} ${duration.toFixed(2)}ms`);
             return response;
