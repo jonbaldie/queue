@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { parseArgs } from "jsr:@std/cli@1.0/parse-args";
 import * as Persistency from "./src/persist.ts";
 import QueueManager from "./src/manager.ts";
@@ -20,8 +21,8 @@ const flags = parseArgs(Deno.args, {
 
 // Set up our persistency manager
 const persist = flags.persist
-    ? new Persistency.FileStore
-    : new Persistency.MemoryStore;
+    ? new Persistency.File
+    : new Persistency.None;
 
 persist.dir(PERSIST);
 
@@ -29,7 +30,7 @@ persist.dir(PERSIST);
 const mgr = new QueueManager(persist, QUEUE_DEPTH_LIMIT, QUEUE_COUNT_LIMIT);
 
 // Load up any existing queue data, if we're persisting
-if (persist instanceof Persistency.FileStore) {
+if (persist instanceof Persistency.File) {
     console.log("Loading in data from persist.dat...\n");
 
     mgr.load();
@@ -47,7 +48,7 @@ const shutdown = async (signal: string) => {
     await server.shutdown();
 
     // If we're using file persistency, save all current state to persistant storage
-    if (persist instanceof Persistency.FileStore) {
+    if (persist instanceof Persistency.File) {
         console.log("Flushing data to persist.dat...\n");
         mgr.save();
     }

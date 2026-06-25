@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { assertEquals } from "jsr:@std/assert@1.0";
 import Queue from "../src/queue.ts";
 import QueueManager from "../src/manager.ts";
@@ -64,7 +65,7 @@ Deno.test("Queue<boolean> stores booleans", () => {
 });
 
 Deno.test("Manager<number> enqueue and dequeue numbers", () => {
-    const mgr = new QueueManager<number>(new Persistency.MemoryStore());
+    const mgr = new QueueManager<number>(new Persistency.None());
     mgr.enqueue("nums", 100);
     mgr.enqueue("nums", 200);
 
@@ -78,7 +79,7 @@ Deno.test("Manager<object> enqueue and dequeue objects", () => {
         label: string;
     }
 
-    const mgr = new QueueManager<Task>(new Persistency.MemoryStore());
+    const mgr = new QueueManager<Task>(new Persistency.None());
     mgr.enqueue("tasks", { priority: 1, label: "urgent" });
     mgr.enqueue("tasks", { priority: 2, label: "normal" });
 
@@ -90,7 +91,7 @@ Deno.test("Manager<object> enqueue and dequeue objects", () => {
 });
 
 Deno.test("Manager<string> remains compatible with string payloads", () => {
-    const mgr = new QueueManager<string>(new Persistency.MemoryStore());
+    const mgr = new QueueManager<string>(new Persistency.None());
     mgr.enqueue("q", "hello");
     mgr.enqueue("q", "world");
 

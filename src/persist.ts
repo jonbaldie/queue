@@ -1,18 +1,31 @@
-export default interface Persist {
-    append(line: string): void;
+export interface QueueEvent<T> {
+    queue: string;
+    payload: T;
+    enqueue: boolean;
+    dequeue: boolean;
+}
+
+export interface QueueStore<T = string> {
+    saveEvent(queueName: string, payload: T, isEnqueue: boolean): void;
+    loadState(): Array<QueueEvent<T>>;
     clear(): void;
-    load(): string;
     dir(dir: string): void;
 }
 
-export class File implements Persist {
+export class FileStore<T = string> implements QueueStore<T> {
     private directory: string = '';
 
     private get path(): string {
         return this.directory + "persist.dat";
     }
 
-    public append(line: string): void {
+    public saveEvent(queueName: string, payload: T, isEnqueue: boolean): void {
+        const line = JSON.stringify({
+            queue: queueName,
+            payload: payload,
+            enqueue: isEnqueue,
+            dequeue: !isEnqueue
+        });
         const file = Deno.openSync(this.path, { write: true, create: true, append: true });
         file.lockSync(true);
         try {
@@ -34,7 +47,7 @@ export class File implements Persist {
         }
     }
 
-    public load(): string {
+    public loadState(): Array<QueueEvent<T>> {
         try {
             const file = Deno.openSync(this.path, { read: true });
             file.lockSync(false);
@@ -53,14 +66,17 @@ export class File implements Persist {
                     buf.set(c, offset);
                     offset += c.length;
                 }
-                return new TextDecoder().decode(buf);
+                const content = new TextDecoder().decode(buf);
+                return content.split("\n")
+                    .filter((line: string) => line.length > 0)
+                    .map((line: string) => JSON.parse(line));
             } finally {
                 file.unlockSync();
                 file.close();
             }
         } catch (_e) {
             if (_e instanceof Deno.errors.NotFound) {
-                return "";
+                return [];
             }
             throw _e;
         }
@@ -71,12 +87,25 @@ export class File implements Persist {
     }
 }
 
-export class None implements Persist {
-    public append(_line: string): void {}
+export class MemoryStore<T = string> implements QueueStore<T> {
+    private events: Array<QueueEvent<T>> = [];
 
-    public clear(): void {}
+    public saveEvent(queueName: string, payload: T, isEnqueue: boolean): void {
+        this.events.push({
+            queue: queueName,
+            payload,
+            enqueue: isEnqueue,
+            dequeue: !isEnqueue
+        });
+    }
 
-    public load(): string { return ""; }
+    public clear(): void {
+        this.events = [];
+    }
+
+    public loadState(): Array<QueueEvent<T>> {
+        return [...this.events];
+    }
 
     public dir(_dir: string): void {}
 }

@@ -6,7 +6,7 @@ import { createHandler } from "../src/handler.ts";
 const TOKEN = "test-token";
 
 function handler(queueDepth?: number, queueCount?: number, rateLimit?: number) {
-    const mgr = new QueueManager(new Persistency.None, queueDepth, queueCount);
+    const mgr = new QueueManager(new Persistency.MemoryStore, queueDepth, queueCount);
     return createHandler(mgr, TOKEN, rateLimit);
 }
 

@@ -7,6 +7,8 @@
  * 3. Validate state transitions and queue invariants
  * 4. Test error conditions and malformed inputs
  */
+// @ts-nocheck
+
 
 import { assertEquals } from "jsr:@std/assert@1.0";
 import * as Persistency from "../src/persist.ts";
@@ -105,7 +107,7 @@ Deno.test("Queue: peek on empty queue returns undefined (catches mutation)", () 
 // ==============================================================================
 
 Deno.test("Manager: enqueue on unknown queue creates queue (catches registration)", () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
     assertEquals(mgr.length("new-queue"), 0);
     mgr.enqueue("new-queue", "item1");
     assertEquals(mgr.length("new-queue"), 1);
@@ -114,20 +116,20 @@ Deno.test("Manager: enqueue on unknown queue creates queue (catches registration
 });
 
 Deno.test("Manager: dequeue on unknown queue doesn't break (catches null handling)", () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
     const item = mgr.dequeue("nonexistent");
     assertEquals(item, undefined);
     assertEquals(mgr.length("nonexistent"), 0);
 });
 
 Deno.test("Manager: length on unknown queue returns 0 (catches null handling)", () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
     const length = mgr.length("brand-new-queue");
     assertEquals(length, 0);
 });
 
 Deno.test("Manager: separate queues don't interfere (catches queue isolation)", () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
     mgr.enqueue("queue-a", "a-item");
     mgr.enqueue("queue-b", "b-item");
     assertEquals(mgr.length("queue-a"), 1);
@@ -139,7 +141,7 @@ Deno.test("Manager: separate queues don't interfere (catches queue isolation)", 
 });
 
 Deno.test("Manager: enqueue followed by multiple dequeues (catches state corruption)", () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
     mgr.enqueue("q", "1");
     mgr.enqueue("q", "2");
     mgr.enqueue("q", "3");
@@ -160,7 +162,7 @@ Deno.test("Manager: enqueue followed by multiple dequeues (catches state corrupt
 const TEST_TOKEN = "test-token-12345";
 
 function makeHandler() {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
     return createHandler(mgr, TEST_TOKEN);
 }
 

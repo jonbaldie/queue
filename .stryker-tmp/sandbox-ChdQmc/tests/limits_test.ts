@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { assertEquals } from "jsr:@std/assert@1.0";
 import * as Persistency from "../src/persist.ts";
 import QueueManager from "../src/manager.ts";
@@ -7,7 +8,7 @@ import { RateLimiter } from "../src/rate_limiter.ts";
 const TEST_TOKEN = "test-secret-token";
 
 function makeHandler(queueDepthLimit?: number, queueCountLimit?: number, rateLimitRequests?: number) {
-    const mgr = new QueueManager(new Persistency.MemoryStore, queueDepthLimit, queueCountLimit);
+    const mgr = new QueueManager(new Persistency.None, queueDepthLimit, queueCountLimit);
     return createHandler(mgr, TEST_TOKEN, rateLimitRequests);
 }
 
