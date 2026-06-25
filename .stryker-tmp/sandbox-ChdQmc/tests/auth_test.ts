@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { assertEquals } from "jsr:@std/assert@1.0";
 import * as Persistency from "../src/persist.ts";
 import QueueManager from "../src/manager.ts";
@@ -6,7 +7,7 @@ import { createHandler } from "../src/handler.ts";
 const TEST_TOKEN = "test-secret-token";
 
 function makeHandler() {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
     return createHandler(mgr, TEST_TOKEN);
 }
 

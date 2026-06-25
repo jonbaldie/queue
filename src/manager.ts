@@ -1,21 +1,23 @@
-import Persist from "./persist.ts"
+import { QueueStore } from "./persist.ts"
 import Queue from "./queue.ts"
 
-interface LoadLine<T> {
-    queue: string;
-    payload: T;
-    enqueue: boolean;
-    dequeue: boolean;
+export const MAX_QUEUE_NAME_LENGTH = 128;
+
+export class QueueNameTooLongError extends Error {
+    constructor() {
+        super("Queue name too long");
+        this.name = "QueueNameTooLongError";
+    }
 }
 
 export default class Manager<T = string> {
     private queues: Map<string, Queue<T>>;
-    private persist: Persist;
+    private store: QueueStore<T>;
     private queueDepthLimit: number;
     private queueCountLimit: number;
 
-    constructor(persist: Persist, queueDepthLimit?: number, queueCountLimit?: number) {
-        this.persist = persist;
+    constructor(store: QueueStore<T>, queueDepthLimit?: number, queueCountLimit?: number) {
+        this.store = store;
         this.queues = new Map;
         this.queueDepthLimit = queueDepthLimit ?? 10000;
         this.queueCountLimit = queueCountLimit ?? 1000;
@@ -27,6 +29,12 @@ export default class Manager<T = string> {
         return this;
     }
 
+    private validateName(name: string): void {
+        if (name.length > MAX_QUEUE_NAME_LENGTH) {
+            throw new QueueNameTooLongError();
+        }
+    }
+
     private registered(name: string): boolean {
         return this.queues.has(name);
     }
@@ -36,13 +44,14 @@ export default class Manager<T = string> {
     }
 
     public canEnqueue(name: string): boolean {
+        this.validateName(name);
         const queue = this.find(name);
         if (!queue) {
             // Creating a new queue - check if we have room
             return this.canCreateQueue();
         }
         // Existing queue - check if it has room
-        return queue.length() < this.queueDepthLimit;
+        return queue.hasCapacity();
     }
 
     private find(name: string): Queue<T> | undefined {
@@ -50,7 +59,8 @@ export default class Manager<T = string> {
     }
 
     public enqueue(name: string, payload: T): Manager<T> {
-        const queue = this.find(name) || new Queue([]);
+        this.validateName(name);
+        const queue = this.find(name) || new Queue([], this.queueDepthLimit);
 
         if (this.registered(name) === false) {
             this.register(name, queue);
@@ -58,18 +68,14 @@ export default class Manager<T = string> {
 
         queue.enqueue(payload);
 
-        this.persist.append(JSON.stringify({
-            queue: name,
-            payload: payload,
-            enqueue: true,
-            dequeue: false
-        }));
+        this.store.saveEvent(name, payload, true);
 
         return this;
     }
 
     public dequeue(name: string): T | undefined {
-        const queue = this.find(name) || new Queue([]);
+        this.validateName(name);
+        const queue = this.find(name) || new Queue([], this.queueDepthLimit);
 
         const wasRegistered = this.registered(name);
 
@@ -86,18 +92,14 @@ export default class Manager<T = string> {
         }
 
         if (payload !== undefined) {
-            this.persist.append(JSON.stringify({
-                queue: name,
-                payload: payload,
-                enqueue: false,
-                dequeue: true
-            }));
+            this.store.saveEvent(name, payload, false);
         }
 
         return payload;
     }
 
     public peek(name: string): T | undefined {
+        this.validateName(name);
         const queue = this.find(name);
 
         if (queue === undefined) {
@@ -108,7 +110,8 @@ export default class Manager<T = string> {
     }
 
     public length(name: string): number {
-        const queue = this.find(name) || new Queue([]);
+        this.validateName(name);
+        const queue = this.find(name) || new Queue([], this.queueDepthLimit);
 
         if (this.registered(name) === false) {
             this.register(name, queue);
@@ -122,43 +125,37 @@ export default class Manager<T = string> {
     }
 
     public save(): void {
-        this.persist.clear();
+        this.store.clear();
         for (const [name, queue] of this.queues) {
             for (const item of queue.all()) {
-                this.persist.append(JSON.stringify({
-                    queue: name,
-                    payload: item,
-                    enqueue: true,
-                    dequeue: false
-                }));
+                this.store.saveEvent(name, item, true);
             }
         }
     }
 
     public load(): void {
-        const all = this.persist.load().split("\n").filter((line: string) => line.length);
+        const events = this.store.loadState();
 
-        all.forEach((line: string) => {
-            const decoded: LoadLine<T> = JSON.parse(line);
-            const queue = this.find(decoded.queue) || new Queue([]);
+        events.forEach((event) => {
+            const queue = this.find(event.queue) || new Queue([], this.queueDepthLimit);
 
-            if (this.registered(decoded.queue) === false) {
-                this.register(decoded.queue, queue);
+            if (this.registered(event.queue) === false) {
+                this.register(event.queue, queue);
             }
 
-            if (decoded.enqueue) {
-                queue.enqueue(decoded.payload);
-            } else if (decoded.dequeue) {
+            if (event.enqueue) {
+                queue.enqueue(event.payload);
+            } else if (event.dequeue) {
                 const wasNonEmpty = queue.length() > 0;
                 queue.dequeue();
 
                 // Clean up empty queues to prevent memory leak (queue-18u)
-                if (this.registered(decoded.queue) && wasNonEmpty && queue.length() === 0) {
-                    this.queues.delete(decoded.queue);
+                if (this.registered(event.queue) && wasNonEmpty && queue.length() === 0) {
+                    this.queues.delete(event.queue);
                 }
             }
         });
 
-        this.persist.clear();
+        this.store.clear();
     }
 }

@@ -1,11 +1,12 @@
-import { assertEquals, assertNotEquals } from "jsr:@std/assert@1.0";
+// @ts-nocheck
+import { assertEquals } from "jsr:@std/assert@1.0";
 import * as Persistency from "../src/persist.ts";
 import Queue from "../src/queue.ts";
 import QueueManager from "../src/manager.ts";
 import { createHandler } from "../src/handler.ts";
 
 const API_TOKEN = "test-token";
-const mgr = new QueueManager(new Persistency.MemoryStore);
+const mgr = new QueueManager(new Persistency.None);
 const handler = createHandler(mgr, API_TOKEN);
 const authHeaders = { "Authorization": `Bearer ${API_TOKEN}` };
 
@@ -54,7 +55,7 @@ Deno.test("POST to length returns 405", async () => {
 
 // /queues endpoint: GET returns list of queue names
 Deno.test("GET /queues returns empty array when no queues", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
     const handler = createHandler(mgr, API_TOKEN);
     const request = new Request("http://localhost:3000/queues", {
         method: "GET",
@@ -67,7 +68,7 @@ Deno.test("GET /queues returns empty array when no queues", async () => {
 });
 
 Deno.test("GET /queues returns queue names", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
     mgr.enqueue("queue1", "item1");
     mgr.enqueue("queue2", "item2");
     const handler = createHandler(mgr, API_TOKEN);
@@ -82,7 +83,7 @@ Deno.test("GET /queues returns queue names", async () => {
 });
 
 Deno.test("POST /queues returns 405", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
     const handler = createHandler(mgr, API_TOKEN);
     const request = new Request("http://localhost:3000/queues", {
         method: "POST",
@@ -93,7 +94,7 @@ Deno.test("POST /queues returns 405", async () => {
 });
 
 Deno.test("GET /queues requires bearer token", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
     const handler = createHandler(mgr, API_TOKEN);
     const request = new Request("http://localhost:3000/queues", {
         method: "GET",
@@ -103,7 +104,7 @@ Deno.test("GET /queues requires bearer token", async () => {
 });
 
 Deno.test("GET /queues returns sorted queue names", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
     mgr.enqueue("zebra", "item1");
     mgr.enqueue("alpha", "item2");
     mgr.enqueue("mango", "item3");
@@ -119,7 +120,7 @@ Deno.test("GET /queues returns sorted queue names", async () => {
 });
 
 Deno.test("GET /queues does not include cleaned-up empty queues", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
     mgr.enqueue("persistent", "item1");
     mgr.enqueue("transient", "item2");
     mgr.dequeue("transient"); // queue becomes empty and gets cleaned up
@@ -323,7 +324,7 @@ Deno.test("queue empty", () => {
 });
 
 Deno.test("manager enqueue", () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
 
     mgr.enqueue("queue", "foo");
     mgr.enqueue("queue", "bar");
@@ -333,7 +334,7 @@ Deno.test("manager enqueue", () => {
 });
 
 Deno.test("manager length", () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
 
     mgr.enqueue("queue", "foo");
 
@@ -353,17 +354,18 @@ Deno.test("manager length", () => {
 });
 
 Deno.test("manager persistency", () => {
-    const persist = new Persistency.FileStore;
-    persist.clear();
-    persist.saveEvent("foo", "bar", true);
-    persist.saveEvent("fee", "bat", true);
-    persist.saveEvent("fee", "gat", true);
-    persist.saveEvent("fee", "bat", false);
-
+    const persist = new Persistency.File;
     const mgr = new QueueManager(persist);
+
+    persist.clear();
+    persist.append(`{ "queue": "foo", "payload": "bar", "enqueue": true, "dequeue": false }`);
+    persist.append(`{ "queue": "fee", "payload": "bat", "enqueue": true, "dequeue": false }`);
+    persist.append(`{ "queue": "fee", "payload": "gat", "enqueue": true, "dequeue": false }`);
+    persist.append(`{ "queue": "fee", "payload": "bat", "enqueue": false, "dequeue": true }`);
+
     mgr.load();
 
-    assertEquals([], persist.loadState());
+    assertEquals("", persist.load());
     assertEquals(1, mgr.length("foo"));
     assertEquals("bar", mgr.dequeue("foo"));
     assertEquals(1, mgr.length("fee"));
@@ -371,22 +373,22 @@ Deno.test("manager persistency", () => {
 });
 
 Deno.test("json persistency", () => {
-    const persist = new Persistency.FileStore;
+    const persist = new Persistency.File;
     const mgr = new QueueManager(persist);
     const payload = "php /var/www/html/index.php";
 
     persist.clear();
-    persist.saveEvent("foo", payload, true);
+    persist.append(JSON.stringify({ queue: "foo", payload: payload, enqueue: true, dequeue: false }));
 
     mgr.load();
 
-    assertEquals([], persist.loadState());
+    assertEquals("", persist.load());
     assertEquals(1, mgr.length("foo"));
     assertEquals(payload, mgr.dequeue("foo"));
 });
 
 Deno.test("persistency", () => {
-    const persist = new Persistency.FileStore;
+    const persist = new Persistency.File;
 
     persist.clear();
 
@@ -394,15 +396,18 @@ Deno.test("persistency", () => {
 
     assertEquals("", load());
 
-    persist.saveEvent("foo", "bar", true);
+    persist.append(`{ "queue": "foo", "payload": "bar", "enqueue": true, "dequeue": false }`);
 
-    assertNotEquals("", load());
+    assertEquals(`{ "queue": "foo", "payload": "bar", "enqueue": true, "dequeue": false }` + "\n", load());
+    assertEquals(load(), persist.load());
 
     persist.clear();
+
+    assertEquals("", load());
 });
 
 Deno.test("concurrent enqueue writes to file", async () => {
-    const persist = new Persistency.FileStore;
+    const persist = new Persistency.File;
     persist.clear();
 
     const mgr = new QueueManager(persist);
@@ -418,13 +423,15 @@ Deno.test("concurrent enqueue writes to file", async () => {
     await Promise.all(promises);
 
     // Read the file and verify all items were persisted
-    const events = persist.loadState();
+    const content = persist.load();
+    const lines = content.split("\n").filter((line: string) => line.length);
 
     // Should have exactly 10 enqueue operations
-    assertEquals(10, events.length);
+    assertEquals(10, lines.length);
 
     // All lines should be valid JSON with enqueue=true
-    events.forEach((obj: any) => {
+    lines.forEach((line: string) => {
+        const obj = JSON.parse(line);
         assertEquals(true, obj.enqueue);
         assertEquals("test_queue", obj.queue);
     });
@@ -433,7 +440,7 @@ Deno.test("concurrent enqueue writes to file", async () => {
 });
 
 Deno.test("concurrent manager operations maintain data integrity", async () => {
-    const persist = new Persistency.FileStore;
+    const persist = new Persistency.File;
     persist.clear();
 
     const mgr = new QueueManager(persist);
@@ -465,13 +472,13 @@ Deno.test("concurrent manager operations maintain data integrity", async () => {
 });
 
 Deno.test("persist operations handle I/O errors gracefully", () => {
-    const persist = new Persistency.FileStore;
+    const persist = new Persistency.File;
     // Set an invalid directory to trigger an I/O error
     persist.dir("/nonexistent/invalid/path");
 
     let errorThrown = false;
     try {
-        persist.saveEvent("foo", "bar", true);
+        persist.append(`{ "queue": "foo", "payload": "bar", "enqueue": true, "dequeue": false }`);
     } catch (_e) {
         errorThrown = true;
     }
@@ -489,7 +496,7 @@ Deno.test("queue peek returns value not index", () => {
 });
 
     Deno.test("manager dequeue from empty queue returns undefined", () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
 
     const result = mgr.dequeue("nonexistent");
 
@@ -497,7 +504,7 @@ Deno.test("queue peek returns value not index", () => {
 });
 
 Deno.test("manager cleans up empty queues to prevent unbounded growth", () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore, 10000, 1);
+    const mgr = new QueueManager(new Persistency.None, 10000, 1);
 
     mgr.enqueue("transient", "foo");
     assertEquals(false, mgr.canCreateQueue()); // At limit
@@ -510,7 +517,7 @@ Deno.test("manager cleans up empty queues to prevent unbounded growth", () => {
 });
 
 Deno.test("dequeue from empty unknown queue does not remove auto-created queue", () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore, 10000, 1);
+    const mgr = new QueueManager(new Persistency.None, 10000, 1);
 
     // Auto-creates an empty queue; was never non-empty so stays registered
     mgr.dequeue("never-existed");
@@ -518,7 +525,7 @@ Deno.test("dequeue from empty unknown queue does not remove auto-created queue",
 });
 
 Deno.test("enqueue after cleanup restores queue", () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
 
     mgr.enqueue("queue", "foo");
     mgr.dequeue("queue"); // cleanup
@@ -529,7 +536,7 @@ Deno.test("enqueue after cleanup restores queue", () => {
 });
 
 Deno.test("queue is removed only after last item is dequeued", () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore, 10000, 1);
+    const mgr = new QueueManager(new Persistency.None, 10000, 1);
 
     mgr.enqueue("queue", "a");
     mgr.enqueue("queue", "b");
@@ -546,11 +553,11 @@ Deno.test("queue is removed only after last item is dequeued", () => {
 });
 
 Deno.test("manager load cleans up empty queues from persistence", () => {
-    const persist = new Persistency.FileStore;
+    const persist = new Persistency.File;
     persist.clear();
 
-    persist.saveEvent("tmp", "data", true);
-    persist.saveEvent("tmp", "data", false);
+    persist.append(JSON.stringify({ queue: "tmp", payload: "data", enqueue: true, dequeue: false }));
+    persist.append(JSON.stringify({ queue: "tmp", payload: "data", enqueue: false, dequeue: true }));
 
     const mgr = new QueueManager(persist, 10000, 1);
     mgr.load();
@@ -563,7 +570,7 @@ Deno.test("manager load cleans up empty queues from persistence", () => {
 });
 
 Deno.test("dequeue returns application/json for object payload", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
     const handler = createHandler(mgr, API_TOKEN);
 
     const enqueueReq = new Request("http://localhost:3000/enqueue/jsonqueue", {
@@ -585,7 +592,7 @@ Deno.test("dequeue returns application/json for object payload", async () => {
 });
 
 Deno.test("dequeue returns application/json for array payload", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
     const handler = createHandler(mgr, API_TOKEN);
 
     const enqueueReq = new Request("http://localhost:3000/enqueue/jsonqueue", {
@@ -607,7 +614,7 @@ Deno.test("dequeue returns application/json for array payload", async () => {
 });
 
 Deno.test("dequeue returns text/plain for number payload", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
     const handler = createHandler(mgr, API_TOKEN);
 
     const enqueueReq = new Request("http://localhost:3000/enqueue/jsonqueue", {
@@ -628,7 +635,7 @@ Deno.test("dequeue returns text/plain for number payload", async () => {
 });
 
 Deno.test("dequeue returns text/plain for boolean payload", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
     const handler = createHandler(mgr, API_TOKEN);
 
     const enqueueReq = new Request("http://localhost:3000/enqueue/jsonqueue", {
@@ -650,7 +657,7 @@ Deno.test("dequeue returns text/plain for boolean payload", async () => {
 
 // queue-nyc: Missing payload key returns 400
 Deno.test("missing payload key returns 400", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
     const handler = createHandler(mgr, API_TOKEN);
     const request = new Request("http://localhost:3000/enqueue/testqueue", {
         method: "POST",
@@ -663,7 +670,7 @@ Deno.test("missing payload key returns 400", async () => {
 
 // queue-w37: Null payload is rejected with 400
 Deno.test("null payload returns 400", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
     const handler = createHandler(mgr, API_TOKEN);
     const request = new Request("http://localhost:3000/enqueue/testqueue", {
         method: "POST",
@@ -676,7 +683,7 @@ Deno.test("null payload returns 400", async () => {
 
 // queue-nyc: Valid payload returns 200
 Deno.test("valid payload key returns 200", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
     const handler = createHandler(mgr, API_TOKEN);
     const request = new Request("http://localhost:3000/enqueue/testqueue", {
         method: "POST",
@@ -689,7 +696,7 @@ Deno.test("valid payload key returns 200", async () => {
 
 // queue-o3b: Health check works even when rate limit is exhausted
 Deno.test("health check exempt from rate limiting", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
     const handler = createHandler(mgr, API_TOKEN, 1); // 1 request per minute
 
     // Exhaust rate limit with a non-health request
@@ -709,7 +716,7 @@ Deno.test("health check exempt from rate limiting", async () => {
 
 // queue-zla: Body within limit is accepted
 Deno.test("body within limit is accepted", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
     const handler = createHandler(mgr, API_TOKEN);
     const request = new Request("http://localhost:3000/enqueue/testqueue", {
         method: "POST",
@@ -722,7 +729,7 @@ Deno.test("body within limit is accepted", async () => {
 
 // queue-zla: Body exceeding limit is rejected without Content-Length header
 Deno.test("body exceeding limit rejected without Content-Length", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
     const handler = createHandler(mgr, API_TOKEN);
     const bigBody = '{"payload": "' + "x".repeat(1024 * 1024) + '"}';
     const request = new Request("http://localhost:3000/enqueue/testqueue", {
@@ -736,7 +743,7 @@ Deno.test("body exceeding limit rejected without Content-Length", async () => {
 
 // queue-zla: Body exceeding limit rejected with fake Content-Length
 Deno.test("body exceeding limit rejected with fake Content-Length", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
     const handler = createHandler(mgr, API_TOKEN);
     const bigBody = '{"payload": "' + "x".repeat(1024 * 1024) + '"}';
     const request = new Request("http://localhost:3000/enqueue/testqueue", {
@@ -750,7 +757,7 @@ Deno.test("body exceeding limit rejected with fake Content-Length", async () => 
 
 // queue-02t: Body read error returns 413 not 400
 Deno.test("body read error returns 413 not 400", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
     const handler = createHandler(mgr, API_TOKEN);
     const bodyStream = new ReadableStream({
         start(controller) {
@@ -767,7 +774,7 @@ Deno.test("body read error returns 413 not 400", async () => {
 });
 
 Deno.test("dequeue returns text/plain for string payload", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager(new Persistency.None);
     const handler = createHandler(mgr, API_TOKEN);
 
     const enqueueReq = new Request("http://localhost:3000/enqueue/jsonqueue", {
@@ -788,30 +795,31 @@ Deno.test("dequeue returns text/plain for string payload", async () => {
 });
 
 Deno.test("empty dequeue does not add entry to persistence log", () => {
-    const persist = new Persistency.FileStore;
+    const persist = new Persistency.File;
     persist.clear();
 
     const mgr = new QueueManager(persist);
     mgr.dequeue("empty-queue");
 
-    const events = persist.loadState();
-    assertEquals(events.length, 0);
+    const content = persist.load();
+    assertEquals("", content);
 
     persist.clear();
 });
 
 Deno.test("non-empty dequeue still adds entry to persistence log", () => {
-    const persist = new Persistency.FileStore;
+    const persist = new Persistency.File;
     persist.clear();
 
     const mgr = new QueueManager(persist);
     mgr.enqueue("myqueue", "item1");
     mgr.dequeue("myqueue");
 
-    const events = persist.loadState();
-    assertEquals(events.length, 2);
+    const content = persist.load();
+    const lines = content.split("\n").filter((line: string) => line.length);
+    assertEquals(2, lines.length);
 
-    const deqEntry = events[1];
+    const deqEntry = JSON.parse(lines[1]);
     assertEquals(deqEntry.queue, "myqueue");
     assertEquals(deqEntry.payload, "item1");
     assertEquals(deqEntry.dequeue, true);

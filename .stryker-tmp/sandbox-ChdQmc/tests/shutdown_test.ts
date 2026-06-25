@@ -1,9 +1,10 @@
+// @ts-nocheck
 import { assertEquals } from "jsr:@std/assert@1.0";
 import * as Persistency from "../src/persist.ts";
 import QueueManager from "../src/manager.ts";
 
 Deno.test("manager save flushes all queues to persist", () => {
-    const persist = new Persistency.FileStore;
+    const persist = new Persistency.File;
     persist.clear();
 
     const mgr = new QueueManager(persist);
@@ -13,16 +14,17 @@ Deno.test("manager save flushes all queues to persist", () => {
 
     mgr.save();
 
-    const events = persist.loadState();
-    assertEquals(events.length, 3);
+    const lines = persist.load().split("\n").filter((line: string) => line.length);
+    assertEquals(3, lines.length);
 
-    assertEquals(events.every((p: any) => p.enqueue === true), true);
-    assertEquals(events.filter((p: any) => p.queue === "q1").length, 2);
-    assertEquals(events.filter((p: any) => p.queue === "q2").length, 1);
+    const parsed = lines.map((l: string) => JSON.parse(l));
+    assertEquals(parsed.every((p: Record<string, unknown>) => p.enqueue === true), true);
+    assertEquals(parsed.filter((p: Record<string, unknown>) => p.queue === "q1").length, 2);
+    assertEquals(parsed.filter((p: Record<string, unknown>) => p.queue === "q2").length, 1);
 });
 
 Deno.test("manager save overwrites previous persist data", () => {
-    const persist = new Persistency.FileStore;
+    const persist = new Persistency.File;
     persist.clear();
 
     const mgr = new QueueManager(persist);
@@ -32,22 +34,22 @@ Deno.test("manager save overwrites previous persist data", () => {
     mgr.enqueue("q1", "b");
     mgr.save();
 
-    const events = persist.loadState();
-    assertEquals(events.length, 2);
+    const lines = persist.load().split("\n").filter((line: string) => line.length);
+    assertEquals(2, lines.length);
 });
 
 Deno.test("manager save with empty queues writes nothing", () => {
-    const persist = new Persistency.FileStore;
+    const persist = new Persistency.File;
     persist.clear();
 
     const mgr = new QueueManager(persist);
     mgr.save();
 
-    assertEquals(persist.loadState(), []);
+    assertEquals(persist.load(), "");
 });
 
 Deno.test("manager save preserves queue order", () => {
-    const persist = new Persistency.FileStore;
+    const persist = new Persistency.File;
     persist.clear();
 
     const mgr = new QueueManager(persist);
@@ -57,13 +59,13 @@ Deno.test("manager save preserves queue order", () => {
 
     mgr.save();
 
-    const events = persist.loadState();
-    const payloads = events.map((e: any) => e.payload);
+    const lines = persist.load().split("\n").filter((line: string) => line.length);
+    const payloads = lines.map((l: string) => JSON.parse(l).payload);
     assertEquals(payloads, ["first", "second", "third"]);
 });
 
 Deno.test("manager save then load round-trips data", () => {
-    const persist = new Persistency.FileStore;
+    const persist = new Persistency.File;
     persist.clear();
 
     const mgr = new QueueManager(persist);
