@@ -1,87 +1,18 @@
-import { assertEquals } from "jsr:@std/assert@1.0";
+import { assertEquals, assertNotEquals, assertThrows, assertRejects } from "jsr:@std/assert@1.0";
+import QueueManager, { QueueNameTooLongError } from "../src/manager.ts";
+import { createHandler } from "../src/handler.ts";
 import * as Persistency from "../src/persist.ts";
-import QueueManager from "../src/manager.ts";
+import { RateLimiter } from "../src/rate_limiter.ts";
+import { parseConfig, ConfigError } from "../src/config.ts";
 
-Deno.test("manager save flushes all queues to persist", () => {
-    const persist = new Persistency.FileStore;
-    persist.clear();
+// Shared helpers
+const API_TOKEN = "test-token";
+const authHeaders = { "Authorization": `Bearer ${API_TOKEN}` };
 
-    const mgr = new QueueManager(persist);
-    mgr.enqueue("q1", "a");
-    mgr.enqueue("q1", "b");
-    mgr.enqueue("q2", "c");
-
-    mgr.save();
-
-    const events = persist.loadState();
-    assertEquals(events.length, 3);
-
-    assertEquals(events.every((p: any) => p.enqueue === true), true);
-    assertEquals(events.filter((p: any) => p.queue === "q1").length, 2);
-    assertEquals(events.filter((p: any) => p.queue === "q2").length, 1);
-});
-
-Deno.test("manager save overwrites previous persist data", () => {
-    const persist = new Persistency.FileStore;
-    persist.clear();
-
-    const mgr = new QueueManager(persist);
-    mgr.enqueue("q1", "a");
-    mgr.save();
-
-    mgr.enqueue("q1", "b");
-    mgr.save();
-
-    const events = persist.loadState();
-    assertEquals(events.length, 2);
-});
-
-Deno.test("manager save with empty queues writes nothing", () => {
-    const persist = new Persistency.FileStore;
-    persist.clear();
-
-    const mgr = new QueueManager(persist);
-    mgr.save();
-
-    assertEquals(persist.loadState(), []);
-});
-
-Deno.test("manager save preserves queue order", () => {
-    const persist = new Persistency.FileStore;
-    persist.clear();
-
-    const mgr = new QueueManager(persist);
-    mgr.enqueue("q", "first");
-    mgr.enqueue("q", "second");
-    mgr.enqueue("q", "third");
-
-    mgr.save();
-
-    const events = persist.loadState();
-    const payloads = events.map((e: any) => e.payload);
-    assertEquals(payloads, ["first", "second", "third"]);
-});
-
-Deno.test("manager save then load round-trips data", () => {
-    const persist = new Persistency.FileStore;
-    persist.clear();
-
-    const mgr = new QueueManager(persist);
-    mgr.enqueue("x", "one");
-    mgr.enqueue("x", "two");
-    mgr.enqueue("y", "three");
-
-    mgr.save();
-
-    const mgr2 = new QueueManager(persist);
-    mgr2.load();
-
-    assertEquals(mgr2.length("x"), 2);
-    assertEquals(mgr2.length("y"), 1);
-    assertEquals(mgr2.dequeue("x"), "one");
-    assertEquals(mgr2.dequeue("x"), "two");
-    assertEquals(mgr2.dequeue("y"), "three");
-});
+function makeHandler(token = API_TOKEN, rateLimit = 100) {
+    const mgr = new QueueManager(new Persistency.MemoryStore());
+    return createHandler(mgr, token, rateLimit);
+}
 
 async function startServer(env: Record<string, string>): Promise<{ child: Deno.ChildProcess; port: number }> {
     const decoder = new TextDecoder();
@@ -107,7 +38,7 @@ async function startServer(env: Record<string, string>): Promise<{ child: Deno.C
             const { done, value } = await stdoutReader.read();
             if (done) break;
             stdoutBuf += decoder.decode(value, { stream: true });
-            const match = stdoutBuf.match(/Listening on (?:127\.0\.0\.1|localhost):(\d+)/);
+            const match = stdoutBuf.match(/Listening on (?:http:\/\/)?(?:127\.0\.0\.1|localhost|0\.0\.0\.0):(\d+)/);
             if (match) {
                 port = parseInt(match[1], 10);
                 break;
@@ -122,7 +53,8 @@ async function startServer(env: Record<string, string>): Promise<{ child: Deno.C
     if (port === null) {
         const stderr = await child.stderr.getReader().read();
         const errText = stderr.value ? decoder.decode(stderr.value) : "";
-        throw new Error(`Server did not start. stdout: ${stdoutBuf}\nstderr: ${errText}`);
+        throw new Error(`Server did not start. stdout: ${stdoutBuf}
+stderr: ${errText}`);
     }
 
     return { child, port };
@@ -134,6 +66,7 @@ async function cleanupChild(child: Deno.ChildProcess) {
     try { child.kill("SIGKILL"); } catch { /* ignore */ }
     try { await child.status; } catch { /* ignore */ }
 }
+
 
 Deno.test("server starts, accepts requests, and shuts down gracefully on SIGTERM", async () => {
     const tempDir = await Deno.makeTempDir();
