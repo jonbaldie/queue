@@ -1,6 +1,15 @@
 import { QueueStore } from "./persist.ts"
 import Queue from "./queue.ts"
 
+export const MAX_QUEUE_NAME_LENGTH = 128;
+
+export class QueueNameTooLongError extends Error {
+    constructor() {
+        super("Queue name too long");
+        this.name = "QueueNameTooLongError";
+    }
+}
+
 export default class Manager<T = string> {
     private queues: Map<string, Queue<T>>;
     private store: QueueStore<T>;
@@ -20,6 +29,12 @@ export default class Manager<T = string> {
         return this;
     }
 
+    private validateName(name: string): void {
+        if (name.length > MAX_QUEUE_NAME_LENGTH) {
+            throw new QueueNameTooLongError();
+        }
+    }
+
     private registered(name: string): boolean {
         return this.queues.has(name);
     }
@@ -29,6 +44,7 @@ export default class Manager<T = string> {
     }
 
     public canEnqueue(name: string): boolean {
+        this.validateName(name);
         const queue = this.find(name);
         if (!queue) {
             // Creating a new queue - check if we have room
@@ -43,6 +59,7 @@ export default class Manager<T = string> {
     }
 
     public enqueue(name: string, payload: T): Manager<T> {
+        this.validateName(name);
         const queue = this.find(name) || new Queue([], this.queueDepthLimit);
 
         if (this.registered(name) === false) {
@@ -57,6 +74,7 @@ export default class Manager<T = string> {
     }
 
     public dequeue(name: string): T | undefined {
+        this.validateName(name);
         const queue = this.find(name) || new Queue([], this.queueDepthLimit);
 
         const wasRegistered = this.registered(name);
@@ -81,6 +99,7 @@ export default class Manager<T = string> {
     }
 
     public peek(name: string): T | undefined {
+        this.validateName(name);
         const queue = this.find(name);
 
         if (queue === undefined) {
@@ -91,6 +110,7 @@ export default class Manager<T = string> {
     }
 
     public length(name: string): number {
+        this.validateName(name);
         const queue = this.find(name) || new Queue([], this.queueDepthLimit);
 
         if (this.registered(name) === false) {
