@@ -1,8 +1,18 @@
-import { assertEquals, assertNotEquals } from "jsr:@std/assert@1.0";
+import { assertEquals, assertNotEquals, assertThrows, assertRejects } from "jsr:@std/assert@1.0";
+import QueueManager, { QueueNameTooLongError } from "../src/manager.ts";
+import { createHandler } from "../src/handler.ts";
 import * as Persistency from "../src/persist.ts";
-import QueueManager from "../src/manager.ts";
+import { RateLimiter } from "../src/rate_limiter.ts";
+import { parseConfig, ConfigError } from "../src/config.ts";
 
-// ── MemoryStore class ────────────────────────────────────────────────────────
+// Shared helpers
+const API_TOKEN = "test-token";
+const authHeaders = { "Authorization": `Bearer ${API_TOKEN}` };
+
+function makeHandler(token = API_TOKEN, rateLimit = 100) {
+    const mgr = new QueueManager(new Persistency.MemoryStore());
+    return createHandler(mgr, token, rateLimit);
+}
 
 Deno.test("persist MemoryStore.loadState() returns empty array", () => {
     const p = new Persistency.MemoryStore();
