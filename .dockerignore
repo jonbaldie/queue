@@ -4,7 +4,5 @@ tests/
 CLAUDE.md
 README.md
 .gitignore
-.runtime/
-.beads/
 .circleci/
 LICENSE
