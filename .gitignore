@@ -3,5 +3,6 @@
 /target/
 /node_modules/
 /.stryker-tmp/sandbox-*/
+mutation/stryker-report.json
 /.claude/
 CLAUDE.md
