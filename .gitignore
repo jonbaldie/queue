@@ -1,6 +1,7 @@
 /persist.dat
 /queue
 /target/
+/node_modules/
 /.stryker-tmp/sandbox-*/
 /.claude/
 CLAUDE.md
