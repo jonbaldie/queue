@@ -47,10 +47,6 @@ Deno.writeFileSync(this.directory + "persist.dat", new Uint8Array());
 
 This prevents "file not found" errors in tests.
 
-## PR Dependencies
-
-PR #2 (Bearer Token Auth) depends on PR #3 (Deno 2.x). Merge order: PR #3 first, then PR #2.
-
 ## Mutation Testing Strategy
 
 Test off-by-one errors, FIFO order, operator mutations, and boundary conditions explicitly.
@@ -68,7 +64,8 @@ Test HTTP handler behaviour with real requests, not internal implementation deta
 Critical: If the CI fails in remote after your push, then you MUST follow-up even if the cause seems pre-existing.  
 
 ## Testing
-- Use red/green TDD. 
+- Use red/green TDD; use the /tdd skill when editing production code with execution seams.
+- Use /diagnosing-bugs when investigating bugs or issues.
 - Actually run the code, automated tests by themselves aren't sufficient.
 - Use 'tracer bullets', aka canary tests, aka smoke tests, aka E2E tests. 
 - Actively look for genuine bugs, edge cases, failure modes - if you find these, then you've succeeded, not failed. 
