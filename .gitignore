@@ -2,6 +2,8 @@
 /queue
 /target/
 /node_modules/
-/.stryker-tmp/sandbox-*/
+/.stryker-tmp/
+/mutation/stryker-report.json
+/mutation/.stryker-ci-*.json
 /.claude/
 CLAUDE.md
