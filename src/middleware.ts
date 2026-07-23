@@ -3,12 +3,12 @@ import { RateLimiter } from "./rate_limiter.ts";
 export type HttpHandler = (request: Request, info?: Deno.ServeHandlerInfo) => Promise<Response> | Response;
 export type Middleware = (next: HttpHandler) => HttpHandler;
 
-const healthPattern = new URLPattern({ pathname: "/health" });
+const HEALTH_PATTERN = new URLPattern({ pathname: "/health" });
 
 export function withAuth(apiToken: string): Middleware {
     return (next: HttpHandler) => {
         return (request: Request, info?: Deno.ServeHandlerInfo) => {
-            if (healthPattern.exec(request.url)) {
+            if (HEALTH_PATTERN.exec(request.url)) {
                 return next(request, info);
             }
             const authHeader = request.headers.get("Authorization");
@@ -23,7 +23,7 @@ export function withAuth(apiToken: string): Middleware {
 export function withRateLimit(limiter: RateLimiter): Middleware {
     return (next: HttpHandler) => {
         return (request: Request, info?: Deno.ServeHandlerInfo) => {
-            if (healthPattern.exec(request.url)) {
+            if (HEALTH_PATTERN.exec(request.url)) {
                 return next(request, info);
             }
             const remoteAddr = info?.remoteAddr && info.remoteAddr.transport === "tcp"
