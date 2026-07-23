@@ -14,15 +14,16 @@ and respect .serena as integral project tooling
 
 **Main branch requires Deno 2.7.6**
 
-### CircleCI Configuration
+### GitHub Actions Configuration
 
-The `.circleci/config.yml` must match the Deno version:
+The `.github/workflows/ci.yml` must match the Deno version:
 ```yaml
-docker:
-  - image: denoland/deno:2.7.6
+uses: denoland/setup-deno@v2
+with:
+  deno-version: 2.7.6
 ```
 
-**If you upgrade Deno, ALWAYS update this image or CI will fail.**
+**If you upgrade Deno, ALWAYS update this workflow or CI will fail.**
 
 ### Standard Library Imports
 
@@ -57,7 +58,7 @@ Test HTTP handler behaviour with real requests, not internal implementation deta
 
 ## Common Diagnostics
 
-**CircleCI fails?** Check: (1) CircleCI Deno version matches code (2) Import format (jsr: vs deno.land) (3) Using Deno 2.x-only APIs
+**GitHub Actions fails?** Check: (1) workflow Deno version matches code (2) Import format (jsr: vs deno.land) (3) Using Deno 2.x-only APIs
 
 **Merge blocked?** `gh api repos/jonbaldie/queue/branches/main/protection --jq '.enforce_admins.enabled'` — if true, disable with DELETE before merging with --admin
 

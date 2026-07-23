@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: 2.7.6
+      - name: Build executable
+        run: |
+          touch persist.dat
+          deno compile \
+            --allow-read \
+            --allow-write=./persist.dat \
+            --allow-net=0.0.0.0:3000 \
+            --allow-env=HOST,PORT,PERSIST,QUEUE_API_TOKEN \
+            main.ts
+      - name: Run tests
+        run: deno test --allow-read --allow-write --allow-net --allow-env --allow-run
+
+  mutation-mutasaurus:
+    name: Mutation testing (Mutasaurus)
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: 2.7.6
+      - name: Run Mutasaurus
+        run: |
+          touch persist.dat
+          deno run \
+            --allow-read \
+            --allow-write \
+            --allow-net \
+            --allow-env \
+            --allow-run \
+            --allow-sys \
+            --allow-ffi \
+            --node-modules-dir=auto \
+            mutation/mutasaurus_ci.ts
+
+  mutation-stryker:
+    name: Mutation testing (Stryker)
+    needs: mutation-mutasaurus
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: 2.7.6
+      - name: Install StrykerJS
+        run: npm install --no-save --no-package-lock @stryker-mutator/core
+      - name: Run StrykerJS
+        run: |
+          touch persist.dat
+          npx --no-install stryker run mutation/stryker.config.json
+          node mutation/stryker_check.js
