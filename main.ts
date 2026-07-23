@@ -3,46 +3,56 @@ import QueueManager from "./src/manager.ts";
 import { createHandler } from "./src/handler.ts";
 import { parseConfig } from "./src/config.ts";
 
-const config = parseConfig(Deno.env.toObject(), Deno.args);
+const LOG_ENCODER = new TextEncoder();
+
+function writeLog(message: string): void {
+    Deno.stdout.writeSync(LOG_ENCODER.encode(`${message}\n`));
+}
+
+const CONFIG = parseConfig(Deno.env.toObject(), Deno.args);
 
 // Set up our persistency manager
-const persist = config.persistEnabled
+const PERSIST_ENGINE = CONFIG.persistEnabled
     ? new Persistency.FileStore
     : new Persistency.MemoryStore;
 
-persist.dir(config.persistDir);
+PERSIST_ENGINE.dir(CONFIG.persistDir);
 
 // Set up the manager, which will handle our queues for us
-const mgr = new QueueManager(persist, config.queueDepthLimit, config.queueCountLimit);
+const MANAGER = new QueueManager(PERSIST_ENGINE, CONFIG.queueDepthLimit, CONFIG.queueCountLimit);
 
 // Load up any existing queue data, if we're persisting
-if (persist instanceof Persistency.FileStore) {
-    console.log("Loading in data from persist.dat...\n");
+if (PERSIST_ENGINE instanceof Persistency.FileStore) {
+    writeLog("Loading in data from persist.dat...\n");
 
-    mgr.load();
+    MANAGER.load();
 }
 
-const handler = createHandler(mgr, config.apiToken, config.rateLimitRequests);
+const HANDLER = createHandler(MANAGER, CONFIG.apiToken, CONFIG.rateLimitRequests);
 
 // Start up the application
-const server = Deno.serve({ hostname: config.host, port: config.port, onListen: ({ hostname, port }) => console.log(`Listening on ${hostname}:${port}`) }, handler);
+const SERVER = Deno.serve({
+    hostname: CONFIG.host,
+    port: CONFIG.port,
+    onListen: ({ hostname, port }) => writeLog(`Listening on ${hostname}:${port}`),
+}, HANDLER);
 
-const shutdown = async (signal: string) => {
-    console.log(`Received ${signal}, shutting down gracefully...`);
+async function shutdown(signal: string): Promise<void> {
+    writeLog(`Received ${signal}, shutting down gracefully...`);
 
     // Stop accepting new connections
-    await server.shutdown();
+    await SERVER.shutdown();
 
     // If we're using file persistency, save all current state to persistant storage
-    if (persist instanceof Persistency.FileStore) {
-        console.log("Flushing data to persist.dat...\n");
-        mgr.save();
+    if (PERSIST_ENGINE instanceof Persistency.FileStore) {
+        writeLog("Flushing data to persist.dat...\n");
+        MANAGER.save();
     }
 
-    console.log("Goodbye!");
+    writeLog("Goodbye!");
 
     Deno.exit(0);
-};
+}
 
 Deno.addSignalListener("SIGINT", () => shutdown("SIGINT"));
 Deno.addSignalListener("SIGTERM", () => shutdown("SIGTERM"));
