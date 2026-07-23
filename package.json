@@ -1,0 +1,11 @@
+{
+  "name": "queue-quality-gate",
+  "private": true,
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "quality:unit": "node scripts/messcript.mjs",
+    "quality:production": "node scripts/messcript.mjs all"
+  }
+}

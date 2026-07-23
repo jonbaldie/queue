@@ -56,6 +56,35 @@ This returns the oldest added payload on queue `foo` and removes it, guaranteein
 
 That's all you need to get started! 😎
 
+## Production quality gate
+
+The production TypeScript quality gate uses messcript at the pinned commit
+`4fe47bd0f15675206aedd0f22ae5eff7aeb01707`. The Node wrapper checks out that
+revision into the ignored `node_modules/.cache/queue-messcript` directory,
+installs its locked dependencies, builds it, and then runs the CLI. It does not
+affect the Deno service or its dependencies.
+
+Run a named production unit with Node 20.11 or newer:
+
+```
+npm run quality:unit -- configuration
+```
+
+The available units are `configuration`, `router`, `middleware`,
+`rate-limiter`, `queue-manager`, `persist-engine`, `http-handler`, and
+`entrypoint`. Run the complete production gate with:
+
+```
+npm run quality:production
+```
+
+Both commands use messcript's recommended `typescript` policy, including its
+default `CyclomaticComplexity` and `NPathComplexity` rules and thresholds. The
+aggregate scope is explicit: it includes only the eight production units above
+and excludes tests, mutation infrastructure, documentation, CI configuration,
+generated output, and development tooling. Findings and processing errors
+retain messcript's normal non-zero exit status.
+
 To get the number of payloads pending on a queue, send a get request to `/length/:queue`
 
 ```
