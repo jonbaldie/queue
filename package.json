@@ -1,7 +1,6 @@
 {
   "name": "queue-quality-gate",
   "private": true,
-  "type": "module",
   "engines": {
     "node": ">=20.11.0"
   },
