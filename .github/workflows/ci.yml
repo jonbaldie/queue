@@ -93,3 +93,21 @@ jobs:
           touch persist.dat
           npx --no-install stryker run mutation/stryker.config.json
           node mutation/stryker_check.js
+
+  production-quality:
+    name: Production quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Run aggregate production quality gate
+        run: npm run quality:production
