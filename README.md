@@ -2,7 +2,7 @@
 
 Fast, portable queue server written in Typescript and built with Deno.
 
-[![CircleCI](https://circleci.com/gh/jonbaldie/queue/tree/main.svg?style=shield)](https://circleci.com/gh/jonbaldie/queue/tree/main)
+[![CI](https://github.com/jonbaldie/queue/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jonbaldie/queue/actions/workflows/ci.yml)
 
 ## Introduction
 

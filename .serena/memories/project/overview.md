@@ -4,10 +4,10 @@
 Fast, lightweight, persistence-optional FIFO queue service written in TypeScript for Deno. Provides HTTP API for enqueue, dequeue, length, peek, queues list, and health check endpoints.
 
 ## Tech Stack
-- **Runtime**: Deno 2.7.6 (critical - must match CI image)
+- **Runtime**: Deno 2.7.6 (critical - must match the GitHub Actions workflow)
 - **Language**: TypeScript
 - **Imports**: JSR format (e.g. `jsr:@std/cli@1.0/parse-args`)
-- **CI**: CircleCI (image: `denoland/deno:2.7.6`)
+- **CI**: GitHub Actions (`.github/workflows/ci.yml`)
 
 ## Commands
 - **Test**: `deno test --allow-all` (permission flags required for file I/O tests)
