@@ -55,8 +55,11 @@ export class FileStore<T = string> implements QueueStore<T> {
                 const chunks: Uint8Array[] = [];
                 const chunk = new Uint8Array(4096);
                 let totalRead = 0;
-                let read: number | null;
-                while ((read = file.readSync(chunk)) !== null && read > 0) {
+                while (true) {
+                    const read = file.readSync(chunk);
+                    if (read === null || read <= 0) {
+                        break;
+                    }
                     chunks.push(chunk.slice(0, read));
                     totalRead += read;
                 }
@@ -74,11 +77,11 @@ export class FileStore<T = string> implements QueueStore<T> {
                 file.unlockSync();
                 file.close();
             }
-        } catch (_e) {
-            if (_e instanceof Deno.errors.NotFound) {
+        } catch (error) {
+            if (error instanceof Deno.errors.NotFound) {
                 return [];
             }
-            throw _e;
+            throw error;
         }
     }
 
@@ -107,5 +110,5 @@ export class MemoryStore<T = string> implements QueueStore<T> {
         return [...this.events];
     }
 
-    public dir(_dir: string): void {}
+    public dir(): void {}
 }
