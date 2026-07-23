@@ -25,6 +25,18 @@ Deno.test("persist MemoryStore.saveEvent() appends", () => {
     assertEquals(p.loadState().length, 1);
 });
 
+Deno.test("persist MemoryStore replays events in append order", () => {
+    const p = new Persistency.MemoryStore();
+    p.saveEvent("q", "first", true);
+    p.saveEvent("q", "second", true);
+    p.saveEvent("q", "first", false);
+
+    assertEquals(
+        p.loadState().map((event) => [event.payload, event.enqueue]),
+        [["first", true], ["second", true], ["first", false]],
+    );
+});
+
 Deno.test("persist MemoryStore.clear() clears events", () => {
     const p = new Persistency.MemoryStore();
     p.saveEvent("q", "anything", true);
@@ -95,6 +107,69 @@ Deno.test("persist FileStore.saveEvent() does not overwrite existing content", (
     const events = p.loadState();
     assertEquals(events[0].payload, "line1");
     assertEquals(events[1].payload, "line2");
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("persist FileStore.saveEvent() waits for an existing file lock", async () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const markerPath = tmpDir + "/ready";
+    const persistPath = tmpDir + "/persist.dat";
+    const persistModule = new URL("../src/persist.ts", import.meta.url).href;
+    const lockedFile = Deno.openSync(persistPath, { write: true, create: true });
+    lockedFile.lockSync(true);
+
+    const childCode = `
+        import { FileStore } from ${JSON.stringify(persistModule)};
+        Deno.writeTextFileSync(${JSON.stringify(markerPath)}, "ready");
+        const store = new FileStore();
+        store.dir(${JSON.stringify(tmpDir)});
+        store.saveEvent("q", "from-child", true);
+    `;
+    const child = new Deno.Command(Deno.execPath(), {
+        args: ["eval", "--no-config", childCode],
+        stdout: "null",
+        stderr: "piped",
+    }).spawn();
+    const statusPromise = child.status;
+    const stderrPromise = new Response(child.stderr).text();
+
+    try {
+        let markerReady = false;
+        for (let attempt = 0; attempt < 500 && !markerReady; attempt++) {
+            try {
+                markerReady = Deno.statSync(markerPath).isFile;
+            } catch (error) {
+                if (!(error instanceof Deno.errors.NotFound)) {
+                    throw error;
+                }
+            }
+            await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+        if (!markerReady) {
+            const status = await statusPromise;
+            throw new Error(
+                `lock contender exited ${status.code}: ${await stderrPromise}`,
+            );
+        }
+        const completedWhileLocked = await Promise.race([
+            statusPromise.then(() => true),
+            new Promise<false>((resolve) => setTimeout(() => resolve(false), 100)),
+        ]);
+        assertEquals(completedWhileLocked, false);
+    } finally {
+        lockedFile.unlockSync();
+        lockedFile.close();
+    }
+
+    const status = await statusPromise;
+    assertEquals(
+        status.success,
+        true,
+        await stderrPromise,
+    );
+    const store = new Persistency.FileStore();
+    store.dir(tmpDir);
+    assertEquals(store.loadState()[0].payload, "from-child");
     Deno.removeSync(tmpDir, { recursive: true });
 });
 
