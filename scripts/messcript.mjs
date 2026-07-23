@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const messcriptRepository = "https://github.com/quality-gates/messcript.git";
@@ -21,6 +21,10 @@ const productionUnits = new Map([
   ["http-handler", ["src/handler.ts"]],
   ["entrypoint", ["main.ts"]],
 ]);
+const requiredComplexityRules = [
+  "CyclomaticComplexity",
+  "NPathComplexity",
+];
 
 function run(command, args, cwd) {
   const result = spawnSync(command, args, {
@@ -133,6 +137,34 @@ function requestedPaths(unitName) {
   return paths;
 }
 
+async function reportAggregatePolicy() {
+  const rulesets = await import(
+    pathToFileURL(join(toolRoot, "dist", "rulesets.js")).href
+  );
+  const selectedRules = new Set(
+    rulesets.loadRulesets(["typescript"]).selections.map(
+      (selection) => selection.name,
+    ),
+  );
+  const missingRules = requiredComplexityRules.filter(
+    (ruleName) => !selectedRules.has(ruleName),
+  );
+  if (missingRules.length > 0) {
+    throw new Error(
+      `typescript policy is missing required rules: ${missingRules.join(", ")}`,
+    );
+  }
+
+  console.log(
+    `Production quality scope (${productionUnits.size}): ${
+      [...productionUnits.keys()].join(", ")
+    }`,
+  );
+  console.log(
+    `Required complexity rules: ${requiredComplexityRules.join(", ")}`,
+  );
+}
+
 const unitName = process.argv[2] ?? "all";
 
 try {
@@ -141,6 +173,9 @@ try {
   if (acquireExit !== 0) {
     process.exitCode = acquireExit;
   } else {
+    if (unitName === "all") {
+      await reportAggregatePolicy();
+    }
     process.exitCode = run(
       "node",
       [messcriptCli, paths.join(","), "text", "typescript", "--color=never"],
