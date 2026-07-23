@@ -241,6 +241,16 @@ Deno.test("response body: rate limited returns 'Too many requests'", async () =>
     assertEquals(await res.text(), "Too many requests");
 });
 
+Deno.test("middleware: rate limiting runs before authentication", async () => {
+    const handler = makeHandler(undefined, undefined, 1);
+    const firstResponse = await handler(new Request("http://localhost/length/q"));
+    const secondResponse = await handler(new Request("http://localhost/length/q"));
+
+    assertEquals(firstResponse.status, 401);
+    assertEquals(secondResponse.status, 429);
+    assertEquals(await secondResponse.text(), "Too many requests");
+});
+
 Deno.test("response body: queues POST returns 'Method not allowed'", async () => {
     const handler = makeHandler();
     const res = await handler(new Request("http://localhost/queues", { method: "POST", headers: auth }));
