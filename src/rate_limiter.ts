@@ -14,14 +14,12 @@ export class RateLimiter {
     }
 
     private getClientIp(request: Request, remoteAddr?: string): string {
-        // Check for x-forwarded-for header first (proxy/CDN)
+        if (remoteAddr) {
+            return remoteAddr;
+        }
         const forwardedFor = request.headers.get("x-forwarded-for");
         if (forwardedFor) {
             return forwardedFor.split(",")[0].trim();
-        }
-        // Fall back to connection remote address
-        if (remoteAddr) {
-            return remoteAddr;
         }
         return "unknown";
     }

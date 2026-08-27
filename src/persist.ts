@@ -23,10 +23,18 @@ export class FileStore<T = string> implements QueueStore<T> {
         return this.directory + "persist.dat";
     }
 
+    private ensureDirectory(): void {
+        if (this.directory === "") {
+            return;
+        }
+        Deno.mkdirSync(this.directory, { recursive: true });
+    }
+
     // Lazily open the write handle so that dir() with an invalid path
     // doesn't throw until an actual I/O operation is attempted.
     private ensureOpen(): void {
         if (this.writeHandle === null) {
+            this.ensureDirectory();
             this.writeHandle = Deno.openSync(this.path, { write: true, create: true, append: true });
         }
     }
@@ -97,7 +105,11 @@ export class FileStore<T = string> implements QueueStore<T> {
                         const line = leftover.slice(0, idx);
                         leftover = leftover.slice(idx + 1);
                         if (line.length > 0) {
-                            events.push(JSON.parse(line));
+                            try {
+                                events.push(JSON.parse(line));
+                            } catch {
+                                // skip malformed lines
+                            }
                         }
                         idx = leftover.indexOf("\n");
                     }
@@ -105,7 +117,11 @@ export class FileStore<T = string> implements QueueStore<T> {
                 // Flush decoder and process any remaining line (no trailing newline)
                 leftover += decoder.decode();
                 if (leftover.length > 0) {
-                    events.push(JSON.parse(leftover));
+                    try {
+                        events.push(JSON.parse(leftover));
+                    } catch {
+                        // skip malformed lines
+                    }
                 }
                 return events;
             } finally {

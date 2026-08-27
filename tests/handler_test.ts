@@ -97,6 +97,42 @@ Deno.test("limits: reading unknown queues does not exceed queue count limit", as
     assertEquals(queues.length <= 1, true);
 });
 
+Deno.test("limits: GET /length of an unknown queue does not consume a queue slot", async () => {
+    const handler = makeHandler(undefined, 1, undefined, API_TOKEN);
+    const lengthRes = await handler(new Request("http://localhost/length/ghost", {
+        headers: authHeaders,
+    }));
+    assertEquals(lengthRes.status, 200);
+    assertEquals(await lengthRes.text(), "0");
+
+    const queuesRes = await handler(new Request("http://localhost/queues", {
+        headers: authHeaders,
+    }));
+    assertEquals(await queuesRes.json(), []);
+
+    const enqueueRes = await handler(new Request("http://localhost/enqueue/real", {
+        method: "POST",
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ payload: "work" }),
+    }));
+    assertEquals(enqueueRes.status, 200);
+});
+
+Deno.test("limits: GET /dequeue of an unknown queue does not consume a queue slot", async () => {
+    const handler = makeHandler(undefined, 1, undefined, API_TOKEN);
+    const dequeueRes = await handler(new Request("http://localhost/dequeue/ghost", {
+        headers: authHeaders,
+    }));
+    assertEquals(dequeueRes.status, 204);
+
+    const enqueueRes = await handler(new Request("http://localhost/enqueue/real", {
+        method: "POST",
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ payload: "work" }),
+    }));
+    assertEquals(enqueueRes.status, 200);
+});
+
 // Rate limit tests
 
 Deno.test("limits: exceed rate limit returns 429", async () => {
@@ -189,43 +225,33 @@ Deno.test("limits: rate limit is per-remote-address for non-proxied requests", a
     assertEquals(200, client2Res.status, "Client2 should not be rate limited");
 });
 
-// x-forwarded-for should take precedence over remote address
-
-Deno.test("limits: x-forwarded-for takes precedence over remote address", async () => {
+Deno.test("limits: x-forwarded-for does not bypass the remote-address rate limit", async () => {
     const RATE_LIMIT = 2;
     const handler = makeHandler(undefined, undefined, RATE_LIMIT, TEST_TOKEN);
+    const info = {
+        remoteAddr: { hostname: "192.168.1.1", port: 12345, transport: "tcp" as const },
+        completed: Promise.resolve(),
+    };
 
-    // Make 2 requests with x-forwarded-for
     for (let i = 0; i < RATE_LIMIT; i++) {
         const req = new Request("http://localhost/length/test-queue", {
             headers: {
                 "Authorization": `Bearer ${TEST_TOKEN}`,
-                "x-forwarded-for": "10.0.0.1",
+                "x-forwarded-for": `203.0.113.${i}`,
             },
         });
-        const res = await handler(req, { remoteAddr: { hostname: "192.168.1.1", port: 12345, transport: "tcp" }, completed: Promise.resolve() });
-        assertEquals(200, res.status, `Forwarded request ${i} should succeed`);
+        const res = await handler(req, info);
+        assertEquals(200, res.status, `Request ${i} should succeed`);
     }
 
-    // Rate limited based on x-forwarded-for, not remoteAddr
     const limitedReq = new Request("http://localhost/length/test-queue", {
         headers: {
             "Authorization": `Bearer ${TEST_TOKEN}`,
-            "x-forwarded-for": "10.0.0.1",
+            "x-forwarded-for": "203.0.113.99",
         },
     });
-    const limitedRes = await handler(limitedReq, { remoteAddr: { hostname: "192.168.1.99", port: 12345, transport: "tcp" }, completed: Promise.resolve() });
-    assertEquals(429, limitedRes.status, "Should be rate limited by x-forwarded-for");
-
-    // Different x-forwarded-for should not be rate limited even with same remoteAddr
-    const otherReq = new Request("http://localhost/length/test-queue", {
-        headers: {
-            "Authorization": `Bearer ${TEST_TOKEN}`,
-            "x-forwarded-for": "10.0.0.2",
-        },
-    });
-    const otherRes = await handler(otherReq, { remoteAddr: { hostname: "192.168.1.1", port: 12345, transport: "tcp" }, completed: Promise.resolve() });
-    assertEquals(200, otherRes.status, "Different forwarded IP should not be rate limited");
+    const limitedRes = await handler(limitedReq, info);
+    assertEquals(429, limitedRes.status, "Spoofed X-Forwarded-For must not reset the cap");
 });
 
 Deno.test("response body: health returns {status:ok} JSON", async () => {

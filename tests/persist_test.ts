@@ -430,3 +430,34 @@ Deno.test("persist MemoryStore.saveBatch() appends all events", () => {
     assertEquals(events[0].payload, "a");
     assertEquals(events[1].payload, "b");
 });
+
+// ── FileStore directory and malformed line handling ──────────────────────────
+
+Deno.test("persist FileStore.saveEvent creates a missing directory", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const missing = tmpDir + "/does-not-exist";
+    const persist = new Persistency.FileStore();
+    persist.dir(missing);
+    persist.saveEvent("q", "x", true);
+    assertEquals(persist.loadState()[0].payload, "x");
+    persist.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("persist FileStore.loadState skips malformed lines", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir);
+    persist.clear();
+    persist.saveEvent("q", "kept", true);
+    Deno.writeTextFileSync(
+        tmpDir + "/persist.dat",
+        "{not json\n" +
+            JSON.stringify({ queue: "q", payload: "kept", enqueue: true, dequeue: false }) + "\n",
+    );
+    const events = persist.loadState();
+    assertEquals(events.length, 1);
+    assertEquals(events[0].payload, "kept");
+    persist.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});

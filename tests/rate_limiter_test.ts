@@ -130,6 +130,19 @@ Deno.test("rate limiter: x-forwarded-for first IP is used when comma-separated",
     assertEquals(limiter.isAllowed(req("10.0.0.2")), true);
 });
 
+Deno.test("rate limiter: remoteAddr wins over x-forwarded-for", () => {
+    const limiter = new RateLimiter(2, 60000, 100, 10000);
+    const spoofed = new Request("http://localhost/test", {
+        headers: { "x-forwarded-for": "203.0.113.1" },
+    });
+    assertEquals(limiter.isAllowed(spoofed, "198.51.100.9"), true);
+    assertEquals(limiter.isAllowed(spoofed, "198.51.100.9"), true);
+    const otherHeader = new Request("http://localhost/test", {
+        headers: { "x-forwarded-for": "203.0.113.2" },
+    });
+    assertEquals(limiter.isAllowed(otherHeader, "198.51.100.9"), false);
+});
+
 Deno.test("rate limiter: unknown IP used when no x-forwarded-for and no remoteAddr", () => {
     const limiter = new RateLimiter(2, 60000, 100, 10000);
     const bare = new Request("http://localhost/test");
