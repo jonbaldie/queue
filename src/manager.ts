@@ -83,10 +83,6 @@ export default class Manager<T = string> {
         }
     }
 
-    private registered(name: string): boolean {
-        return this.queues.has(name);
-    }
-
     public canCreateQueue(): boolean {
         return this.queues.size < this.queueCountLimit;
     }
@@ -95,10 +91,8 @@ export default class Manager<T = string> {
         this.validateName(name);
         const queue = this.find(name);
         if (!queue) {
-            // Creating a new queue - check if we have room
-            return this.canCreateQueue();
+            return this.canCreateQueue() && 0 < this.queueDepthLimit;
         }
-        // Existing queue - check if it has room
         return queue.length < this.queueDepthLimit;
     }
 
@@ -108,14 +102,16 @@ export default class Manager<T = string> {
 
     public enqueue(name: string, payload: T): Manager<T> {
         this.validateName(name);
-        const queue = this.find(name) || new FIFOQueue<T>();
-
-        if (this.registered(name) === false) {
-            this.register(name, queue);
+        const existing = this.find(name);
+        if (!existing && !this.canCreateQueue()) {
+            throw new Error("Queue count limit reached");
         }
-
+        const queue = existing || new FIFOQueue<T>();
         if (queue.length >= this.queueDepthLimit) {
             throw new Error("Queue depth limit reached");
+        }
+        if (!existing) {
+            this.register(name, queue);
         }
         queue.push(payload);
 
@@ -183,7 +179,7 @@ export default class Manager<T = string> {
         for (const event of this.store.loadState()) {
             this.applyLoadedEvent(event);
         }
-        this.store.clear();
+        this.save();
     }
 
     private applyLoadedEvent(event: QueueEvent<T>): void {
