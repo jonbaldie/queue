@@ -17,6 +17,18 @@ export function isQueueEvent<T>(value: unknown): value is QueueEvent<T> {
         event.enqueue !== event.dequeue;
 }
 
+function parseLine<T>(line: string): QueueEvent<T> | undefined {
+    try {
+        const event = JSON.parse(line);
+        if (isQueueEvent<T>(event)) {
+            return event;
+        }
+        return undefined;
+    } catch {
+        return undefined;
+    }
+}
+
 export interface QueueStore<T = string> {
     saveEvent(queueName: string, payload: T, isEnqueue: boolean): void;
     saveBatch(events: Array<QueueEvent<T>>): void;
@@ -108,7 +120,7 @@ export class FileStore<T = string> implements QueueStore<T> {
                 let leftover = "";
                 while (true) {
                     const read = file.readSync(chunk);
-                    if (read === null || read <= 0) {
+                    if (!read) {
                         break;
                     }
                     leftover += decoder.decode(chunk.subarray(0, read), { stream: true });
@@ -117,13 +129,9 @@ export class FileStore<T = string> implements QueueStore<T> {
                         const line = leftover.slice(0, idx);
                         leftover = leftover.slice(idx + 1);
                         if (line.length > 0) {
-                            try {
-                                const event = JSON.parse(line);
-                                if (isQueueEvent<T>(event)) {
-                                    events.push(event);
-                                }
-                            } catch {
-                                // skip malformed lines
+                            const event = parseLine<T>(line);
+                            if (event) {
+                                events.push(event);
                             }
                         }
                         idx = leftover.indexOf("\n");
@@ -132,13 +140,9 @@ export class FileStore<T = string> implements QueueStore<T> {
                 // Flush decoder and process any remaining line (no trailing newline)
                 leftover += decoder.decode();
                 if (leftover.length > 0) {
-                    try {
-                        const event = JSON.parse(leftover);
-                        if (isQueueEvent<T>(event)) {
-                            events.push(event);
-                        }
-                    } catch {
-                        // skip malformed lines
+                    const event = parseLine<T>(leftover);
+                    if (event) {
+                        events.push(event);
                     }
                 }
                 return events;
