@@ -327,12 +327,45 @@ Deno.test("manager cleans up empty queues to prevent unbounded growth", () => {
     assertEquals("bar", mgr.dequeue("another"));
 });
 
-Deno.test("dequeue from empty unknown queue does not remove auto-created queue", () => {
+Deno.test("dequeue from unknown queue does not consume a queue slot", () => {
     const mgr = new QueueManager(new Persistency.MemoryStore, 10000, 1);
 
-    // Auto-creates an empty queue; was never non-empty so stays registered
     mgr.dequeue("never-existed");
-    assertEquals(false, mgr.canCreateQueue());
+    assertEquals(true, mgr.canCreateQueue());
+    mgr.enqueue("real", "bar");
+    assertEquals("bar", mgr.dequeue("real"));
+});
+
+Deno.test("length of unknown queue does not consume a queue slot", () => {
+    const mgr = new QueueManager(new Persistency.MemoryStore, 10000, 1);
+
+    assertEquals(mgr.length("ghost"), 0);
+    assertEquals(mgr.listQueues(), []);
+    assertEquals(true, mgr.canCreateQueue());
+    mgr.enqueue("real", "bar");
+    assertEquals("bar", mgr.dequeue("real"));
+});
+
+Deno.test("load does not throw or exceed depth when the log is deeper than the limit", () => {
+    const persist = new Persistency.MemoryStore();
+    persist.saveEvent("jobs", "a", true);
+    persist.saveEvent("jobs", "b", true);
+
+    const mgr = new QueueManager(persist, 1, 10);
+    mgr.load();
+    assertEquals(mgr.length("jobs"), 1);
+    assertEquals(mgr.dequeue("jobs"), "a");
+});
+
+Deno.test("load does not exceed queue count when the log has more queues than the limit", () => {
+    const persist = new Persistency.MemoryStore();
+    persist.saveEvent("one", "a", true);
+    persist.saveEvent("two", "b", true);
+
+    const mgr = new QueueManager(persist, 10, 1);
+    mgr.load();
+    assertEquals(mgr.listQueues(), ["one"]);
+    assertEquals(mgr.dequeue("one"), "a");
 });
 
 Deno.test("enqueue after cleanup restores queue", () => {
