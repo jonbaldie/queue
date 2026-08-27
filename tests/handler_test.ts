@@ -81,6 +81,22 @@ Deno.test("limits: create beyond queue count limit returns 507", async () => {
     assertEquals(507, overflowRes.status, "Creating beyond queue count limit should return 507");
 });
 
+Deno.test("limits: reading unknown queues does not exceed queue count limit", async () => {
+    const handler = makeHandler(undefined, 1, undefined, API_TOKEN);
+    for (const queue of ["a", "b"]) {
+        const response = await handler(new Request(`http://localhost/length/${queue}`, {
+            headers: authHeaders,
+        }));
+        assertEquals(response.status, 200);
+    }
+    const queuesResponse = await handler(new Request("http://localhost/queues", {
+        headers: authHeaders,
+    }));
+    assertEquals(queuesResponse.status, 200);
+    const queues = await queuesResponse.json() as string[];
+    assertEquals(queues.length <= 1, true);
+});
+
 // Rate limit tests
 
 Deno.test("limits: exceed rate limit returns 429", async () => {
@@ -342,6 +358,16 @@ Deno.test("response body: invalid JSON returns 'Invalid JSON'", async () => {
     }));
     assertEquals(res.status, 400);
     assertEquals(await res.text(), "Invalid JSON");
+});
+
+Deno.test("enqueue of a JSON primitive returns 400 instead of throwing", async () => {
+    const handler = makeHandler();
+    const res = await handler(new Request("http://localhost/enqueue/q", {
+        method: "POST",
+        body: "0",
+        headers: auth,
+    }));
+    assertEquals(res.status, 400);
 });
 
 Deno.test("response body: successful enqueue returns queue name in body", async () => {

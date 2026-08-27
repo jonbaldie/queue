@@ -81,6 +81,9 @@ export default class Manager<T = string> {
         const wasRegistered = this.registered(name);
 
         if (wasRegistered === false) {
+            if (!this.canCreateQueue()) {
+                return undefined;
+            }
             this.register(name, queue);
         }
 
@@ -115,6 +118,9 @@ export default class Manager<T = string> {
         const queue = this.find(name) || [];
 
         if (this.registered(name) === false) {
+            if (!this.canCreateQueue()) {
+                return 0;
+            }
             this.register(name, queue);
         }
 

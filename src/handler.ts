@@ -31,6 +31,9 @@ function enqueueHandler(mgr: QueueManager<string>): RouteHandler {
         }
         try {
             const json = JSON.parse(body);
+            if (json === null || typeof json !== "object") {
+                return new Response("Missing payload key", { status: 400 });
+            }
             if (!("payload" in json)) {
                 return new Response("Missing payload key", { status: 400 });
             }
