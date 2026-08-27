@@ -19,7 +19,15 @@ export class FileStore<T = string> implements QueueStore<T> {
         return this.directory + "persist.dat";
     }
 
+    private ensureDirectory(): void {
+        if (this.directory === "") {
+            return;
+        }
+        Deno.mkdirSync(this.directory, { recursive: true });
+    }
+
     public saveEvent(queueName: string, payload: T, isEnqueue: boolean): void {
+        this.ensureDirectory();
         const line = JSON.stringify({
             queue: queueName,
             payload: payload,
@@ -37,6 +45,7 @@ export class FileStore<T = string> implements QueueStore<T> {
     }
 
     public clear(): void {
+        this.ensureDirectory();
         const file = Deno.openSync(this.path, { write: true, create: true });
         file.lockSync(true);
         try {
@@ -72,7 +81,13 @@ export class FileStore<T = string> implements QueueStore<T> {
                 const content = new TextDecoder().decode(buf);
                 return content.split("\n")
                     .filter((line: string) => line.length > 0)
-                    .map((line: string) => JSON.parse(line));
+                    .flatMap((line: string) => {
+                        try {
+                            return [JSON.parse(line)];
+                        } catch {
+                            return [];
+                        }
+                    });
             } finally {
                 file.unlockSync();
                 file.close();

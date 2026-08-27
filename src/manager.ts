@@ -76,22 +76,15 @@ export default class Manager<T = string> {
 
     public dequeue(name: string): T | undefined {
         this.validateName(name);
-        const queue = this.find(name) || [];
-
-        const wasRegistered = this.registered(name);
-
-        if (wasRegistered === false) {
-            if (!this.canCreateQueue()) {
-                return undefined;
-            }
-            this.register(name, queue);
+        const queue = this.find(name);
+        if (!queue) {
+            return undefined;
         }
 
         const wasNonEmpty = queue.length > 0;
         const payload = queue.shift();
 
-        // Clean up empty queues to prevent memory leak (queue-18u)
-        if (wasRegistered && wasNonEmpty && queue.length === 0) {
+        if (wasNonEmpty && queue.length === 0) {
             this.queues.delete(name);
         }
 
@@ -115,16 +108,8 @@ export default class Manager<T = string> {
 
     public length(name: string): number {
         this.validateName(name);
-        const queue = this.find(name) || [];
-
-        if (this.registered(name) === false) {
-            if (!this.canCreateQueue()) {
-                return 0;
-            }
-            this.register(name, queue);
-        }
-
-        return queue.length;
+        const queue = this.find(name);
+        return queue ? queue.length : 0;
     }
 
     public listQueues(): string[] {
@@ -144,23 +129,30 @@ export default class Manager<T = string> {
         const events = this.store.loadState();
 
         events.forEach((event) => {
-            const queue = this.find(event.queue) || [];
-
-            if (this.registered(event.queue) === false) {
-                this.register(event.queue, queue);
-            }
-
             if (event.enqueue) {
+                const existing = this.find(event.queue);
+                if (!existing && !this.canCreateQueue()) {
+                    return;
+                }
+                const queue = existing || [];
                 if (queue.length >= this.queueDepthLimit) {
-                    throw new Error("Queue depth limit reached");
+                    return;
+                }
+                if (!existing) {
+                    this.register(event.queue, queue);
                 }
                 queue.push(event.payload);
-            } else if (event.dequeue) {
+                return;
+            }
+
+            if (event.dequeue) {
+                const queue = this.find(event.queue);
+                if (!queue) {
+                    return;
+                }
                 const wasNonEmpty = queue.length > 0;
                 queue.shift();
-
-                // Clean up empty queues to prevent memory leak (queue-18u)
-                if (this.registered(event.queue) && wasNonEmpty && queue.length === 0) {
+                if (wasNonEmpty && queue.length === 0) {
                     this.queues.delete(event.queue);
                 }
             }
