@@ -46,6 +46,7 @@ Deno.test("parseConfig - parses --persist flag correctly", () => {
 
 Deno.test("parseConfig - throws ConfigError on non-numeric PORT", () => {
     assertThrows(() => parseConfig({ PORT: "abc" }, []), ConfigError, "PORT must be a valid integer between 0 and 65535");
+    assertThrows(() => parseConfig({ PORT: "1x" }, []), ConfigError, "PORT must be a valid integer between 0 and 65535");
 });
 
 Deno.test("parseConfig - throws ConfigError on out-of-range PORT", () => {
@@ -62,6 +63,7 @@ Deno.test("parseConfig - throws ConfigError on invalid QUEUE_DEPTH_LIMIT", () =>
 Deno.test("parseConfig - throws ConfigError on invalid QUEUE_COUNT_LIMIT", () => {
     assertThrows(() => parseConfig({ QUEUE_COUNT_LIMIT: "abc" }, []), ConfigError, "QUEUE_COUNT_LIMIT must be a positive integer");
     assertThrows(() => parseConfig({ QUEUE_COUNT_LIMIT: "-5" }, []), ConfigError, "QUEUE_COUNT_LIMIT must be a positive integer");
+    assertThrows(() => parseConfig({ QUEUE_COUNT_LIMIT: "1x" }, []), ConfigError, "QUEUE_COUNT_LIMIT must be a positive integer");
 });
 
 Deno.test("parseConfig - throws ConfigError on invalid RATE_LIMIT_REQUESTS", () => {

@@ -26,8 +26,11 @@ export function parseConfig(env: Record<string, string | undefined>, args: strin
 
     let port = 3000;
     if (env["PORT"]) {
-        const p = parseInt(env["PORT"], 10);
-        if (isNaN(p) || p < 0 || p > 65535) {
+        if (!/^\d+$/.test(env["PORT"])) {
+            throw new ConfigError("PORT must be a valid integer between 0 and 65535");
+        }
+        const p = Number(env["PORT"]);
+        if (!Number.isInteger(p) || p < 0 || p > 65535) {
             throw new ConfigError("PORT must be a valid integer between 0 and 65535");
         }
         port = p;
@@ -35,8 +38,11 @@ export function parseConfig(env: Record<string, string | undefined>, args: strin
 
     const parsePositiveInt = (name: string, value: string | undefined, defaultValue: number): number => {
         if (!value) return defaultValue;
-        const num = parseInt(value, 10);
-        if (isNaN(num) || num <= 0) {
+        if (!/^\d+$/.test(value)) {
+            throw new ConfigError(`${name} must be a positive integer`);
+        }
+        const num = Number(value);
+        if (!Number.isInteger(num) || num <= 0) {
             throw new ConfigError(`${name} must be a positive integer`);
         }
         return num;
