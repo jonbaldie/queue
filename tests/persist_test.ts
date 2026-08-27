@@ -355,3 +355,78 @@ Deno.test("manager load() dequeue entry removes item from queue", () => {
     persist.close();
     Deno.removeSync(tmpDir, { recursive: true });
 });
+
+// ── saveBatch edge cases ────────────────────────────────────────────────────
+
+Deno.test("persist FileStore.saveBatch([]) does not create file", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const p = new Persistency.FileStore();
+    p.dir(tmpDir + "/");
+    p.saveBatch([]);
+    let fileExists = false;
+    try { Deno.statSync(tmpDir + "/persist.dat"); fileExists = true; } catch { /* expected */ }
+    assertEquals(fileExists, false);
+    p.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("persist FileStore.saveBatch() writes multiple events in one batch", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const p = new Persistency.FileStore();
+    p.dir(tmpDir + "/");
+    p.clear();
+    p.saveBatch([
+        { queue: "q", payload: "a", enqueue: true, dequeue: false },
+        { queue: "q", payload: "b", enqueue: false, dequeue: true },
+    ]);
+    const events = p.loadState();
+    assertEquals(events.length, 2);
+    assertEquals(events[0].payload, "a");
+    assertEquals(events[0].enqueue, true);
+    assertEquals(events[0].dequeue, false);
+    assertEquals(events[1].payload, "b");
+    assertEquals(events[1].enqueue, false);
+    assertEquals(events[1].dequeue, true);
+    p.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+// ── loadState() without trailing newline ────────────────────────────────────
+
+Deno.test("persist FileStore.loadState() handles data without trailing newline", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const line1 = JSON.stringify({ queue: "q", payload: "with-newline", enqueue: true, dequeue: false }) + "\n";
+    const line2 = JSON.stringify({ queue: "q", payload: "no-newline", enqueue: true, dequeue: false });
+    Deno.writeFileSync(tmpDir + "/persist.dat", new TextEncoder().encode(line1 + line2));
+
+    const p = new Persistency.FileStore();
+    p.dir(tmpDir + "/");
+    const events = p.loadState();
+    assertEquals(events.length, 2);
+    assertEquals(events[0].payload, "with-newline");
+    assertEquals(events[1].payload, "no-newline");
+    p.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+// ── MemoryStore edge cases ──────────────────────────────────────────────────
+
+Deno.test("persist MemoryStore.saveEvent sets dequeue to opposite of isEnqueue", () => {
+    const p = new Persistency.MemoryStore();
+    p.saveEvent("q", "enq", true);
+    assertEquals(p.loadState()[0].dequeue, false);
+    p.saveEvent("q", "deq", false);
+    assertEquals(p.loadState()[1].dequeue, true);
+});
+
+Deno.test("persist MemoryStore.saveBatch() appends all events", () => {
+    const p = new Persistency.MemoryStore();
+    p.saveBatch([
+        { queue: "q", payload: "a", enqueue: true, dequeue: false },
+        { queue: "q", payload: "b", enqueue: true, dequeue: false },
+    ]);
+    const events = p.loadState();
+    assertEquals(events.length, 2);
+    assertEquals(events[0].payload, "a");
+    assertEquals(events[1].payload, "b");
+});

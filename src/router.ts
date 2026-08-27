@@ -41,4 +41,3 @@ export class Router {
         return new Response("Not found.", { status: 404 });
     };
 }
-// Performance fixes for #53-60
