@@ -495,3 +495,63 @@ Deno.test("Manager: separate queues don't interfere (catches queue isolation)", 
     assertEquals(mgr.length("queue-b"), 1);
     assertEquals(mgr.dequeue("queue-b"), "b-item");
 });
+
+// ── Mutation coverage for manager.ts ──────────────────────────────────────────
+
+Deno.test("QueueNameTooLongError has correct message and name", () => {
+    const error = new QueueNameTooLongError();
+    assertEquals(error.message, "Queue name too long");
+    assertEquals(error.name, "QueueNameTooLongError");
+});
+
+Deno.test("manager canEnqueue validates queue name", () => {
+    const mgr = new QueueManager(new Persistency.MemoryStore());
+    assertThrows(() => mgr.canEnqueue("x".repeat(129)), QueueNameTooLongError);
+});
+
+Deno.test("manager enqueue throws when queue depth limit reached", () => {
+    const mgr = new QueueManager(new Persistency.MemoryStore(), 2, 1000);
+    mgr.enqueue("q", "a");
+    mgr.enqueue("q", "b");
+    assertThrows(() => mgr.enqueue("q", "c"), Error, "Queue depth limit reached");
+});
+
+Deno.test("manager persistEnabled=false skips saveEvent on enqueue", () => {
+    const persist = new Persistency.MemoryStore();
+    const mgr = new QueueManager(persist, 10000, 1000, false);
+    mgr.enqueue("q", "item");
+    assertEquals(persist.loadState().length, 0);
+});
+
+Deno.test("manager load throws when queue depth limit exceeded", () => {
+    const persist = new Persistency.MemoryStore();
+    persist.saveEvent("q", "a", true);
+    persist.saveEvent("q", "b", true);
+    const mgr = new QueueManager(persist, 1, 1000);
+    assertThrows(() => mgr.load(), Error, "Queue depth limit reached");
+});
+
+Deno.test("manager load skips events with neither enqueue nor dequeue", () => {
+    const persist = new Persistency.MemoryStore();
+    persist.saveBatch([
+        { queue: "q", payload: "a", enqueue: true, dequeue: false },
+        { queue: "q", payload: "b", enqueue: false, dequeue: false },
+    ]);
+    const mgr = new QueueManager(persist);
+    mgr.load();
+    assertEquals(mgr.length("q"), 1);
+    assertEquals(mgr.dequeue("q"), "a");
+});
+
+Deno.test("dequeue on registered-but-empty queue does not delete it", () => {
+    const mgr = new QueueManager(new Persistency.MemoryStore(), 10000, 1);
+    mgr.length("auto-created"); // auto-registers empty queue
+    mgr.dequeue("auto-created"); // wasRegistered=true, wasNonEmpty=false
+    assertEquals(false, mgr.canCreateQueue()); // queue should still be registered
+});
+
+Deno.test("manager length auto-registers unknown queue", () => {
+    const mgr = new QueueManager(new Persistency.MemoryStore(), 10000, 1);
+    mgr.length("new-q");
+    assertEquals(false, mgr.canCreateQueue()); // queue was auto-registered, at limit
+});
