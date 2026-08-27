@@ -1,4 +1,4 @@
-import { QueueStore } from "./persist.ts"
+import { QueueEvent, QueueStore } from "./persist.ts"
 export const MAX_QUEUE_NAME_LENGTH = 128;
 
 export class QueueNameTooLongError extends Error {
@@ -126,38 +126,46 @@ export default class Manager<T = string> {
     }
 
     public load(): void {
-        const events = this.store.loadState();
-
-        events.forEach((event) => {
-            if (event.enqueue) {
-                const existing = this.find(event.queue);
-                if (!existing && !this.canCreateQueue()) {
-                    return;
-                }
-                const queue = existing || [];
-                if (queue.length >= this.queueDepthLimit) {
-                    return;
-                }
-                if (!existing) {
-                    this.register(event.queue, queue);
-                }
-                queue.push(event.payload);
-                return;
-            }
-
-            if (event.dequeue) {
-                const queue = this.find(event.queue);
-                if (!queue) {
-                    return;
-                }
-                const wasNonEmpty = queue.length > 0;
-                queue.shift();
-                if (wasNonEmpty && queue.length === 0) {
-                    this.queues.delete(event.queue);
-                }
-            }
-        });
-
+        for (const event of this.store.loadState()) {
+            this.applyLoadedEvent(event);
+        }
         this.store.clear();
+    }
+
+    private applyLoadedEvent(event: QueueEvent<T>): void {
+        if (event.enqueue) {
+            this.applyLoadedEnqueue(event);
+            return;
+        }
+        if (event.dequeue) {
+            this.applyLoadedDequeue(event);
+        }
+    }
+
+    private applyLoadedEnqueue(event: QueueEvent<T>): void {
+        const existing = this.find(event.queue);
+        if (!existing && !this.canCreateQueue()) {
+            return;
+        }
+        const queue = existing || [];
+        if (queue.length >= this.queueDepthLimit) {
+            return;
+        }
+        if (!existing) {
+            this.register(event.queue, queue);
+        }
+        queue.push(event.payload);
+    }
+
+    private applyLoadedDequeue(event: QueueEvent<T>): void {
+        const queue = this.find(event.queue);
+        if (!queue) {
+            return;
+        }
+        const wasNonEmpty = queue.length > 0;
+        queue.shift();
+        if (wasNonEmpty && queue.length === 0) {
+            this.queues.delete(event.queue);
+        }
     }
 }
