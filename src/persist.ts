@@ -5,7 +5,7 @@ export interface QueueEvent<T> {
     dequeue: boolean;
 }
 
-function isQueueEvent<T>(value: unknown): value is QueueEvent<T> {
+export function isQueueEvent<T>(value: unknown): value is QueueEvent<T> {
     if (typeof value !== "object" || value === null || Array.isArray(value)) {
         return false;
     }
