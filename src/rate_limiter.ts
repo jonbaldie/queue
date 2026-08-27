@@ -27,19 +27,39 @@ export class RateLimiter {
     private cleanupStaleEntries(now: number): void {
         const cutoff = now - this.windowMs;
         for (const [ip, timestamps] of this.requestTimestamps) {
-            const fresh = timestamps.filter(ts => ts > cutoff);
-            if (fresh.length === 0) {
+            // Fast path: timestamps are sorted ascending, so if the oldest
+            // (first) is still fresh, all are fresh — skip without scanning.
+            if (timestamps.length === 0 || timestamps[0] > cutoff) {
+                continue;
+            }
+            // Binary search for the first fresh timestamp (array is sorted ascending)
+            let lo = 0, hi = timestamps.length;
+            while (lo < hi) {
+                const mid = (lo + hi) >>> 1;
+                if (timestamps[mid] > cutoff) {
+                    hi = mid;
+                } else {
+                    lo = mid + 1;
+                }
+            }
+            // lo is the index of the first fresh timestamp
+            if (lo === timestamps.length) {
+                // All stale
                 this.requestTimestamps.delete(ip);
-            } else if (fresh.length !== timestamps.length) {
-                this.requestTimestamps.set(ip, fresh);
+            } else if (lo > 0) {
+                // Some stale, some fresh — keep only the fresh ones
+                this.requestTimestamps.set(ip, timestamps.slice(lo));
             }
         }
 
         if (this.requestTimestamps.size > this.maxTrackedIPs) {
+            // Evict IPs with the oldest last-activity (max timestamp).
+            // Timestamps are sorted ascending, so the last element is the max —
+            // O(1) per comparison instead of O(T) via Math.max(...arr).
             const entries = Array.from(this.requestTimestamps.entries());
             entries.sort((a, b) => {
-                const aMax = Math.max(...a[1]);
-                const bMax = Math.max(...b[1]);
+                const aMax = a[1][a[1].length - 1];
+                const bMax = b[1][b[1].length - 1];
                 return aMax - bMax;
             });
             const toEvict = this.requestTimestamps.size - this.maxTrackedIPs;
