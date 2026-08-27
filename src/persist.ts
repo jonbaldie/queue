@@ -5,6 +5,18 @@ export interface QueueEvent<T> {
     dequeue: boolean;
 }
 
+export function isQueueEvent<T>(value: unknown): value is QueueEvent<T> {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+        return false;
+    }
+    const event = value as Record<string, unknown>;
+    return typeof event.queue === "string" &&
+        "payload" in event &&
+        typeof event.enqueue === "boolean" &&
+        typeof event.dequeue === "boolean" &&
+        event.enqueue !== event.dequeue;
+}
+
 export interface QueueStore<T = string> {
     saveEvent(queueName: string, payload: T, isEnqueue: boolean): void;
     loadState(): Array<QueueEvent<T>>;
@@ -83,7 +95,8 @@ export class FileStore<T = string> implements QueueStore<T> {
                     .filter((line: string) => line.length > 0)
                     .flatMap((line: string) => {
                         try {
-                            return [JSON.parse(line)];
+                            const event = JSON.parse(line);
+                            return isQueueEvent<T>(event) ? [event] : [];
                         } catch {
                             return [];
                         }

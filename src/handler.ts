@@ -13,7 +13,9 @@ async function readRequestBody(request: Request): Promise<string | Response> {
     }
     try {
         const body = await request.text();
-        if (body.length > MAX_BODY_SIZE) {
+        // Measure wire size in bytes, not UTF-16 code units: a multi-byte
+        // UTF-8 body can exceed the byte limit while `body.length` is under it.
+        if (LOG_ENCODER.encode(body).length > MAX_BODY_SIZE) {
             return new Response("Payload too large", { status: 413 });
         }
         return body;
