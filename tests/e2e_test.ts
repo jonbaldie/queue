@@ -129,3 +129,34 @@ Deno.test("server shuts down gracefully on SIGINT", async () => {
         await Deno.remove(tempDir, { recursive: true }).catch(() => {});
     }
 });
+
+Deno.test("server starts and ignores a null persistence record", async () => {
+    const tempDir = await Deno.makeTempDir();
+    const token = "malformed-persist-test-token";
+
+    try {
+        await Deno.writeTextFile(tempDir + "/persist.dat", "null");
+        const { child, port } = await startServer({
+            HOST: "127.0.0.1",
+            PORT: "0",
+            PERSIST: tempDir,
+            QUEUE_API_TOKEN: token,
+        });
+
+        try {
+            const health = await fetch(`http://127.0.0.1:${port}/health`);
+            assertEquals(health.status, 200);
+            await health.body?.cancel();
+
+            const queues = await fetch(`http://127.0.0.1:${port}/queues`, {
+                headers: { "Authorization": `Bearer ${token}` },
+            });
+            assertEquals(queues.status, 200);
+            assertEquals(await queues.json(), []);
+        } finally {
+            await cleanupChild(child);
+        }
+    } finally {
+        await Deno.remove(tempDir, { recursive: true }).catch(() => {});
+    }
+});

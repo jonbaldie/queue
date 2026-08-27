@@ -5,6 +5,18 @@ export interface QueueEvent<T> {
     dequeue: boolean;
 }
 
+export function isQueueEvent<T>(value: unknown): value is QueueEvent<T> {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+        return false;
+    }
+    const event = value as Record<string, unknown>;
+    return typeof event.queue === "string" &&
+        "payload" in event &&
+        typeof event.enqueue === "boolean" &&
+        typeof event.dequeue === "boolean" &&
+        event.enqueue !== event.dequeue;
+}
+
 export interface QueueStore<T = string> {
     saveEvent(queueName: string, payload: T, isEnqueue: boolean): void;
     saveBatch(events: Array<QueueEvent<T>>): void;
@@ -106,7 +118,10 @@ export class FileStore<T = string> implements QueueStore<T> {
                         leftover = leftover.slice(idx + 1);
                         if (line.length > 0) {
                             try {
-                                events.push(JSON.parse(line));
+                                const event = JSON.parse(line);
+                                if (isQueueEvent<T>(event)) {
+                                    events.push(event);
+                                }
                             } catch {
                                 // skip malformed lines
                             }
@@ -118,7 +133,10 @@ export class FileStore<T = string> implements QueueStore<T> {
                 leftover += decoder.decode();
                 if (leftover.length > 0) {
                     try {
-                        events.push(JSON.parse(leftover));
+                        const event = JSON.parse(leftover);
+                        if (isQueueEvent<T>(event)) {
+                            events.push(event);
+                        }
                     } catch {
                         // skip malformed lines
                     }

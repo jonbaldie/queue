@@ -461,3 +461,60 @@ Deno.test("persist FileStore.loadState skips malformed lines", () => {
     persist.close();
     Deno.removeSync(tmpDir, { recursive: true });
 });
+
+// ── isQueueEvent() shape guard ──────────────────────────────────────────────
+// The guard decides which parsed JSON records FileStore.loadState replays.
+// These cases are pure (no I/O) so mutation verdicts are deterministic on CI.
+
+const validEvents: unknown[] = [
+    { queue: "q", payload: "x", enqueue: true, dequeue: false },
+    { queue: "q", payload: "x", enqueue: false, dequeue: true },
+    { queue: "q", payload: { nested: 1 }, enqueue: true, dequeue: false },
+];
+
+const invalidEvents: unknown[] = [
+    null, // not an object
+    [], // array, not a plain object
+    42, // primitive
+    "not-an-object",
+    { queue: 1, payload: "x", enqueue: true, dequeue: false }, // non-string queue
+    { queue: "q", enqueue: true, dequeue: false }, // missing payload
+    { queue: "q", payload: "x", enqueue: 1, dequeue: false }, // non-boolean enqueue
+    { queue: "q", payload: "x", enqueue: true, dequeue: 0 }, // non-boolean dequeue
+    { queue: "q", payload: "x", enqueue: true, dequeue: true }, // enqueue == dequeue
+    { queue: "q", payload: "x", enqueue: false, dequeue: false }, // enqueue == dequeue
+];
+
+Deno.test("isQueueEvent accepts well-formed queue events", () => {
+    for (const candidate of validEvents) {
+        assertEquals(Persistency.isQueueEvent(candidate), true);
+    }
+});
+
+Deno.test("isQueueEvent rejects malformed queue events", () => {
+    for (const candidate of invalidEvents) {
+        assertEquals(Persistency.isQueueEvent(candidate), false);
+    }
+});
+
+Deno.test("FileStore.loadState skips non-event JSON records", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir);
+    persist.clear();
+    const kept = JSON.stringify({ queue: "q", payload: "kept", enqueue: true, dequeue: false });
+    const lines = [
+        "null",
+        "[]",
+        "42",
+        JSON.stringify({ queue: 1, payload: "x", enqueue: true, dequeue: false }),
+        JSON.stringify({ queue: "q", enqueue: true, dequeue: true }),
+        kept,
+    ].join("\n");
+    Deno.writeTextFileSync(tmpDir + "/persist.dat", lines);
+    const events = persist.loadState();
+    assertEquals(events.length, 1);
+    assertEquals(events[0].payload, "kept");
+    persist.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});

@@ -955,6 +955,35 @@ Deno.test("body exceeding limit rejected with fake Content-Length", async () => 
     assertEquals(response.status, 413);
 });
 
+// queue-utf8: a chunked multi-byte UTF-8 body whose byte size exceeds the
+// limit but whose UTF-16 code-unit count is under it must still be rejected.
+// The byte limit must be measured in bytes, not in JS string code units.
+
+Deno.test("oversized multi-byte UTF-8 body without content-length returns 413", async () => {
+    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const handler = createHandler(mgr, API_TOKEN);
+    // U+4E00 is one UTF-16 code unit but three UTF-8 bytes.
+    // 400000 chars -> ~1.2 MiB of wire bytes, < 1 MiB of code units.
+    const fill = "一".repeat(400000);
+    const bodyBytes = new TextEncoder().encode(JSON.stringify({ payload: fill }));
+    assertEquals(bodyBytes.length > 1024 * 1024, true); // exceeds byte limit
+    const bodyStream = new ReadableStream({
+        start(controller) {
+            controller.enqueue(bodyBytes);
+            controller.close();
+        },
+    });
+    const request = new Request("http://localhost:3000/enqueue/testqueue", {
+        method: "POST",
+        body: bodyStream,
+        headers: authHeaders, // no content-length -> chunked
+        // @ts-ignore: duplex is required for streaming bodies in Deno
+        duplex: "half",
+    });
+    const response = await handler(request);
+    assertEquals(response.status, 413);
+});
+
 // queue-02t: Body read error returns 413 not 400
 
 Deno.test("body read error returns 413 not 400", async () => {
