@@ -32,6 +32,7 @@ Deno.test("manager save flushes all queues to persist", () => {
     assertEquals(events.every((p: any) => p.enqueue === true), true);
     assertEquals(events.filter((p: any) => p.queue === "q1").length, 2);
     assertEquals(events.filter((p: any) => p.queue === "q2").length, 1);
+    persist.close();
 });
 
 Deno.test("manager save overwrites previous persist data", () => {
@@ -47,6 +48,7 @@ Deno.test("manager save overwrites previous persist data", () => {
 
     const events = persist.loadState();
     assertEquals(events.length, 2);
+    persist.close();
 });
 
 Deno.test("manager save with empty queues writes nothing", () => {
@@ -57,6 +59,7 @@ Deno.test("manager save with empty queues writes nothing", () => {
     mgr.save();
 
     assertEquals(persist.loadState(), []);
+    persist.close();
 });
 
 Deno.test("manager save preserves queue order", () => {
@@ -73,6 +76,7 @@ Deno.test("manager save preserves queue order", () => {
     const events = persist.loadState();
     const payloads = events.map((e: any) => e.payload);
     assertEquals(payloads, ["first", "second", "third"]);
+    persist.close();
 });
 
 Deno.test("manager save then load round-trips data", () => {
@@ -94,6 +98,7 @@ Deno.test("manager save then load round-trips data", () => {
     assertEquals(mgr2.dequeue("x"), "one");
     assertEquals(mgr2.dequeue("x"), "two");
     assertEquals(mgr2.dequeue("y"), "three");
+    persist.close();
 });
 
 async function startServer(env: Record<string, string>): Promise<{ child: Deno.ChildProcess; port: number }> {
@@ -194,6 +199,7 @@ Deno.test("manager persistency", () => {
     assertEquals("bar", mgr.dequeue("foo"));
     assertEquals(1, mgr.length("fee"));
     assertEquals("gat", mgr.dequeue("fee"));
+    persist.close();
 });
 
 Deno.test("json persistency", () => {
@@ -209,6 +215,7 @@ Deno.test("json persistency", () => {
     assertEquals([], persist.loadState());
     assertEquals(1, mgr.length("foo"));
     assertEquals(payload, mgr.dequeue("foo"));
+    persist.close();
 });
 
 Deno.test("persistency", () => {
@@ -225,6 +232,7 @@ Deno.test("persistency", () => {
     assertNotEquals("", load());
 
     persist.clear();
+    persist.close();
 });
 
 Deno.test("concurrent enqueue writes to file", async () => {
@@ -256,6 +264,7 @@ Deno.test("concurrent enqueue writes to file", async () => {
     });
 
     persist.clear();
+    persist.close();
 });
 
 Deno.test("concurrent manager operations maintain data integrity", async () => {
@@ -288,6 +297,7 @@ Deno.test("concurrent manager operations maintain data integrity", async () => {
     assertEquals(0, mgr.length("q1"));
 
     persist.clear();
+    persist.close();
 });
 
 Deno.test("persist operations handle I/O errors gracefully", () => {
@@ -303,6 +313,7 @@ Deno.test("persist operations handle I/O errors gracefully", () => {
     }
 
     assertEquals(true, errorThrown);
+    persist.close();
 });
 
 
@@ -378,6 +389,7 @@ Deno.test("manager load cleans up empty queues from persistence", () => {
 
     mgr.enqueue("other", "value");
     assertEquals("value", mgr.dequeue("other"));
+    persist.close();
 });
 
 Deno.test("empty dequeue does not add entry to persistence log", () => {
@@ -391,6 +403,7 @@ Deno.test("empty dequeue does not add entry to persistence log", () => {
     assertEquals(events.length, 0);
 
     persist.clear();
+    persist.close();
 });
 
 Deno.test("non-empty dequeue still adds entry to persistence log", () => {
@@ -411,6 +424,7 @@ Deno.test("non-empty dequeue still adds entry to persistence log", () => {
     assertEquals(deqEntry.enqueue, false);
 
     persist.clear();
+    persist.close();
 });
 
 Deno.test("Manager<number> enqueue and dequeue numbers", () => {

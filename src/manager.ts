@@ -1,4 +1,4 @@
-import { QueueStore } from "./persist.ts"
+import { QueueStore, QueueEvent } from "./persist.ts"
 export const MAX_QUEUE_NAME_LENGTH = 128;
 
 export class QueueNameTooLongError extends Error {
@@ -8,20 +8,70 @@ export class QueueNameTooLongError extends Error {
     }
 }
 
+/**
+ * FIFO queue with O(1) amortized enqueue and dequeue.
+ * Uses a head index instead of Array.shift() to avoid O(n) reindexing.
+ */
+class FIFOQueue<T> {
+    private items: T[] = [];
+    private head = 0;
+
+    push(item: T): void {
+        this.items.push(item);
+    }
+
+    shift(): T | undefined {
+        if (this.head >= this.items.length) return undefined;
+        const item = this.items[this.head];
+        this.items[this.head] = undefined as T; // help GC
+        this.head++;
+        // Compact when the consumed prefix exceeds the remaining items
+        if (this.head > 16 && this.head >= (this.items.length >> 1)) {
+            this.items = this.items.slice(this.head);
+            this.head = 0;
+        }
+        return item;
+    }
+
+    peek(): T | undefined {
+        return this.head < this.items.length ? this.items[this.head] : undefined;
+    }
+
+    get length(): number {
+        return this.items.length - this.head;
+    }
+
+    [Symbol.iterator](): Iterator<T> {
+        let index = this.head;
+        const items = this.items;
+        const end = items.length;
+        return {
+            next(): IteratorResult<T> {
+                if (index < end) {
+                    return { value: items[index++], done: false };
+                }
+                return { value: undefined as unknown as T, done: true };
+            },
+        };
+    }
+}
+
 export default class Manager<T = string> {
-    private queues: Map<string, Array<T>>;
+    private queues: Map<string, FIFOQueue<T>>;
     private store: QueueStore<T>;
     private queueDepthLimit: number;
     private queueCountLimit: number;
+    private persistEnabled: boolean;
 
-    constructor(store: QueueStore<T>, queueDepthLimit?: number, queueCountLimit?: number) {
+    constructor(store: QueueStore<T>, queueDepthLimit?: number, queueCountLimit?: number, persistEnabled?: boolean) {
         this.store = store;
-        this.queues = new Map;
+        this.queues = new Map();
         this.queueDepthLimit = queueDepthLimit ?? 10000;
         this.queueCountLimit = queueCountLimit ?? 1000;
+        this.persistEnabled = persistEnabled ?? true;
     }
 
-    private register(name: string, queue: Array<T>): Manager<T> {
+    private register(name: string, queue: FIFOQueue<T>): Manager<T> {
         this.queues.set(name, queue);
 
         return this;
@@ -52,13 +102,13 @@ export default class Manager<T = string> {
         return queue.length < this.queueDepthLimit;
     }
 
-    private find(name: string): Array<T> | undefined {
+    private find(name: string): FIFOQueue<T> | undefined {
         return this.queues.get(name);
     }
 
     public enqueue(name: string, payload: T): Manager<T> {
         this.validateName(name);
-        const queue = this.find(name) || [];
+        const queue = this.find(name) || new FIFOQueue<T>();
 
         if (this.registered(name) === false) {
             this.register(name, queue);
@@ -69,14 +119,16 @@ export default class Manager<T = string> {
         }
         queue.push(payload);
 
-        this.store.saveEvent(name, payload, true);
+        if (this.persistEnabled) {
+            this.store.saveEvent(name, payload, true);
+        }
 
         return this;
     }
 
     public dequeue(name: string): T | undefined {
         this.validateName(name);
-        const queue = this.find(name) || [];
+        const queue = this.find(name) || new FIFOQueue<T>();
 
         const wasRegistered = this.registered(name);
 
@@ -95,7 +147,7 @@ export default class Manager<T = string> {
             this.queues.delete(name);
         }
 
-        if (payload !== undefined) {
+        if (payload !== undefined && this.persistEnabled) {
             this.store.saveEvent(name, payload, false);
         }
 
@@ -110,12 +162,12 @@ export default class Manager<T = string> {
             return undefined;
         }
 
-        return queue[0];
+        return queue.peek();
     }
 
     public length(name: string): number {
         this.validateName(name);
-        const queue = this.find(name) || [];
+        const queue = this.find(name) || new FIFOQueue<T>();
 
         if (this.registered(name) === false) {
             if (!this.canCreateQueue()) {
@@ -133,18 +185,20 @@ export default class Manager<T = string> {
 
     public save(): void {
         this.store.clear();
+        const events: QueueEvent<T>[] = [];
         for (const [name, queue] of this.queues) {
             for (const item of queue) {
-                this.store.saveEvent(name, item, true);
+                events.push({ queue: name, payload: item, enqueue: true, dequeue: false });
             }
         }
+        this.store.saveBatch(events);
     }
 
     public load(): void {
         const events = this.store.loadState();
 
         events.forEach((event) => {
-            const queue = this.find(event.queue) || [];
+            const queue = this.find(event.queue) || new FIFOQueue<T>();
 
             if (this.registered(event.queue) === false) {
                 this.register(event.queue, queue);

@@ -19,7 +19,7 @@ const PERSIST_ENGINE = CONFIG.persistEnabled
 PERSIST_ENGINE.dir(CONFIG.persistDir);
 
 // Set up the manager, which will handle our queues for us
-const MANAGER = new QueueManager(PERSIST_ENGINE, CONFIG.queueDepthLimit, CONFIG.queueCountLimit);
+const MANAGER = new QueueManager(PERSIST_ENGINE, CONFIG.queueDepthLimit, CONFIG.queueCountLimit, CONFIG.persistEnabled);
 
 // Load up any existing queue data, if we're persisting
 if (PERSIST_ENGINE instanceof Persistency.FileStore) {
@@ -48,6 +48,8 @@ async function shutdown(signal: string): Promise<void> {
         writeLog("Flushing data to persist.dat...\n");
         MANAGER.save();
     }
+
+    PERSIST_ENGINE.close();
 
     writeLog("Goodbye!");
 
