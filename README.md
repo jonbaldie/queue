@@ -52,7 +52,7 @@ To get the next payload from the `foo` queue, send a get request to `/dequeue/:q
 curl -X GET http://127.0.0.1:1991/dequeue/foo
 ```
 
-This returns the oldest added payload on queue `foo` and removes it, guaranteeing both the order and that each payload will only be read once.
+This returns the oldest added payload on queue `foo` as JSON and removes it, guaranteeing both the order and that each payload will only be read once. Strings, numbers, booleans, arrays, and objects all use `application/json` so a string `"0"` is distinct from the number `0`.
 
 That's all you need to get started! 😎
 
@@ -113,7 +113,7 @@ To get persistency, simply add the `--persist` option when starting up the serve
 docker run -d -e PORT=1991 -e HOST=0.0.0.0 -e PERSIST=/mnt/ jonbaldie/queue /usr/bin/queue --persist
 ```
 
-If the server sees that the `persist.dat` file exists on startup, it will run the binary log from the beginning and then clear the file down.
+If the server sees that the `persist.dat` file exists on startup, it will replay the binary log and then rewrite the file as a snapshot of remaining items.
 
 When using Docker, it might be useful to add `persist.dat` as a persistent volume to keep your binary logs safe.
 

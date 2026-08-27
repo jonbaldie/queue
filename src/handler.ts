@@ -67,12 +67,9 @@ function itemResponse(item: unknown): Response {
     if (item === undefined) {
         return new Response(null, { status: 204 });
     }
-    if (typeof item === "object" && item !== null) {
-        return new Response(JSON.stringify(item), {
-            headers: { "Content-Type": "application/json" },
-        });
-    }
-    return new Response(String(item));
+    return new Response(JSON.stringify(item), {
+        headers: { "Content-Type": "application/json" },
+    });
 }
 
 function dequeueHandler(mgr: QueueManager<string>): RouteHandler {

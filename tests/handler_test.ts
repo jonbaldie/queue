@@ -747,8 +747,8 @@ Deno.test("GET peek returns 200 with payload when queue has items", async () => 
     });
     const response = await handler(request);
     assertEquals(response.status, 200);
-    const body = await response.text();
-    assertEquals(body, "peekable");
+    assertEquals(response.headers.get("content-type"), "application/json");
+    assertEquals(await response.json(), "peekable");
 });
 
 // Happy path: GET peek returns 204 when queue is empty
@@ -806,7 +806,7 @@ Deno.test("dequeue returns application/json for array payload", async () => {
     assertEquals(body, [1, 2, 3]);
 });
 
-Deno.test("dequeue returns text/plain for number payload", async () => {
+Deno.test("dequeue returns application/json for number payload", async () => {
     const mgr = new QueueManager(new Persistency.MemoryStore);
     const handler = createHandler(mgr, API_TOKEN);
 
@@ -823,11 +823,11 @@ Deno.test("dequeue returns text/plain for number payload", async () => {
     });
     const response = await handler(request);
     assertEquals(response.status, 200);
-    const body = await response.text();
-    assertEquals(body, "42");
+    assertEquals(response.headers.get("content-type"), "application/json");
+    assertEquals(await response.json(), 42);
 });
 
-Deno.test("dequeue returns text/plain for boolean payload", async () => {
+Deno.test("dequeue returns application/json for boolean payload", async () => {
     const mgr = new QueueManager(new Persistency.MemoryStore);
     const handler = createHandler(mgr, API_TOKEN);
 
@@ -844,8 +844,8 @@ Deno.test("dequeue returns text/plain for boolean payload", async () => {
     });
     const response = await handler(request);
     assertEquals(response.status, 200);
-    const body = await response.text();
-    assertEquals(body, "true");
+    assertEquals(response.headers.get("content-type"), "application/json");
+    assertEquals(await response.json(), true);
 });
 
 // queue-nyc: Missing payload key returns 400
@@ -1003,7 +1003,7 @@ Deno.test("body read error returns 413 not 400", async () => {
     assertEquals(response.status, 413);
 });
 
-Deno.test("dequeue returns text/plain for string payload", async () => {
+Deno.test("dequeue returns application/json for string payload", async () => {
     const mgr = new QueueManager(new Persistency.MemoryStore);
     const handler = createHandler(mgr, API_TOKEN);
 
@@ -1020,8 +1020,8 @@ Deno.test("dequeue returns text/plain for string payload", async () => {
     });
     const response = await handler(request);
     assertEquals(response.status, 200);
-    const body = await response.text();
-    assertEquals(body, "hello world");
+    assertEquals(response.headers.get("content-type"), "application/json");
+    assertEquals(await response.json(), "hello world");
 });
 
 Deno.test("Manager: enqueue followed by multiple dequeues (catches state corruption)", () => {
@@ -1145,8 +1145,7 @@ Deno.test("API: enqueue stores payload and dequeue retrieves it (catches data lo
         })
     );
     assertEquals(deqRes.status, 200);
-    const retrieved = await deqRes.text();
-    assertEquals(retrieved, payload);
+    assertEquals(await deqRes.json(), payload);
 });
 
 Deno.test("API: dequeue empty queue returns 204 (catches crash)", async () => {
@@ -1271,8 +1270,7 @@ Deno.test("API: FIFO order through HTTP (catches dequeue order mutation)", async
                 headers: { "Authorization": `Bearer ${TEST_TOKEN}` },
             })
         );
-        const actual = await res.text();
-        assertEquals(actual, expected);
+        assertEquals(await res.json(), expected);
     }
 });
 
@@ -1297,13 +1295,13 @@ Deno.test("API: multiple queues isolated (catches queue mixing)", async () => {
             headers: { "Authorization": `Bearer ${TEST_TOKEN}` },
         })
     );
-    assertEquals(await res1.text(), "q1-item");
+    assertEquals(await res1.json(), "q1-item");
     const res2 = await handler(
         new Request("http://localhost/dequeue/q2", {
             headers: { "Authorization": `Bearer ${TEST_TOKEN}` },
         })
     );
-    assertEquals(await res2.text(), "q2-item");
+    assertEquals(await res2.json(), "q2-item");
 });
 
 Deno.test("API: enqueue with empty payload (catches validation)", async () => {
@@ -1347,8 +1345,7 @@ Deno.test("API: very long payload (catches buffer handling)", async () => {
             headers: { "Authorization": `Bearer ${TEST_TOKEN}` },
         })
     );
-    const retrieved = await deqRes.text();
-    assertEquals(retrieved, longPayload);
+    assertEquals(await deqRes.json(), longPayload);
 });
 
 Deno.test("auth: no token on enqueue returns 401", async () => {
@@ -1448,4 +1445,52 @@ Deno.test("auth: valid token on length returns 200", async () => {
     });
     const res = await handler(req);
     assertEquals(200, res.status);
+});
+
+Deno.test("dequeue distinguishes string zero from number zero", async () => {
+    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const handler = createHandler(mgr, API_TOKEN);
+
+    await handler(new Request("http://localhost:3000/enqueue/q", {
+        method: "POST",
+        body: JSON.stringify({ payload: "0" }),
+        headers: authHeaders,
+    }));
+    await handler(new Request("http://localhost:3000/enqueue/q", {
+        method: "POST",
+        body: JSON.stringify({ payload: 0 }),
+        headers: authHeaders,
+    }));
+
+    const first = await handler(new Request("http://localhost:3000/dequeue/q", {
+        headers: authHeaders,
+    }));
+    assertEquals(first.status, 200);
+    assertEquals(first.headers.get("content-type"), "application/json");
+    assertEquals(await first.json(), "0");
+
+    const second = await handler(new Request("http://localhost:3000/dequeue/q", {
+        headers: authHeaders,
+    }));
+    assertEquals(second.status, 200);
+    assertEquals(second.headers.get("content-type"), "application/json");
+    assertEquals(await second.json(), 0);
+});
+
+Deno.test("peek returns JSON for a string payload", async () => {
+    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const handler = createHandler(mgr, API_TOKEN);
+
+    await handler(new Request("http://localhost:3000/enqueue/q", {
+        method: "POST",
+        body: JSON.stringify({ payload: "hello" }),
+        headers: authHeaders,
+    }));
+
+    const response = await handler(new Request("http://localhost:3000/peek/q", {
+        headers: authHeaders,
+    }));
+    assertEquals(response.status, 200);
+    assertEquals(response.headers.get("content-type"), "application/json");
+    assertEquals(await response.json(), "hello");
 });

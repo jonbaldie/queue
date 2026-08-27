@@ -194,7 +194,9 @@ Deno.test("manager persistency", () => {
     const mgr = new QueueManager(persist);
     mgr.load();
 
-    assertEquals([], persist.loadState());
+    const snapshot = persist.loadState();
+    assertEquals(snapshot.length, 2);
+    assertEquals(snapshot.every((event) => event.enqueue === true), true);
     assertEquals(1, mgr.length("foo"));
     assertEquals("bar", mgr.dequeue("foo"));
     assertEquals(1, mgr.length("fee"));
@@ -212,7 +214,10 @@ Deno.test("json persistency", () => {
 
     mgr.load();
 
-    assertEquals([], persist.loadState());
+    const snapshot = persist.loadState();
+    assertEquals(snapshot.length, 1);
+    assertEquals(snapshot[0].payload, payload);
+    assertEquals(snapshot[0].enqueue, true);
     assertEquals(1, mgr.length("foo"));
     assertEquals(payload, mgr.dequeue("foo"));
     persist.close();
@@ -576,4 +581,86 @@ Deno.test("manager load skips events with neither enqueue nor dequeue", () => {
     mgr.load();
     assertEquals(mgr.length("q"), 1);
     assertEquals(mgr.dequeue("q"), "a");
+});
+
+Deno.test("enqueue throws when queue count limit reached", () => {
+    const mgr = new QueueManager(new Persistency.MemoryStore(), 10, 1);
+    mgr.enqueue("a", "1");
+    assertThrows(() => mgr.enqueue("b", "2"), Error, "Queue count limit reached");
+    assertEquals(mgr.listQueues(), ["a"]);
+    assertEquals(mgr.dequeue("a"), "1");
+});
+
+Deno.test("enqueue on an existing queue is allowed at the count limit", () => {
+    const mgr = new QueueManager(new Persistency.MemoryStore(), 10, 1);
+    mgr.enqueue("a", "1");
+    mgr.enqueue("a", "2");
+    assertEquals(mgr.length("a"), 2);
+    assertEquals(mgr.dequeue("a"), "1");
+    assertEquals(mgr.dequeue("a"), "2");
+});
+
+Deno.test("canEnqueue false means enqueue does not create a queue", () => {
+    const mgr = new QueueManager(new Persistency.MemoryStore(), 10, 1);
+    mgr.enqueue("a", "1");
+    assertEquals(mgr.canEnqueue("b"), false);
+    assertThrows(() => mgr.enqueue("b", "2"), Error, "Queue count limit reached");
+    assertEquals(mgr.listQueues(), ["a"]);
+});
+
+Deno.test("depth limit 0 refuses enqueue without leaking an empty queue", () => {
+    const mgr = new QueueManager(new Persistency.MemoryStore(), 0, 2);
+    assertEquals(mgr.canEnqueue("q"), false);
+    assertThrows(() => mgr.enqueue("q", "x"), Error, "Queue depth limit reached");
+    assertEquals(mgr.listQueues(), []);
+    assertEquals(mgr.length("q"), 0);
+});
+
+Deno.test("load snapshots remaining items so a second load restores them", () => {
+    const persist = new Persistency.MemoryStore();
+    const mgr = new QueueManager(persist);
+    mgr.enqueue("jobs", "keep-me");
+
+    const boot = new Persistency.MemoryStore();
+    for (const ev of persist.loadState()) {
+        boot.saveEvent(ev.queue, ev.payload, ev.enqueue);
+    }
+    const loaded = new QueueManager(boot);
+    loaded.load();
+    assertEquals(loaded.peek("jobs"), "keep-me");
+
+    const boot2 = new Persistency.MemoryStore();
+    for (const ev of boot.loadState()) {
+        boot2.saveEvent(ev.queue, ev.payload, ev.enqueue);
+    }
+    const loaded2 = new QueueManager(boot2);
+    loaded2.load();
+    assertEquals(loaded2.dequeue("jobs"), "keep-me");
+});
+
+Deno.test("FileStore load snapshots remaining items onto disk", () => {
+    const tmp = Deno.makeTempDirSync();
+    try {
+        const store = new Persistency.FileStore();
+        store.dir(tmp);
+        const mgr = new QueueManager(store);
+        mgr.enqueue("jobs", "keep-me");
+        store.close();
+
+        const store2 = new Persistency.FileStore();
+        store2.dir(tmp);
+        const loaded = new QueueManager(store2);
+        loaded.load();
+        assertEquals(loaded.peek("jobs"), "keep-me");
+        store2.close();
+
+        const store3 = new Persistency.FileStore();
+        store3.dir(tmp);
+        const loaded2 = new QueueManager(store3);
+        loaded2.load();
+        assertEquals(loaded2.dequeue("jobs"), "keep-me");
+        store3.close();
+    } finally {
+        Deno.removeSync(tmp, { recursive: true });
+    }
 });
