@@ -17,15 +17,31 @@ export function isQueueEvent<T>(value: unknown): value is QueueEvent<T> {
         event.enqueue !== event.dequeue;
 }
 
+function parseLine<T>(line: string): QueueEvent<T> | undefined {
+    try {
+        const event = JSON.parse(line);
+        if (isQueueEvent<T>(event)) {
+            return event;
+        }
+        return undefined;
+    } catch {
+        return undefined;
+    }
+}
+
 export interface QueueStore<T = string> {
     saveEvent(queueName: string, payload: T, isEnqueue: boolean): void;
+    saveBatch(events: Array<QueueEvent<T>>): void;
     loadState(): Array<QueueEvent<T>>;
     clear(): void;
     dir(dir: string): void;
+    close(): void;
 }
 
 export class FileStore<T = string> implements QueueStore<T> {
     private directory: string = '';
+    private writeHandle: Deno.FsFile | null = null;
+    private encoder = new TextEncoder();
 
     private get path(): string {
         return this.directory + "persist.dat";
@@ -38,33 +54,57 @@ export class FileStore<T = string> implements QueueStore<T> {
         Deno.mkdirSync(this.directory, { recursive: true });
     }
 
+    // Lazily open the write handle so that dir() with an invalid path
+    // doesn't throw until an actual I/O operation is attempted.
+    private ensureOpen(): void {
+        if (this.writeHandle === null) {
+            this.ensureDirectory();
+            this.writeHandle = Deno.openSync(this.path, { write: true, create: true, append: true });
+        }
+    }
+
     public saveEvent(queueName: string, payload: T, isEnqueue: boolean): void {
-        this.ensureDirectory();
+        this.ensureOpen();
         const line = JSON.stringify({
             queue: queueName,
             payload: payload,
             enqueue: isEnqueue,
             dequeue: !isEnqueue
         });
-        const file = Deno.openSync(this.path, { write: true, create: true, append: true });
-        file.lockSync(true);
+        this.writeHandle!.lockSync(true);
         try {
-            file.writeSync(new TextEncoder().encode(line + "\n"));
+            this.writeHandle!.writeSync(this.encoder.encode(line + "\n"));
         } finally {
-            file.unlockSync();
-            file.close();
+            this.writeHandle!.unlockSync();
+        }
+    }
+
+    public saveBatch(events: Array<QueueEvent<T>>): void {
+        if (events.length === 0) return;
+        this.ensureOpen();
+        this.writeHandle!.lockSync(true);
+        try {
+            for (const event of events) {
+                const line = JSON.stringify({
+                    queue: event.queue,
+                    payload: event.payload,
+                    enqueue: event.enqueue,
+                    dequeue: event.dequeue
+                });
+                this.writeHandle!.writeSync(this.encoder.encode(line + "\n"));
+            }
+        } finally {
+            this.writeHandle!.unlockSync();
         }
     }
 
     public clear(): void {
-        this.ensureDirectory();
-        const file = Deno.openSync(this.path, { write: true, create: true });
-        file.lockSync(true);
+        this.ensureOpen();
+        this.writeHandle!.lockSync(true);
         try {
-            file.truncateSync(0);
+            this.writeHandle!.truncateSync(0);
         } finally {
-            file.unlockSync();
-            file.close();
+            this.writeHandle!.unlockSync();
         }
     }
 
@@ -73,34 +113,39 @@ export class FileStore<T = string> implements QueueStore<T> {
             const file = Deno.openSync(this.path, { read: true });
             file.lockSync(false);
             try {
-                const chunks: Uint8Array[] = [];
+                // Stream-parse line by line to avoid 3x peak memory from split/filter/map
+                const events: QueueEvent<T>[] = [];
+                const decoder = new TextDecoder();
                 const chunk = new Uint8Array(4096);
-                let totalRead = 0;
+                let leftover = "";
                 while (true) {
                     const read = file.readSync(chunk);
-                    if (read === null || read <= 0) {
+                    if (!read) {
                         break;
                     }
-                    chunks.push(chunk.slice(0, read));
-                    totalRead += read;
-                }
-                const buf = new Uint8Array(totalRead);
-                let offset = 0;
-                for (const c of chunks) {
-                    buf.set(c, offset);
-                    offset += c.length;
-                }
-                const content = new TextDecoder().decode(buf);
-                return content.split("\n")
-                    .filter((line: string) => line.length > 0)
-                    .flatMap((line: string) => {
-                        try {
-                            const event = JSON.parse(line);
-                            return isQueueEvent<T>(event) ? [event] : [];
-                        } catch {
-                            return [];
+                    leftover += decoder.decode(chunk.subarray(0, read), { stream: true });
+                    let idx = leftover.indexOf("\n");
+                    while (idx >= 0) {
+                        const line = leftover.slice(0, idx);
+                        leftover = leftover.slice(idx + 1);
+                        if (line.length > 0) {
+                            const event = parseLine<T>(line);
+                            if (event) {
+                                events.push(event);
+                            }
                         }
-                    });
+                        idx = leftover.indexOf("\n");
+                    }
+                }
+                // Flush decoder and process any remaining line (no trailing newline)
+                leftover += decoder.decode();
+                if (leftover.length > 0) {
+                    const event = parseLine<T>(leftover);
+                    if (event) {
+                        events.push(event);
+                    }
+                }
+                return events;
             } finally {
                 file.unlockSync();
                 file.close();
@@ -114,7 +159,18 @@ export class FileStore<T = string> implements QueueStore<T> {
     }
 
     public dir(dir: string): void {
+        if (this.writeHandle !== null) {
+            this.writeHandle.close();
+            this.writeHandle = null;
+        }
         this.directory = dir.replace(/\/$/, '') + "/";
+    }
+
+    public close(): void {
+        if (this.writeHandle !== null) {
+            this.writeHandle.close();
+            this.writeHandle = null;
+        }
     }
 }
 
@@ -130,6 +186,12 @@ export class MemoryStore<T = string> implements QueueStore<T> {
         });
     }
 
+    public saveBatch(events: Array<QueueEvent<T>>): void {
+        for (const event of events) {
+            this.events.push(event);
+        }
+    }
+
     public clear(): void {
         this.events = [];
     }
@@ -139,4 +201,6 @@ export class MemoryStore<T = string> implements QueueStore<T> {
     }
 
     public dir(): void {}
+
+    public close(): void {}
 }

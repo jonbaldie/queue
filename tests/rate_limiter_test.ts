@@ -439,3 +439,44 @@ Deno.test("rate limiter: eviction sort uses max timestamp (Math.max not Math.min
         }, 20);
     });
 });
+
+// ── Cleanup fast path: empty timestamp arrays ──────────────────────────────────
+
+Deno.test("rate limiter: cleanup skips IPs with empty timestamp arrays", () => {
+    // The fast-path `if (timestamps.length === 0 || timestamps[0] > cutoff) continue`
+    // must skip IPs whose timestamp array is empty. Without the continue, the
+    // binary search would compute lo=0===length → delete the IP entry.
+    const limiter = new RateLimiter(100, 60000, 1, 10000);
+    const internal = limiter as unknown as { requestTimestamps: Map<string, number[]> };
+
+    internal.requestTimestamps.set("empty.ip", []);
+    limiter.isAllowed(req("trigger.ip"));
+
+    assertEquals(internal.requestTimestamps.has("empty.ip"), true);
+});
+
+// ── Eviction sort: insertion order ≠ sorted order ──────────────────────────────
+
+Deno.test("rate limiter: eviction sort orders by max timestamp regardless of insertion order", () => {
+    // Plant IPs in reverse order of their max timestamp so that without the
+    // sort, the wrong IP (newest) would be evicted first.
+    const limiter = new RateLimiter(100, 60000, 1, 2);
+    const internal = limiter as unknown as { requestTimestamps: Map<string, number[]> };
+
+    const oldTs = Date.now() - 5000;
+    const midTs = Date.now() - 2000;
+    const newTs = Date.now();
+
+    // Insert in reverse: newest first, oldest last
+    internal.requestTimestamps.set("newest.ip", [newTs]);
+    internal.requestTimestamps.set("mid.ip", [midTs]);
+    internal.requestTimestamps.set("oldest.ip", [oldTs]);
+
+    // Trigger cleanup — size=3 > maxTrackedIPs=2 → evict 1 (oldest)
+    limiter.isAllowed(req("trigger.ip"));
+
+    // With sort: oldest.ip evicted (correct)
+    // Without sort (insertion order): newest.ip evicted (wrong)
+    assertEquals(internal.requestTimestamps.has("oldest.ip"), false);
+    assertEquals(internal.requestTimestamps.has("newest.ip"), true);
+});
