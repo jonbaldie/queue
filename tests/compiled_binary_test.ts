@@ -100,3 +100,36 @@ Deno.test({
     sanitizeResources: false,
     sanitizeOps: false,
 });
+
+Deno.test({
+    name: "compiled binary: starts and persists with an arbitrary --persist dir (#65)",
+    fn: async () => {
+        const tempDir = await Deno.makeTempDir({ prefix: "queue-compile-test-" });
+        const outPath = `${tempDir}/queue`;
+        const persistDir = `${tempDir}/persist`;
+        try {
+            await compile(
+                [
+                    "--allow-read",
+                    "--allow-write",
+                    "--allow-net",
+                    "--allow-env",
+                    "--allow-sys",
+                ],
+                outPath,
+            );
+            const { started, output } = await probeStartup(outPath, ["--persist"], {
+                QUEUE_API_TOKEN: "compile-test-token",
+                HOST: "127.0.0.1",
+                PORT: "0",
+                PERSIST: persistDir,
+            });
+            assertEquals(started, true, `binary did not report listening. Output:\n${output}`);
+        } finally {
+            await Deno.remove(tempDir, { recursive: true }).catch(() => {});
+        }
+    },
+    // Compiling a 100MB+ binary is slow; this is an integration test, not a unit test.
+    sanitizeResources: false,
+    sanitizeOps: false,
+});
