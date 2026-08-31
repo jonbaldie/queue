@@ -9,7 +9,29 @@ function writeLog(message: string): void {
     Deno.stdout.writeSync(LOG_ENCODER.encode(`${message}\n`));
 }
 
-const CONFIG = parseConfig(Deno.env.toObject(), Deno.args);
+// Read each config var by name rather than Deno.env.toObject(), which
+// enumerates the entire process environment and therefore requires
+// unrestricted env access. A compiled binary with a scoped --allow-env
+// allowlist (see Dockerfile/CI) can only grant per-name access.
+const ENV_VAR_NAMES = [
+    "HOST",
+    "PORT",
+    "PERSIST",
+    "QUEUE_API_TOKEN",
+    "QUEUE_DEPTH_LIMIT",
+    "QUEUE_COUNT_LIMIT",
+    "RATE_LIMIT_REQUESTS",
+] as const;
+
+function readEnv(): Record<string, string | undefined> {
+    const env: Record<string, string | undefined> = {};
+    for (const name of ENV_VAR_NAMES) {
+        env[name] = Deno.env.get(name);
+    }
+    return env;
+}
+
+const CONFIG = parseConfig(readEnv(), Deno.args);
 
 // Set up our persistency manager
 const PERSIST_ENGINE = CONFIG.persistEnabled

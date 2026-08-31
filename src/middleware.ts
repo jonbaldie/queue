@@ -3,7 +3,7 @@ import { RateLimiter } from "./rate_limiter.ts";
 export type HttpHandler = (request: Request, info?: Deno.ServeHandlerInfo) => Promise<Response> | Response;
 export type Middleware = (next: HttpHandler) => HttpHandler;
 
-const HEALTH_PATTERN = new URLPattern({ pathname: "/health" });
+const HEALTH_PATTERN = new URLPattern({ pathname: "/health{/}?" });
 
 export function withAuth(apiToken: string): Middleware {
     return (next: HttpHandler) => {
@@ -12,7 +12,9 @@ export function withAuth(apiToken: string): Middleware {
                 return next(request, info);
             }
             const authHeader = request.headers.get("Authorization");
-            if (!authHeader || authHeader !== `Bearer ${apiToken}`) {
+            const [scheme, ...rest] = (authHeader ?? "").split(" ");
+            const token = rest.join(" ");
+            if (!scheme || scheme.toLowerCase() !== "bearer" || token !== apiToken) {
                 return new Response("Unauthorized", { status: 401 });
             }
             return next(request, info);
