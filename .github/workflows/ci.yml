@@ -36,7 +36,7 @@ jobs:
           deno compile \
             --allow-read \
             --allow-write \
-            --allow-net=0.0.0.0:3000 \
+            --allow-net \
             --allow-env=HOST,PORT,PERSIST,QUEUE_API_TOKEN,QUEUE_DEPTH_LIMIT,QUEUE_COUNT_LIMIT,RATE_LIMIT_REQUESTS \
             main.ts
       - name: Run tests
