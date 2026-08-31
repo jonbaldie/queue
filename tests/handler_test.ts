@@ -275,6 +275,16 @@ Deno.test("response body: unauthorized returns 'Unauthorized'", async () => {
     assertEquals(await res.text(), "Unauthorized");
 });
 
+Deno.test("auth: scheme name is case-insensitive per RFC 9110", async () => {
+    const handler = makeHandler();
+    for (const scheme of ["bearer", "BEARER", "BeArEr"]) {
+        const res = await handler(new Request("http://localhost/queues", {
+            headers: { "Authorization": `${scheme} ${API_TOKEN}` },
+        }));
+        assertEquals(res.status, 200, `scheme "${scheme}" should authenticate`);
+    }
+});
+
 Deno.test("response body: rate limited returns 'Too many requests'", async () => {
     const handler = makeHandler(undefined, undefined, 1);
     await handler(new Request("http://localhost/length/q", { headers: auth }));
