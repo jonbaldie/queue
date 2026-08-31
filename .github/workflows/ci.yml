@@ -37,7 +37,7 @@ jobs:
             --allow-read \
             --allow-write=./persist.dat \
             --allow-net=0.0.0.0:3000 \
-            --allow-env=HOST,PORT,PERSIST,QUEUE_API_TOKEN \
+            --allow-env=HOST,PORT,PERSIST,QUEUE_API_TOKEN,QUEUE_DEPTH_LIMIT,QUEUE_COUNT_LIMIT,RATE_LIMIT_REQUESTS \
             main.ts
       - name: Run tests
         run: deno test --allow-read --allow-write --allow-net --allow-env --allow-run
