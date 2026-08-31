@@ -262,6 +262,13 @@ Deno.test("response body: health returns {status:ok} JSON", async () => {
     assertEquals(await res.json(), { status: "ok" });
 });
 
+Deno.test("response body: health trailing slash returns {status:ok} JSON, no auth required", async () => {
+    const handler = makeHandler();
+    const res = await handler(new Request("http://localhost/health/"));
+    assertEquals(res.status, 200);
+    assertEquals(await res.json(), { status: "ok" });
+});
+
 Deno.test("response body: health POST returns 'Method not allowed'", async () => {
     const handler = makeHandler();
     const res = await handler(new Request("http://localhost/health", { method: "POST" }));
