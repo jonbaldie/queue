@@ -35,9 +35,9 @@ jobs:
           touch persist.dat
           deno compile \
             --allow-read \
-            --allow-write=./persist.dat \
+            --allow-write \
             --allow-net \
-            --allow-env=HOST,PORT,PERSIST,QUEUE_API_TOKEN \
+            --allow-env=HOST,PORT,PERSIST,QUEUE_API_TOKEN,QUEUE_DEPTH_LIMIT,QUEUE_COUNT_LIMIT,RATE_LIMIT_REQUESTS \
             main.ts
       - name: Run tests
         run: deno test --allow-read --allow-write --allow-net --allow-env --allow-run

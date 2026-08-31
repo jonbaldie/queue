@@ -262,6 +262,13 @@ Deno.test("response body: health returns {status:ok} JSON", async () => {
     assertEquals(await res.json(), { status: "ok" });
 });
 
+Deno.test("response body: health trailing slash returns {status:ok} JSON, no auth required", async () => {
+    const handler = makeHandler();
+    const res = await handler(new Request("http://localhost/health/"));
+    assertEquals(res.status, 200);
+    assertEquals(await res.json(), { status: "ok" });
+});
+
 Deno.test("response body: health POST returns 'Method not allowed'", async () => {
     const handler = makeHandler();
     const res = await handler(new Request("http://localhost/health", { method: "POST" }));
@@ -273,6 +280,16 @@ Deno.test("response body: unauthorized returns 'Unauthorized'", async () => {
     const res = await handler(new Request("http://localhost/enqueue/q", { method: "POST", body: '{"payload":"x"}' }));
     assertEquals(res.status, 401);
     assertEquals(await res.text(), "Unauthorized");
+});
+
+Deno.test("auth: scheme name is case-insensitive per RFC 9110", async () => {
+    const handler = makeHandler();
+    for (const scheme of ["bearer", "BEARER", "BeArEr"]) {
+        const res = await handler(new Request("http://localhost/queues", {
+            headers: { "Authorization": `${scheme} ${API_TOKEN}` },
+        }));
+        assertEquals(res.status, 200, `scheme "${scheme}" should authenticate`);
+    }
 });
 
 Deno.test("response body: rate limited returns 'Too many requests'", async () => {
