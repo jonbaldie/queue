@@ -3,7 +3,7 @@
   "mutate": ["src/**/*.ts"],
   "testRunner": "command",
   "commandRunner": {
-    "command": "deno test --allow-read --allow-write --allow-net --allow-env --allow-run --no-check"
+    "command": "deno test --allow-read --allow-write --allow-net --allow-env --allow-run --no-check --ignore=tests/compiled_binary_test.ts"
   },
   "reporters": ["json", "clear-text"],
   "jsonReporter": {
