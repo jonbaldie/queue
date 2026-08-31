@@ -36,7 +36,7 @@ jobs:
           deno compile \
             --allow-read \
             --allow-write=./persist.dat \
-            --allow-net=0.0.0.0:3000 \
+            --allow-net \
             --allow-env=HOST,PORT,PERSIST,QUEUE_API_TOKEN \
             main.ts
       - name: Run tests
