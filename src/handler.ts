@@ -107,7 +107,7 @@ function lengthHandler(mgr: QueueManager<string>): RouteHandler {
 }
 
 function registerRoutes(router: Router, mgr: QueueManager<string>): void {
-    router.get("/health", () => {
+    router.get("/health{/}?", () => {
         return new Response(JSON.stringify({ status: "ok" }), {
             status: 200,
             headers: { "Content-Type": "application/json" },

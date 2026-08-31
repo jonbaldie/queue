@@ -3,7 +3,7 @@ import { RateLimiter } from "./rate_limiter.ts";
 export type HttpHandler = (request: Request, info?: Deno.ServeHandlerInfo) => Promise<Response> | Response;
 export type Middleware = (next: HttpHandler) => HttpHandler;
 
-const HEALTH_PATTERN = new URLPattern({ pathname: "/health" });
+const HEALTH_PATTERN = new URLPattern({ pathname: "/health{/}?" });
 
 export function withAuth(apiToken: string): Middleware {
     return (next: HttpHandler) => {
