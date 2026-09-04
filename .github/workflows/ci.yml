@@ -92,8 +92,13 @@ jobs:
       - name: Run StrykerJS
         run: |
           touch persist.dat
-          npx --no-install stryker run mutation/stryker.config.json
-          node mutation/stryker_check.js
+          deno run \
+            --allow-read \
+            --allow-write \
+            --allow-net \
+            --allow-env \
+            --allow-run \
+            mutation/stryker_ci.ts
 
   production-quality:
     name: Production quality

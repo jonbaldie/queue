@@ -336,8 +336,11 @@ Options:
   if (args.json) {
     console.log(JSON.stringify(result, null, 2));
   } else {
+    const modeLabel = result.mode === "full-suite"
+      ? `full-suite (${result.isFallback ? "fail-closed fallback" : "intentional"})`
+      : result.mode;
     console.log(`Comparison base: ${result.base ?? "none"}${result.mergeBase ? ` (${result.mergeBase.slice(0, 8)})` : ""}`);
-    console.log(`Mode: ${result.mode}${result.isFallback ? " (fail-closed fallback)" : ""}`);
+    console.log(`Mode: ${modeLabel}`);
     console.log(`Reason: ${result.reason}`);
     if (result.paths.length > 0) {
       console.log(`Selected targets (${result.paths.length}):`);

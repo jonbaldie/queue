@@ -3,8 +3,11 @@ import { join } from "jsr:@std/path/join";
 
 const selection = await selectMutationTargets();
 
+const modeLabel = selection.mode === "full-suite"
+  ? `full-suite (${selection.isFallback ? "fail-closed fallback" : "intentional"})`
+  : selection.mode;
 console.log(`Comparison base: ${selection.base ?? "none"}${selection.mergeBase ? ` (${selection.mergeBase.slice(0, 8)})` : ""}`);
-console.log(`Mode: ${selection.mode}${selection.isFallback ? " (fail-closed fallback)" : ""}`);
+console.log(`Mode: ${modeLabel}`);
 console.log(`Reason: ${selection.reason}`);
 
 if (selection.mode === "skip" || selection.paths.length === 0) {
