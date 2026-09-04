@@ -1,17 +1,29 @@
-import { Mutasaurus } from "jsr:@mutasaurus/mutasaurus@0.1.4";
+import { selectMutationTargets } from "./selector.ts";
 
 const THRESHOLD = 80;
 
+const selection = await selectMutationTargets();
+
+console.log(`Comparison base: ${selection.base ?? "none"}${selection.mergeBase ? ` (${selection.mergeBase.slice(0, 8)})` : ""}`);
+console.log(`Mode: ${selection.mode}${selection.isFallback ? " (fail-closed fallback)" : ""}`);
+console.log(`Reason: ${selection.reason}`);
+
+if (selection.mode === "skip" || selection.paths.length === 0) {
+  console.log(`Skip reason: ${selection.reason}`);
+  console.log("No mutation engine was invoked (clean skip).");
+  Deno.exit(0);
+}
+
+const { Mutasaurus } = await import("jsr:@mutasaurus/mutasaurus@0.1.4");
+
+const sourceFiles = selection.paths.map((p) => (p.startsWith("./") ? p : `./${p}`));
+console.log(`Selected targets for Mutasaurus (${sourceFiles.length}):`);
+for (const f of sourceFiles) {
+  console.log(`  - ${f}`);
+}
+
 const mutasaurus = new Mutasaurus({
-  sourceFiles: [
-    "./src/config.ts",
-    "./src/handler.ts",
-    "./src/manager.ts",
-    "./src/middleware.ts",
-    "./src/persist.ts",
-    "./src/rate_limiter.ts",
-    "./src/router.ts",
-  ],
+  sourceFiles,
   testFiles: [
     "./tests/config_test.ts",
     "./tests/e2e_test.ts",
