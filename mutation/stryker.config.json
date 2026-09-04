@@ -3,7 +3,7 @@
   "mutate": ["src/**/*.ts"],
   "testRunner": "command",
   "commandRunner": {
-    "command": "deno test --allow-read --allow-write --allow-net --allow-env --allow-run --no-check --ignore=tests/compiled_binary_test.ts"
+    "command": "deno test --allow-read --allow-write --allow-net --allow-env --allow-run --no-check --ignore=tests/compiled_binary_test.ts,tests/mutation_full_gate_test.ts,tests/mutation_scoped_test.ts,tests/mutation_selector_test.ts,tests/mutation_skip_test.ts"
   },
   "reporters": ["json", "clear-text"],
   "jsonReporter": {
