@@ -19,7 +19,7 @@ if (selection.mode === "skip" || selection.paths.length === 0) {
 
 const { Mutasaurus } = await import("jsr:@mutasaurus/mutasaurus@0.1.4");
 
-const sourceFiles = selection.paths.map((p) => (p.startsWith("./") ? p : `./${p}`));
+const sourceFiles = selection.paths;
 console.log(`Selected targets for Mutasaurus (${sourceFiles.length}):`);
 for (const f of sourceFiles) {
   console.log(`  - ${f}`);

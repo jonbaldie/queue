@@ -17,7 +17,6 @@ export interface SelectorOptions {
   cwd?: string;
   targetBranch?: string;
   headRef?: string;
-  prEvent?: boolean;
 }
 
 interface GitCommandResult {
@@ -95,33 +94,44 @@ export async function getAllProductionFiles(cwd: string): Promise<string[]> {
   return files.sort();
 }
 
-async function resolveTargetRef(targetBranch: string, cwd: string): Promise<string | null> {
+async function resolveTargetRef(
+  targetBranch: string,
+  cwd: string,
+): Promise<{ ref: string | null; error?: string }> {
+  // Attempt to fetch target branch explicitly from origin if remote exists
+  const fetchResult = await runGit(["fetch", "origin", targetBranch], cwd);
+
   const candidates = [
-    targetBranch,
     `origin/${targetBranch}`,
     `refs/remotes/origin/${targetBranch}`,
+    targetBranch,
     `refs/heads/${targetBranch}`,
   ];
 
   for (const candidate of candidates) {
     const check = await runGit(["rev-parse", "--verify", "--quiet", candidate], cwd);
     if (check.success) {
-      return candidate;
+      return { ref: candidate };
     }
   }
 
-  // Attempt fetch from origin if available
-  const fetchResult = await runGit(["fetch", "origin", targetBranch], cwd);
-  if (fetchResult.success) {
-    for (const candidate of candidates) {
-      const check = await runGit(["rev-parse", "--verify", "--quiet", candidate], cwd);
-      if (check.success) {
-        return candidate;
-      }
-    }
-  }
+  return {
+    ref: null,
+    error: fetchResult.stderr || `Could not resolve ref for branch '${targetBranch}'`,
+  };
+}
 
-  return null;
+function isFullSuiteTrigger(filePath: string): boolean {
+  return (
+    filePath.startsWith("tests/") ||
+    filePath.startsWith("mutation/") ||
+    filePath.startsWith(".github/") ||
+    filePath.startsWith("scripts/") ||
+    filePath === "main.ts" ||
+    filePath === "deno.lock" ||
+    filePath === "package.json" ||
+    filePath === "package-lock.json"
+  );
 }
 
 export async function selectMutationTargets(options: SelectorOptions = {}): Promise<SelectorResult> {
@@ -131,7 +141,6 @@ export async function selectMutationTargets(options: SelectorOptions = {}): Prom
   // Check event type and environment
   const eventName = Deno.env.get("GITHUB_EVENT_NAME");
   const envBaseRef = Deno.env.get("GITHUB_BASE_REF");
-  const isPrExplicit = options.prEvent ?? (eventName ? eventName === "pull_request" : undefined);
   const targetBranch = options.targetBranch ?? (envBaseRef && envBaseRef.trim().length > 0 ? envBaseRef.trim() : undefined);
 
   // If GITHUB_EVENT_NAME is set to a non-PR event (e.g. push to main, workflow_dispatch)
@@ -145,10 +154,10 @@ export async function selectMutationTargets(options: SelectorOptions = {}): Prom
     };
   }
 
-  // If no target branch is specified and not explicitly marked as PR
+  // If no target branch is specified and not in a PR
   if (!targetBranch) {
     const allProd = await getAllProductionFiles(cwd);
-    if (isPrExplicit === true) {
+    if (eventName === "pull_request") {
       return {
         mode: "full-suite",
         reason: "Pull request target branch not specified; failing closed to full suite",
@@ -164,13 +173,13 @@ export async function selectMutationTargets(options: SelectorOptions = {}): Prom
     };
   }
 
-  // Resolve target branch ref
-  const resolvedTarget = await resolveTargetRef(targetBranch, cwd);
+  // Resolve target branch ref with explicit fetch
+  const { ref: resolvedTarget, error: resolveError } = await resolveTargetRef(targetBranch, cwd);
   if (!resolvedTarget) {
     const allProd = await getAllProductionFiles(cwd);
     return {
       mode: "full-suite",
-      reason: `Target branch '${targetBranch}' could not be resolved or fetched; failing closed to full suite`,
+      reason: `Target branch '${targetBranch}' could not be resolved or fetched: ${resolveError ?? "unknown error"}; failing closed to full suite`,
       base: targetBranch,
       head: headRef,
       paths: allProd,
@@ -184,7 +193,7 @@ export async function selectMutationTargets(options: SelectorOptions = {}): Prom
     const allProd = await getAllProductionFiles(cwd);
     return {
       mode: "full-suite",
-      reason: `Merge-base calculation failed between '${resolvedTarget}' and '${headRef}'; failing closed to full suite`,
+      reason: `Merge-base calculation failed between '${resolvedTarget}' and '${headRef}': ${mbResult.stderr || "no common ancestor"}; failing closed to full suite`,
       base: resolvedTarget,
       head: headRef,
       paths: allProd,
@@ -199,7 +208,7 @@ export async function selectMutationTargets(options: SelectorOptions = {}): Prom
     const allProd = await getAllProductionFiles(cwd);
     return {
       mode: "full-suite",
-      reason: `git diff failed against merge-base ${mergeBaseSha}; failing closed to full suite`,
+      reason: `git diff failed against merge-base ${mergeBaseSha}: ${diffResult.stderr}; failing closed to full suite`,
       base: resolvedTarget,
       head: headRef,
       mergeBase: mergeBaseSha,
@@ -240,18 +249,14 @@ export async function selectMutationTargets(options: SelectorOptions = {}): Prom
 
   // Check if any changes trigger full-suite mode
   for (const change of changes) {
-    const p = change.path;
-    const oldP = change.oldPath;
-    const isTrigger = (f: string) =>
-      f.startsWith("tests/") ||
-      f.startsWith("mutation/") ||
-      f.startsWith(".github/");
+    const changedPath = change.path;
+    const oldChangedPath = change.oldPath;
 
-    if (isTrigger(p) || (oldP && isTrigger(oldP))) {
+    if (isFullSuiteTrigger(changedPath) || (oldChangedPath && isFullSuiteTrigger(oldChangedPath))) {
       const allProd = await getAllProductionFiles(cwd);
       return {
         mode: "full-suite",
-        reason: `Full suite triggered by change to test, mutation, or workflow infrastructure: ${p}`,
+        reason: `Full suite triggered by change to test, mutation, or workflow infrastructure: ${changedPath}`,
         base: resolvedTarget,
         head: headRef,
         mergeBase: mergeBaseSha,
@@ -301,9 +306,9 @@ export async function selectMutationTargets(options: SelectorOptions = {}): Prom
 // CLI execution
 if (import.meta.main) {
   const args = parseArgs(Deno.args, {
-    string: ["target-branch", "base", "head", "output", "cwd"],
+    string: ["target-branch", "base", "head", "cwd"],
     boolean: ["json", "help"],
-    alias: { b: "target-branch", o: "output", h: "help" },
+    alias: { b: "target-branch", h: "help" },
   });
 
   if (args.help) {
@@ -314,7 +319,6 @@ Usage:
 Options:
   --target-branch, -b <branch>  Target branch to compare against (e.g. main)
   --head <ref>                  Head commit/ref (default: HEAD)
-  --output, -o <file>           Write JSON result to specified file
   --json                        Print JSON output to stdout
   --cwd <dir>                   Working directory
   --help, -h                    Show this help
@@ -328,10 +332,6 @@ Options:
     targetBranch,
     headRef: args.head,
   });
-
-  if (args.output) {
-    await Deno.writeTextFile(args.output, JSON.stringify(result, null, 2) + "\n");
-  }
 
   if (args.json) {
     console.log(JSON.stringify(result, null, 2));

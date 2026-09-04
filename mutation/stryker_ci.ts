@@ -36,6 +36,7 @@ if (selection.mode === "selected") {
   configFileToRun = tmpConfigPath;
 }
 
+let exitCode = 0;
 try {
   const strykerCmd = new Deno.Command("npx", {
     args: ["--no-install", "stryker", "run", configFileToRun],
@@ -46,16 +47,16 @@ try {
 
   if (!strykerOutput.success) {
     console.error("Stryker run failed");
-    Deno.exit(strykerOutput.code);
+    exitCode = strykerOutput.code;
+  } else {
+    const checkCmd = new Deno.Command("node", {
+      args: ["mutation/stryker_check.js"],
+      stdout: "inherit",
+      stderr: "inherit",
+    });
+    const checkOutput = await checkCmd.output();
+    exitCode = checkOutput.code;
   }
-
-  const checkCmd = new Deno.Command("node", {
-    args: ["mutation/stryker_check.js"],
-    stdout: "inherit",
-    stderr: "inherit",
-  });
-  const checkOutput = await checkCmd.output();
-  Deno.exit(checkOutput.code);
 } finally {
   if (configFileToRun !== baseConfigPath) {
     try {
@@ -65,3 +66,5 @@ try {
     }
   }
 }
+
+Deno.exit(exitCode);

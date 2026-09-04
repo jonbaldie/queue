@@ -1,4 +1,4 @@
-import { assertEquals, assertStringIncludes } from "jsr:@std/assert";
+import { assertEquals } from "jsr:@std/assert";
 import { join } from "jsr:@std/path/join";
 import { selectMutationTargets } from "../mutation/selector.ts";
 
@@ -97,27 +97,22 @@ Deno.test("scoped: both engines receive identical selected path set", async () =
     });
 
     assertEquals(selection.mode, "selected");
-
-    // Check Mutasaurus mapping
-    const mutasaurusTargets = selection.paths.map((p) => (p.startsWith("./") ? p : `./${p}`));
-    // Check Stryker mapping
+    // Both Mutasaurus and Stryker runners consume selection.paths directly as identical relative paths
+    const mutasaurusTargets = selection.paths;
     const strykerTargets = selection.paths;
 
-    // Normalizing both sets should yield identical relative paths
-    const normalize = (p: string) => p.replace(/^\.\//, "");
-    assertEquals(
-      mutasaurusTargets.map(normalize).sort(),
-      strykerTargets.map(normalize).sort(),
-    );
+    assertEquals(mutasaurusTargets, ["src/router.ts"]);
+    assertEquals(strykerTargets, ["src/router.ts"]);
+    assertEquals(mutasaurusTargets, strykerTargets);
   } finally {
     await cleanup();
   }
 });
 
-Deno.test("scoped: Stryker config override contains exact selected paths as data without shell interpolation", async () => {
+Deno.test("scoped: paths with spaces and special characters are preserved as literal data", async () => {
   const { repoDir, runGit, cleanup } = await createTestRepo();
   try {
-    await runGit("checkout", "-b", "feat/safe-paths");
+    await runGit("checkout", "-b", "feat/special-chars-data");
     const complexPath = "src/special $name & 'quotes'.ts";
     await Deno.writeTextFile(join(repoDir, complexPath), "export const special = 1;\n");
     await runGit("add", ".");
@@ -130,14 +125,6 @@ Deno.test("scoped: Stryker config override contains exact selected paths as data
 
     assertEquals(selection.mode, "selected");
     assertEquals(selection.paths, [complexPath]);
-
-    // Simulate Stryker scoped config generation
-    const baseConfig = { mutate: ["src/**/*.ts"] };
-    const scopedConfig = { ...baseConfig, mutate: selection.paths };
-    const jsonStr = JSON.stringify(scopedConfig);
-    const parsed = JSON.parse(jsonStr);
-
-    assertEquals(parsed.mutate, [complexPath]);
   } finally {
     await cleanup();
   }
