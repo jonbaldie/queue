@@ -67,6 +67,28 @@ async function cleanupChild(child: Deno.ChildProcess) {
     try { await child.status; } catch { /* ignore */ }
 }
 
+async function assertDoesNotBind(env: Record<string, string>): Promise<string> {
+    const child = new Deno.Command(Deno.execPath(), {
+        args: ["run", "--allow-all", "main.ts"],
+        cwd: ".",
+        env,
+        stdout: "piped",
+        stderr: "piped",
+    }).spawn();
+
+    const timeoutId = setTimeout(() => {
+        try { child.kill("SIGKILL"); } catch { /* ignore */ }
+    }, 3000);
+
+    const { code, stdout, stderr } = await child.output();
+    clearTimeout(timeoutId);
+
+    const output = new TextDecoder().decode(stdout) + new TextDecoder().decode(stderr);
+    assertEquals(output.includes("Listening on"), false, `server bound a port. Output:\n${output}`);
+    assertNotEquals(code, 0);
+    return output;
+}
+
 
 Deno.test("server starts, accepts requests, and shuts down gracefully on SIGTERM", async () => {
     const tempDir = await Deno.makeTempDir();
@@ -257,6 +279,35 @@ Deno.test("e2e: 405 responses include required Allow header (RFC 9110 §15.5.6)"
         } finally {
             await cleanupChild(child);
         }
+    } finally {
+        await Deno.remove(tempDir, { recursive: true }).catch(() => {});
+    }
+});
+
+Deno.test("e2e: missing QUEUE_API_TOKEN fails before the server binds a port", async () => {
+    const tempDir = await Deno.makeTempDir();
+    try {
+        const output = await assertDoesNotBind({
+            HOST: "127.0.0.1",
+            PORT: "0",
+            PERSIST: tempDir,
+        });
+        assertEquals(output.includes("QUEUE_API_TOKEN must be a non-empty string"), true);
+    } finally {
+        await Deno.remove(tempDir, { recursive: true }).catch(() => {});
+    }
+});
+
+Deno.test("e2e: empty QUEUE_API_TOKEN fails before the server binds a port", async () => {
+    const tempDir = await Deno.makeTempDir();
+    try {
+        const output = await assertDoesNotBind({
+            HOST: "127.0.0.1",
+            PORT: "0",
+            PERSIST: tempDir,
+            QUEUE_API_TOKEN: "",
+        });
+        assertEquals(output.includes("QUEUE_API_TOKEN must be a non-empty string"), true);
     } finally {
         await Deno.remove(tempDir, { recursive: true }).catch(() => {});
     }
