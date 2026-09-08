@@ -32,6 +32,20 @@ Deno.test("Router: 405 response on multi-method route includes all allowed metho
     assertEquals(await res.text(), "Method not allowed");
 });
 
+Deno.test("Router: dispatches a later method on the same pathname", async () => {
+    const router = new Router();
+    router.get("/items", () => new Response("get items"));
+    router.post("/items", () => new Response("post items"));
+
+    const getRes = await router.handle(new Request("http://localhost/items", { method: "GET" }));
+    assertEquals(getRes.status, 200);
+    assertEquals(await getRes.text(), "get items");
+
+    const postRes = await router.handle(new Request("http://localhost/items", { method: "POST" }));
+    assertEquals(postRes.status, 200);
+    assertEquals(await postRes.text(), "post items");
+});
+
 Deno.test("Router: 405 response on multi-method route preserves registration order in Allow header", async () => {
     const router = new Router();
     router.post("/items", () => new Response("post"));
