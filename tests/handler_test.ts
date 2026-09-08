@@ -1511,3 +1511,125 @@ Deno.test("peek returns JSON for a string payload", async () => {
     assertEquals(response.headers.get("content-type"), "application/json");
     assertEquals(await response.json(), "hello");
 });
+
+// RFC 9110 §9.3.2: HEAD requests to GET endpoints
+
+Deno.test("HEAD /health returns 200 with matching headers and empty body", async () => {
+    const handler = makeHandler();
+    const res = await handler(new Request("http://localhost/health", { method: "HEAD" }));
+    assertEquals(res.status, 200);
+    assertEquals(res.headers.get("content-type"), "application/json");
+    assertEquals(res.body, null);
+    assertEquals(await res.text(), "");
+});
+
+Deno.test("HEAD /health/ (trailing slash) returns 200 with empty body", async () => {
+    const handler = makeHandler();
+    const res = await handler(new Request("http://localhost/health/", { method: "HEAD" }));
+    assertEquals(res.status, 200);
+    assertEquals(res.headers.get("content-type"), "application/json");
+    assertEquals(res.body, null);
+    assertEquals(await res.text(), "");
+});
+
+Deno.test("HEAD /queues unauthenticated returns 401 Unauthorized", async () => {
+    const handler = makeHandler();
+    const res = await handler(new Request("http://localhost/queues", { method: "HEAD" }));
+    assertEquals(res.status, 401);
+});
+
+Deno.test("HEAD /queues authenticated returns 200 with matching headers and empty body", async () => {
+    const handler = makeHandler();
+    const res = await handler(new Request("http://localhost/queues", {
+        method: "HEAD",
+        headers: authHeaders,
+    }));
+    assertEquals(res.status, 200);
+    assertEquals(res.headers.get("content-type"), "application/json");
+    assertEquals(res.body, null);
+    assertEquals(await res.text(), "");
+});
+
+Deno.test("HEAD /length/:queue authenticated returns 200 with empty body", async () => {
+    const handler = makeHandler();
+    const res = await handler(new Request("http://localhost/length/test-queue", {
+        method: "HEAD",
+        headers: authHeaders,
+    }));
+    assertEquals(res.status, 200);
+    assertEquals(res.body, null);
+    assertEquals(await res.text(), "");
+});
+
+Deno.test("HEAD /peek/:queue on empty queue returns 204 with empty body", async () => {
+    const handler = makeHandler();
+    const res = await handler(new Request("http://localhost/peek/test-queue", {
+        method: "HEAD",
+        headers: authHeaders,
+    }));
+    assertEquals(res.status, 204);
+    assertEquals(res.body, null);
+    assertEquals(await res.text(), "");
+});
+
+Deno.test("HEAD /peek/:queue on non-empty queue returns 200 with headers and empty body", async () => {
+    const mgr = new QueueManager(new Persistency.MemoryStore());
+    mgr.enqueue("test-queue", "payload-1");
+    const handler = createHandler(mgr, API_TOKEN);
+
+    const res = await handler(new Request("http://localhost/peek/test-queue", {
+        method: "HEAD",
+        headers: authHeaders,
+    }));
+    assertEquals(res.status, 200);
+    assertEquals(res.headers.get("content-type"), "application/json");
+    assertEquals(res.body, null);
+    assertEquals(await res.text(), "");
+    assertEquals(mgr.length("test-queue"), 1);
+});
+
+Deno.test("HEAD /dequeue/:queue on empty queue returns 204 with empty body", async () => {
+    const handler = makeHandler();
+    const res = await handler(new Request("http://localhost/dequeue/test-queue", {
+        method: "HEAD",
+        headers: authHeaders,
+    }));
+    assertEquals(res.status, 204);
+    assertEquals(res.body, null);
+    assertEquals(await res.text(), "");
+});
+
+Deno.test("HEAD /dequeue/:queue on non-empty queue returns 200 with headers and empty body", async () => {
+    const mgr = new QueueManager(new Persistency.MemoryStore());
+    mgr.enqueue("test-queue", "payload-1");
+    const handler = createHandler(mgr, API_TOKEN);
+
+    const res = await handler(new Request("http://localhost/dequeue/test-queue", {
+        method: "HEAD",
+        headers: authHeaders,
+    }));
+    assertEquals(res.status, 200);
+    assertEquals(res.headers.get("content-type"), "application/json");
+    assertEquals(res.body, null);
+    assertEquals(await res.text(), "");
+    assertEquals(mgr.length("test-queue"), 0);
+});
+
+Deno.test("HEAD /enqueue/:queue returns 405 Method Not Allowed", async () => {
+    const handler = makeHandler();
+    const res = await handler(new Request("http://localhost/enqueue/test-queue", {
+        method: "HEAD",
+        headers: authHeaders,
+    }));
+    assertEquals(res.status, 405);
+    assertEquals(await res.text(), "Method not allowed");
+});
+
+Deno.test("HEAD /nonexistent returns 404 Not Found", async () => {
+    const handler = makeHandler();
+    const res = await handler(new Request("http://localhost/nonexistent", {
+        method: "HEAD",
+        headers: authHeaders,
+    }));
+    assertEquals(res.status, 404);
+});
