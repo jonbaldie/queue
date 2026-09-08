@@ -41,7 +41,18 @@ export class Router {
                     });
                 }
                 if (request.method !== route.method) {
-                    return new Response("Method not allowed", { status: 405 });
+                    const allowedMethods: string[] = [];
+                    for (const r of this.routes) {
+                        if (r.pattern.exec(url)) {
+                            if (!allowedMethods.includes(r.method)) {
+                                allowedMethods.push(r.method);
+                            }
+                        }
+                    }
+                    return new Response("Method not allowed", {
+                        status: 405,
+                        headers: { "Allow": allowedMethods.join(", ") },
+                    });
                 }
                 return route.handler(request, match);
             }

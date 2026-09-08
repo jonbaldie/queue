@@ -526,6 +526,7 @@ Deno.test("POST to dequeue returns 405", async () => {
     });
     const response = await handler(request);
     assertEquals(response.status, 405);
+    assertEquals(response.headers.get("Allow"), "GET");
 });
 
 // Fix 3: HTTP method enforcement - POST to length should return 405
@@ -537,6 +538,7 @@ Deno.test("POST to length returns 405", async () => {
     });
     const response = await handler(request);
     assertEquals(response.status, 405);
+    assertEquals(response.headers.get("Allow"), "GET");
 });
 
 // /queues endpoint: GET returns list of queue names
@@ -578,6 +580,7 @@ Deno.test("POST /queues returns 405", async () => {
     });
     const response = await handler(request);
     assertEquals(response.status, 405);
+    assertEquals(response.headers.get("Allow"), "GET");
 });
 
 Deno.test("GET /queues requires bearer token", async () => {
@@ -631,6 +634,7 @@ Deno.test("POST to peek returns 405", async () => {
     });
     const response = await handler(request);
     assertEquals(response.status, 405);
+    assertEquals(response.headers.get("Allow"), "GET");
 });
 
 // Health endpoint: returns 200 without authentication
@@ -662,6 +666,7 @@ Deno.test("health endpoint returns 405 on POST", async () => {
     });
     const response = await handler(request);
     assertEquals(response.status, 405);
+    assertEquals(response.headers.get("Allow"), "GET");
 });
 
 // Fix 4: Queue name validation - long queue name should return 400
@@ -1227,6 +1232,7 @@ Deno.test("API: GET request to enqueue is rejected (catches method check)", asyn
         })
     );
     assertEquals(res.status, 405);
+    assertEquals(res.headers.get("Allow"), "POST");
 });
 
 Deno.test("API: POST request to dequeue is rejected (catches method check)", async () => {
@@ -1248,6 +1254,7 @@ Deno.test("API: POST request to dequeue is rejected (catches method check)", asy
         })
     );
     assertEquals(res.status, 405);
+    assertEquals(res.headers.get("Allow"), "GET");
 });
 
 Deno.test("API: queue name with special characters (catches injection)", async () => {
@@ -1622,6 +1629,7 @@ Deno.test("HEAD /enqueue/:queue returns 405 Method Not Allowed", async () => {
         headers: authHeaders,
     }));
     assertEquals(res.status, 405);
+    assertEquals(res.headers.get("Allow"), "POST");
     assertEquals(await res.text(), "Method not allowed");
 });
 
@@ -1632,4 +1640,45 @@ Deno.test("HEAD /nonexistent returns 404 Not Found", async () => {
         headers: authHeaders,
     }));
     assertEquals(res.status, 404);
+});
+
+// RFC 9110 §15.5.6: 405 Method Not Allowed responses must include Allow header
+
+Deno.test("405 response on GET endpoint includes Allow: GET header", async () => {
+    const handler = makeHandler();
+    const res = await handler(new Request("http://localhost/queues", {
+        method: "POST",
+        headers: authHeaders,
+    }));
+    assertEquals(res.status, 405);
+    assertEquals(res.headers.get("Allow"), "GET");
+});
+
+Deno.test("405 response on POST endpoint includes Allow: POST header", async () => {
+    const handler = makeHandler();
+    const res = await handler(new Request("http://localhost/enqueue/test-queue", {
+        method: "GET",
+        headers: authHeaders,
+    }));
+    assertEquals(res.status, 405);
+    assertEquals(res.headers.get("Allow"), "POST");
+});
+
+Deno.test("405 response on unauthenticated health endpoint includes Allow: GET header", async () => {
+    const handler = makeHandler();
+    const res = await handler(new Request("http://localhost/health", {
+        method: "POST",
+    }));
+    assertEquals(res.status, 405);
+    assertEquals(res.headers.get("Allow"), "GET");
+});
+
+Deno.test("404 response on nonexistent endpoint does not include Allow header", async () => {
+    const handler = makeHandler();
+    const res = await handler(new Request("http://localhost/nonexistent", {
+        method: "POST",
+        headers: authHeaders,
+    }));
+    assertEquals(res.status, 404);
+    assertEquals(res.headers.get("Allow"), null);
 });

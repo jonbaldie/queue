@@ -34,6 +34,7 @@ const mutasaurus = new Mutasaurus({
     "./tests/manager_test.ts",
     "./tests/persist_test.ts",
     "./tests/rate_limiter_test.ts",
+    "./tests/router_test.ts",
   ],
   workers: 4,
   noCheck: true,

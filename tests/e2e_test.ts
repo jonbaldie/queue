@@ -197,7 +197,63 @@ Deno.test("e2e: HEAD requests to GET endpoints return 200 with empty body (RFC 9
                 headers: { "Authorization": `Bearer ${token}` },
             });
             assertEquals(enqueueRes.status, 405);
+            assertEquals(enqueueRes.headers.get("allow"), "POST");
             await enqueueRes.body?.cancel();
+        } finally {
+            await cleanupChild(child);
+        }
+    } finally {
+        await Deno.remove(tempDir, { recursive: true }).catch(() => {});
+    }
+});
+
+Deno.test("e2e: 405 responses include required Allow header (RFC 9110 §15.5.6)", async () => {
+    const tempDir = await Deno.makeTempDir();
+    const token = "allow-e2e-token";
+
+    try {
+        const { child, port } = await startServer({
+            HOST: "127.0.0.1",
+            PORT: "0",
+            PERSIST: tempDir,
+            QUEUE_API_TOKEN: token,
+        });
+
+        try {
+            // POST /queues returns 405 with Allow: GET
+            const queuesRes = await fetch(`http://127.0.0.1:${port}/queues`, {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${token}` },
+            });
+            assertEquals(queuesRes.status, 405);
+            assertEquals(queuesRes.headers.get("allow"), "GET");
+            await queuesRes.body?.cancel();
+
+            // GET /enqueue/q returns 405 with Allow: POST
+            const enqueueRes = await fetch(`http://127.0.0.1:${port}/enqueue/q`, {
+                method: "GET",
+                headers: { "Authorization": `Bearer ${token}` },
+            });
+            assertEquals(enqueueRes.status, 405);
+            assertEquals(enqueueRes.headers.get("allow"), "POST");
+            await enqueueRes.body?.cancel();
+
+            // POST /health returns 405 with Allow: GET (unauthenticated)
+            const healthRes = await fetch(`http://127.0.0.1:${port}/health`, {
+                method: "POST",
+            });
+            assertEquals(healthRes.status, 405);
+            assertEquals(healthRes.headers.get("allow"), "GET");
+            await healthRes.body?.cancel();
+
+            // POST /nonexistent returns 404 with no Allow header
+            const notFoundRes = await fetch(`http://127.0.0.1:${port}/nonexistent`, {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${token}` },
+            });
+            assertEquals(notFoundRes.status, 404);
+            assertEquals(notFoundRes.headers.get("allow"), null);
+            await notFoundRes.body?.cancel();
         } finally {
             await cleanupChild(child);
         }
