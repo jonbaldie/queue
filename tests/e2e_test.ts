@@ -261,3 +261,45 @@ Deno.test("e2e: 405 responses include required Allow header (RFC 9110 §15.5.6)"
         await Deno.remove(tempDir, { recursive: true }).catch(() => {});
     }
 });
+
+Deno.test("e2e: Bearer tokens with multiple spaces and tabs authenticate (RFC 9110 §11.1)", async () => {
+    const tempDir = await Deno.makeTempDir();
+    const token = "auth-whitespace-token";
+
+    try {
+        const { child, port } = await startServer({
+            HOST: "127.0.0.1",
+            PORT: "0",
+            PERSIST: tempDir,
+            QUEUE_API_TOKEN: token,
+        });
+
+        try {
+            // Single space
+            const singleRes = await fetch(`http://127.0.0.1:${port}/queues`, {
+                headers: { "Authorization": `Bearer ${token}` },
+            });
+            assertEquals(singleRes.status, 200);
+            await singleRes.body?.cancel();
+
+            // Multiple spaces
+            const multiRes = await fetch(`http://127.0.0.1:${port}/queues`, {
+                headers: { "Authorization": `Bearer   ${token}` },
+            });
+            assertEquals(multiRes.status, 200);
+            await multiRes.body?.cancel();
+
+            // Tab delimiter
+            const tabRes = await fetch(`http://127.0.0.1:${port}/queues`, {
+                headers: { "Authorization": `Bearer\t${token}` },
+            });
+            assertEquals(tabRes.status, 200);
+            await tabRes.body?.cancel();
+        } finally {
+            await cleanupChild(child);
+        }
+    } finally {
+        await Deno.remove(tempDir, { recursive: true }).catch(() => {});
+    }
+});
+
