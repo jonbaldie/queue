@@ -27,11 +27,19 @@ export class Router {
         });
     }
 
-    public handle: HttpHandler = (request: Request): Promise<Response> | Response => {
+    public handle: HttpHandler = async (request: Request): Promise<Response> => {
         const url = request.url;
         for (const route of this.routes) {
             const match = route.pattern.exec(url);
             if (match) {
+                if (request.method === "HEAD" && route.method === "GET") {
+                    const getResponse = await route.handler(request, match);
+                    return new Response(null, {
+                        status: getResponse.status,
+                        statusText: getResponse.statusText,
+                        headers: getResponse.headers,
+                    });
+                }
                 if (request.method !== route.method) {
                     return new Response("Method not allowed", { status: 405 });
                 }

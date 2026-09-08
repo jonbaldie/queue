@@ -160,3 +160,48 @@ Deno.test("server starts and ignores a null persistence record", async () => {
         await Deno.remove(tempDir, { recursive: true }).catch(() => {});
     }
 });
+
+Deno.test("e2e: HEAD requests to GET endpoints return 200 with empty body (RFC 9110)", async () => {
+    const tempDir = await Deno.makeTempDir();
+    const token = "head-e2e-test-token";
+
+    try {
+        const { child, port } = await startServer({
+            HOST: "127.0.0.1",
+            PORT: "0",
+            PERSIST: tempDir,
+            QUEUE_API_TOKEN: token,
+        });
+
+        try {
+            // HEAD /health
+            const healthRes = await fetch(`http://127.0.0.1:${port}/health`, { method: "HEAD" });
+            assertEquals(healthRes.status, 200);
+            assertEquals(healthRes.headers.get("content-type"), "application/json");
+            const healthBody = await healthRes.text();
+            assertEquals(healthBody, "");
+
+            // HEAD /queues (authenticated)
+            const queuesRes = await fetch(`http://127.0.0.1:${port}/queues`, {
+                method: "HEAD",
+                headers: { "Authorization": `Bearer ${token}` },
+            });
+            assertEquals(queuesRes.status, 200);
+            assertEquals(queuesRes.headers.get("content-type"), "application/json");
+            const queuesBody = await queuesRes.text();
+            assertEquals(queuesBody, "");
+
+            // HEAD /enqueue/:queue returns 405 Method Not Allowed
+            const enqueueRes = await fetch(`http://127.0.0.1:${port}/enqueue/q`, {
+                method: "HEAD",
+                headers: { "Authorization": `Bearer ${token}` },
+            });
+            assertEquals(enqueueRes.status, 405);
+            await enqueueRes.body?.cancel();
+        } finally {
+            await cleanupChild(child);
+        }
+    } finally {
+        await Deno.remove(tempDir, { recursive: true }).catch(() => {});
+    }
+});
