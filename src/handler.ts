@@ -24,9 +24,28 @@ async function readRequestBody(request: Request): Promise<string | Response> {
     }
 }
 
+function extractQueueName(match: Parameters<RouteHandler>[1]): { name: string } | { error: Response } {
+    const raw = match.pathname.groups.queue;
+    if (raw === undefined) {
+        return { error: new Response("Invalid queue name", { status: 400 }) };
+    }
+    try {
+        return { name: decodeURIComponent(raw) };
+    } catch (error) {
+        if (error instanceof URIError) {
+            return { error: new Response("Invalid queue name", { status: 400 }) };
+        }
+        throw error;
+    }
+}
+
 function enqueueHandler(mgr: QueueManager<string>): RouteHandler {
     return async (request, match) => {
-        const queueName = match.pathname.groups.queue as string;
+        const queueResult = extractQueueName(match);
+        if ("error" in queueResult) {
+            return queueResult.error;
+        }
+        const queueName = queueResult.name;
         const body = await readRequestBody(request);
         if (body instanceof Response) {
             return body;
@@ -75,8 +94,12 @@ function itemResponse(item: unknown): Response {
 function dequeueHandler(mgr: QueueManager<string>): RouteHandler {
     return (request, match) => {
         void request;
+        const queueResult = extractQueueName(match);
+        if ("error" in queueResult) {
+            return queueResult.error;
+        }
         try {
-            return itemResponse(mgr.dequeue(match.pathname.groups.queue as string));
+            return itemResponse(mgr.dequeue(queueResult.name));
         } catch (error) {
             return queueNameErrorResponse(error);
         }
@@ -86,8 +109,12 @@ function dequeueHandler(mgr: QueueManager<string>): RouteHandler {
 function peekHandler(mgr: QueueManager<string>): RouteHandler {
     return (request, match) => {
         void request;
+        const queueResult = extractQueueName(match);
+        if ("error" in queueResult) {
+            return queueResult.error;
+        }
         try {
-            return itemResponse(mgr.peek(match.pathname.groups.queue as string));
+            return itemResponse(mgr.peek(queueResult.name));
         } catch (error) {
             return queueNameErrorResponse(error);
         }
@@ -97,8 +124,12 @@ function peekHandler(mgr: QueueManager<string>): RouteHandler {
 function lengthHandler(mgr: QueueManager<string>): RouteHandler {
     return (request, match) => {
         void request;
+        const queueResult = extractQueueName(match);
+        if ("error" in queueResult) {
+            return queueResult.error;
+        }
         try {
-            const length = mgr.length(match.pathname.groups.queue as string);
+            const length = mgr.length(queueResult.name);
             return new Response(`${length}`);
         } catch (error) {
             return queueNameErrorResponse(error);

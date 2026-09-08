@@ -1748,3 +1748,192 @@ Deno.test("404 response on nonexistent endpoint does not include Allow header", 
     assertEquals(res.status, 404);
     assertEquals(res.headers.get("Allow"), null);
 });
+
+// Issue 84: Percent-encoded queue name canonicalization
+Deno.test("URI-equivalent percent-encodings address the same queue", async () => {
+    const handler = makeHandler();
+
+    // Enqueue via uppercase percent-encoded name %C3%BC
+    const res1 = await handler(new Request("http://localhost/enqueue/%C3%BC", {
+        method: "POST",
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ payload: "first" }),
+    }));
+    assertEquals(res1.status, 200);
+
+    // Enqueue via lowercase percent-encoded name %c3%bc
+    const res2 = await handler(new Request("http://localhost/enqueue/%c3%bc", {
+        method: "POST",
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ payload: "second" }),
+    }));
+    assertEquals(res2.status, 200);
+
+    // GET /queues reports one canonical decoded name "ü"
+    const listRes = await handler(new Request("http://localhost/queues", {
+        headers: authHeaders,
+    }));
+    assertEquals(listRes.status, 200);
+    assertEquals(await listRes.json(), ["ü"]);
+
+    // /length resolves across encodings and raw UTF-8
+    const lenUpper = await handler(new Request("http://localhost/length/%C3%BC", { headers: authHeaders }));
+    assertEquals(lenUpper.status, 200);
+    assertEquals(await lenUpper.text(), "2");
+
+    const lenLower = await handler(new Request("http://localhost/length/%c3%bc", { headers: authHeaders }));
+    assertEquals(lenLower.status, 200);
+    assertEquals(await lenLower.text(), "2");
+
+    const lenRaw = await handler(new Request("http://localhost/length/ü", { headers: authHeaders }));
+    assertEquals(lenRaw.status, 200);
+    assertEquals(await lenRaw.text(), "2");
+
+    // /peek resolves across encodings
+    const peekUpper = await handler(new Request("http://localhost/peek/%C3%BC", { headers: authHeaders }));
+    assertEquals(peekUpper.status, 200);
+    assertEquals(await peekUpper.json(), "first");
+
+    const peekLower = await handler(new Request("http://localhost/peek/%c3%bc", { headers: authHeaders }));
+    assertEquals(peekLower.status, 200);
+    assertEquals(await peekLower.json(), "first");
+
+    // /dequeue resolves across encodings and preserves FIFO order
+    const deq1 = await handler(new Request("http://localhost/dequeue/%c3%bc", { headers: authHeaders }));
+    assertEquals(deq1.status, 200);
+    assertEquals(await deq1.json(), "first");
+
+    const deq2 = await handler(new Request("http://localhost/dequeue/%C3%BC", { headers: authHeaders }));
+    assertEquals(deq2.status, 200);
+    assertEquals(await deq2.json(), "second");
+
+    // Queue is now empty
+    const lenEmpty = await handler(new Request("http://localhost/length/%C3%BC", { headers: authHeaders }));
+    assertEquals(lenEmpty.status, 200);
+    assertEquals(await lenEmpty.text(), "0");
+
+    const listEmpty = await handler(new Request("http://localhost/queues", { headers: authHeaders }));
+    assertEquals(listEmpty.status, 200);
+    assertEquals(await listEmpty.json(), []);
+});
+
+Deno.test("URI decoding does not apply form-url-encoding (+ is not space)", async () => {
+    const handler = makeHandler();
+
+    // Enqueue with literal +
+    const resPlus = await handler(new Request("http://localhost/enqueue/a+b", {
+        method: "POST",
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ payload: "plus" }),
+    }));
+    assertEquals(resPlus.status, 200);
+
+    // Enqueue with percent-encoded + (%2B)
+    const resEncodedPlus = await handler(new Request("http://localhost/enqueue/a%2Bb", {
+        method: "POST",
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ payload: "encoded-plus" }),
+    }));
+    assertEquals(resEncodedPlus.status, 200);
+
+    // Enqueue with percent-encoded space (%20)
+    const resSpace = await handler(new Request("http://localhost/enqueue/a%20b", {
+        method: "POST",
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ payload: "space" }),
+    }));
+    assertEquals(resSpace.status, 200);
+
+    // GET /queues should have ["a b", "a+b"], showing "a+b" and "a b" are distinct queues
+    const listRes = await handler(new Request("http://localhost/queues", { headers: authHeaders }));
+    assertEquals(listRes.status, 200);
+    const queues = await listRes.json() as string[];
+    assertEquals(queues.sort(), ["a b", "a+b"]);
+
+    // Check length of a+b is 2
+    const lenPlus = await handler(new Request("http://localhost/length/a+b", { headers: authHeaders }));
+    assertEquals(await lenPlus.text(), "2");
+
+    // Check length of a b is 1
+    const lenSpace = await handler(new Request("http://localhost/length/a%20b", { headers: authHeaders }));
+    assertEquals(await lenSpace.text(), "1");
+});
+
+Deno.test("malformed percent-encoded queue names return 400 and do not create queue", async () => {
+    const handler = makeHandler();
+    const malformed = ["%", "%2", "%ZZ", "%c3", "%C3%28"];
+
+    for (const bad of malformed) {
+        // enqueue
+        const enqRes = await handler(new Request(`http://localhost/enqueue/${bad}`, {
+            method: "POST",
+            headers: { ...authHeaders, "Content-Type": "application/json" },
+            body: JSON.stringify({ payload: "item" }),
+        }));
+        assertEquals(enqRes.status, 400, `enqueue with ${bad} should return 400`);
+
+        // dequeue
+        const deqRes = await handler(new Request(`http://localhost/dequeue/${bad}`, {
+            headers: authHeaders,
+        }));
+        assertEquals(deqRes.status, 400, `dequeue with ${bad} should return 400`);
+
+        // peek
+        const peekRes = await handler(new Request(`http://localhost/peek/${bad}`, {
+            headers: authHeaders,
+        }));
+        assertEquals(peekRes.status, 400, `peek with ${bad} should return 400`);
+
+        // length
+        const lenRes = await handler(new Request(`http://localhost/length/${bad}`, {
+            headers: authHeaders,
+        }));
+        assertEquals(lenRes.status, 400, `length with ${bad} should return 400`);
+    }
+
+    // Ensure no queues were created
+    const listRes = await handler(new Request("http://localhost/queues", { headers: authHeaders }));
+    assertEquals(listRes.status, 200);
+    assertEquals(await listRes.json(), []);
+});
+
+Deno.test("decoded queue name length validation applies to decoded name", async () => {
+    const handler = makeHandler();
+
+    // 128 characters encoded as %61 has raw length 384 (> 128), but decodes to 128 chars
+    const encoded128 = "%61".repeat(128);
+    const res128 = await handler(new Request(`http://localhost/enqueue/${encoded128}`, {
+        method: "POST",
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ payload: "ok" }),
+    }));
+    assertEquals(res128.status, 200);
+
+    // Verify it was stored as 128 'a's
+    const listRes = await handler(new Request("http://localhost/queues", { headers: authHeaders }));
+    assertEquals(await listRes.json(), ["a".repeat(128)]);
+
+    // 129 characters encoded as %61 decodes to 129 chars (> 128) -> returns 400 "Queue name too long"
+    const encoded129 = "%61".repeat(129);
+    const res129 = await handler(new Request(`http://localhost/enqueue/${encoded129}`, {
+        method: "POST",
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ payload: "too-long" }),
+    }));
+    assertEquals(res129.status, 400);
+    assertEquals(await res129.text(), "Queue name too long");
+
+    // Also verify length, peek, and dequeue reject 129 decoded chars with 400 "Queue name too long"
+    const lenRes = await handler(new Request(`http://localhost/length/${encoded129}`, { headers: authHeaders }));
+    assertEquals(lenRes.status, 400);
+    assertEquals(await lenRes.text(), "Queue name too long");
+
+    const peekRes = await handler(new Request(`http://localhost/peek/${encoded129}`, { headers: authHeaders }));
+    assertEquals(peekRes.status, 400);
+    assertEquals(await peekRes.text(), "Queue name too long");
+
+    const deqRes = await handler(new Request(`http://localhost/dequeue/${encoded129}`, { headers: authHeaders }));
+    assertEquals(deqRes.status, 400);
+    assertEquals(await deqRes.text(), "Queue name too long");
+});
+
