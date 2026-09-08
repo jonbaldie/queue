@@ -340,6 +340,23 @@ Deno.test("auth: rejects invalid tokens, schemes, or empty tokens with whitespac
     }
 });
 
+Deno.test("auth: empty configured token rejects missing and empty Bearer credentials", async () => {
+    const handler = makeHandler(undefined, undefined, 100, "");
+    const invalidHeaders = [undefined, "Bearer", "Bearer ", "Bearer   ", "Bearer\t"];
+    for (const header of invalidHeaders) {
+        const res = await handler(new Request("http://localhost/queues", {
+            headers: header ? { "Authorization": header } : {},
+        }));
+        assertEquals(res.status, 401, `header "${header}" should be rejected when api token is empty`);
+    }
+});
+
+Deno.test("auth: health remains public when configured token is empty", async () => {
+    const handler = makeHandler(undefined, undefined, 100, "");
+    const res = await handler(new Request("http://localhost/health"));
+    assertEquals(res.status, 200);
+});
+
 
 Deno.test("response body: rate limited returns 'Too many requests'", async () => {
     const handler = makeHandler(undefined, undefined, 1);

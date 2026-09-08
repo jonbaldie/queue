@@ -52,11 +52,16 @@ export function parseConfig(env: Record<string, string | undefined>, args: strin
     const queueCountLimit = parsePositiveInt("QUEUE_COUNT_LIMIT", env["QUEUE_COUNT_LIMIT"], 1000);
     const rateLimitRequests = parsePositiveInt("RATE_LIMIT_REQUESTS", env["RATE_LIMIT_REQUESTS"], 100);
 
+    const apiToken = env["QUEUE_API_TOKEN"];
+    if (!apiToken) {
+        throw new ConfigError("QUEUE_API_TOKEN must be a non-empty string");
+    }
+
     return {
         host: env["HOST"] || "localhost",
         port,
         persistDir: env["PERSIST"] || Deno.cwd(),
-        apiToken: env["QUEUE_API_TOKEN"] || "",
+        apiToken,
         queueDepthLimit,
         queueCountLimit,
         rateLimitRequests,

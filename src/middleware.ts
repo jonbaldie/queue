@@ -14,7 +14,7 @@ export function withAuth(apiToken: string): Middleware {
             const authHeader = request.headers.get("Authorization");
             const [scheme, ...rest] = (authHeader ?? "").trim().split(/\s+/);
             const token = rest.join(" ");
-            if (!scheme || scheme.toLowerCase() !== "bearer" || token !== apiToken) {
+            if (!apiToken || !scheme || scheme.toLowerCase() !== "bearer" || !token || token !== apiToken) {
                 return new Response("Unauthorized", { status: 401 });
             }
             return next(request, info);

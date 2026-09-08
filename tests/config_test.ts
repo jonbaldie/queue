@@ -1,12 +1,12 @@
 import { assertEquals, assertThrows } from "jsr:@std/assert@1.0";
 import { parseConfig, ConfigError } from "../src/config.ts";
 
-Deno.test("parseConfig - returns defaults when no env or args provided", () => {
-    const config = parseConfig({}, []);
+Deno.test("parseConfig - returns defaults when only QUEUE_API_TOKEN is provided", () => {
+    const config = parseConfig({ QUEUE_API_TOKEN: "test-token" }, []);
     assertEquals(config.host, "localhost");
     assertEquals(config.port, 3000);
     assertEquals(typeof config.persistDir, "string");
-    assertEquals(config.apiToken, "");
+    assertEquals(config.apiToken, "test-token");
     assertEquals(config.queueDepthLimit, 10000);
     assertEquals(config.queueCountLimit, 1000);
     assertEquals(config.rateLimitRequests, 100);
@@ -28,6 +28,7 @@ Deno.test("parseConfig - parses string environment variables correctly", () => {
 Deno.test("parseConfig - parses numeric environment variables correctly", () => {
     const env = {
         PORT: "8080",
+        QUEUE_API_TOKEN: "test-token",
         QUEUE_DEPTH_LIMIT: "5000",
         QUEUE_COUNT_LIMIT: "500",
         RATE_LIMIT_REQUESTS: "50"
@@ -40,7 +41,7 @@ Deno.test("parseConfig - parses numeric environment variables correctly", () => 
 });
 
 Deno.test("parseConfig - parses --persist flag correctly", () => {
-    const config = parseConfig({}, ["--persist"]);
+    const config = parseConfig({ QUEUE_API_TOKEN: "test-token" }, ["--persist"]);
     assertEquals(config.persistEnabled, true);
 });
 
@@ -68,4 +69,12 @@ Deno.test("parseConfig - throws ConfigError on invalid QUEUE_COUNT_LIMIT", () =>
 
 Deno.test("parseConfig - throws ConfigError on invalid RATE_LIMIT_REQUESTS", () => {
     assertThrows(() => parseConfig({ RATE_LIMIT_REQUESTS: "xyz" }, []), ConfigError, "RATE_LIMIT_REQUESTS must be a positive integer");
+});
+
+Deno.test("parseConfig - throws ConfigError when QUEUE_API_TOKEN is missing", () => {
+    assertThrows(() => parseConfig({}, []), ConfigError, "QUEUE_API_TOKEN must be a non-empty string");
+});
+
+Deno.test("parseConfig - throws ConfigError when QUEUE_API_TOKEN is empty", () => {
+    assertThrows(() => parseConfig({ QUEUE_API_TOKEN: "" }, []), ConfigError, "QUEUE_API_TOKEN must be a non-empty string");
 });
