@@ -292,6 +292,55 @@ Deno.test("auth: scheme name is case-insensitive per RFC 9110", async () => {
     }
 });
 
+Deno.test("auth: accepts Bearer tokens formatted with multiple spaces or tabs (RFC 9110 §11.1)", async () => {
+    const handler = makeHandler();
+    const validHeaders = [
+        `Bearer ${API_TOKEN}`,
+        `Bearer   ${API_TOKEN}`,
+        `Bearer\t${API_TOKEN}`,
+        `Bearer\t\t${API_TOKEN}`,
+        `Bearer \t  ${API_TOKEN}`,
+        `bearer   ${API_TOKEN}`,
+        `BEARER\t${API_TOKEN}`,
+        `BeArEr \t ${API_TOKEN}`,
+        `Bearer   ${API_TOKEN}   `,
+        `Bearer\t${API_TOKEN}\t`,
+    ];
+    for (const header of validHeaders) {
+        const res = await handler(new Request("http://localhost/queues", {
+            headers: { "Authorization": header },
+        }));
+        assertEquals(res.status, 200, `header "${header}" should authenticate`);
+    }
+});
+
+Deno.test("auth: rejects invalid tokens, schemes, or empty tokens with whitespace", async () => {
+    const handler = makeHandler();
+    const invalidHeaders = [
+        "",
+        "   ",
+        "\t",
+        "Bearer",
+        "Bearer ",
+        "Bearer   ",
+        "Bearer\t",
+        "Bearer \t ",
+        `Bearer${API_TOKEN}`,
+        `Bearer   wrong-token`,
+        `Bearer\twrong-token`,
+        `Basic ${API_TOKEN}`,
+        `Basic   ${API_TOKEN}`,
+        `Token\t${API_TOKEN}`,
+    ];
+    for (const header of invalidHeaders) {
+        const res = await handler(new Request("http://localhost/queues", {
+            headers: { "Authorization": header },
+        }));
+        assertEquals(res.status, 401, `header "${header}" should be rejected`);
+    }
+});
+
+
 Deno.test("response body: rate limited returns 'Too many requests'", async () => {
     const handler = makeHandler(undefined, undefined, 1);
     await handler(new Request("http://localhost/length/q", { headers: auth }));
