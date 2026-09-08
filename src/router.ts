@@ -29,34 +29,41 @@ export class Router {
 
     public handle: HttpHandler = async (request: Request): Promise<Response> => {
         const url = request.url;
+        let matchedPattern = false;
+        const allowedMethods: string[] = [];
+
         for (const route of this.routes) {
             const match = route.pattern.exec(url);
-            if (match) {
-                if (request.method === "HEAD" && route.method === "GET") {
-                    const getResponse = await route.handler(request, match);
-                    return new Response(null, {
-                        status: getResponse.status,
-                        statusText: getResponse.statusText,
-                        headers: getResponse.headers,
-                    });
-                }
-                if (request.method !== route.method) {
-                    const allowedMethods: string[] = [];
-                    for (const r of this.routes) {
-                        if (r.pattern.exec(url)) {
-                            if (!allowedMethods.includes(r.method)) {
-                                allowedMethods.push(r.method);
-                            }
-                        }
-                    }
-                    return new Response("Method not allowed", {
-                        status: 405,
-                        headers: { "Allow": allowedMethods.join(", ") },
-                    });
-                }
+            if (!match) {
+                continue;
+            }
+
+            matchedPattern = true;
+            if (!allowedMethods.includes(route.method)) {
+                allowedMethods.push(route.method);
+            }
+
+            if (request.method === "HEAD" && route.method === "GET") {
+                const getResponse = await route.handler(request, match);
+                return new Response(null, {
+                    status: getResponse.status,
+                    statusText: getResponse.statusText,
+                    headers: getResponse.headers,
+                });
+            }
+
+            if (request.method === route.method) {
                 return route.handler(request, match);
             }
         }
+
+        if (matchedPattern) {
+            return new Response("Method not allowed", {
+                status: 405,
+                headers: { "Allow": allowedMethods.join(", ") },
+            });
+        }
+
         return new Response("Not found.", { status: 404 });
     };
 }
