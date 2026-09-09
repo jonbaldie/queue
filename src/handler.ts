@@ -11,17 +11,46 @@ async function readRequestBody(request: Request): Promise<string | Response> {
     if (contentLength && parseInt(contentLength) > MAX_BODY_SIZE) {
         return new Response("Payload too large", { status: 413 });
     }
-    try {
-        const body = await request.text();
-        // Measure wire size in bytes, not UTF-16 code units: a multi-byte
-        // UTF-8 body can exceed the byte limit while `body.length` is under it.
-        if (LOG_ENCODER.encode(body).length > MAX_BODY_SIZE) {
-            return new Response("Payload too large", { status: 413 });
-        }
-        return body;
-    } catch {
-        return new Response("Payload too large", { status: 413 });
+
+    if (request.body === null) {
+        return "";
     }
+
+    const reader = request.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let bodySize = 0;
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+                break;
+            }
+            bodySize += value.byteLength;
+            if (bodySize > MAX_BODY_SIZE) {
+                await reader.cancel();
+                return new Response("Payload too large", { status: 413 });
+            }
+            chunks.push(value);
+        }
+    } catch {
+        try {
+            await reader.cancel();
+        } catch (error) {
+            // The stream may already be closed or errored.
+            void error;
+        }
+        return new Response("Payload too large", { status: 413 });
+    } finally {
+        reader.releaseLock();
+    }
+
+    const body = new Uint8Array(bodySize);
+    let offset = 0;
+    for (const chunk of chunks) {
+        body.set(chunk, offset);
+        offset += chunk.byteLength;
+    }
+    return await new Response(body).text();
 }
 
 function extractQueueName(match: Parameters<RouteHandler>[1]): { name: string } | { error: Response } {

@@ -436,6 +436,109 @@ Deno.test("response body: large content-length returns 'Payload too large'", asy
     assertEquals(await res.text(), "Payload too large");
 });
 
+Deno.test("response body: streaming overflow returns 413 before the body ends", async () => {
+    const handler = makeHandler();
+    const maxBodySize = 1024 * 1024;
+    const emptyPayloadBody = '{"payload":""}';
+    const bodyText = `{"payload":"${"x".repeat(maxBodySize - emptyPayloadBody.length + 1)}"}`;
+    const bodyBytes = new TextEncoder().encode(bodyText);
+    assertEquals(bodyBytes.byteLength, maxBodySize + 1);
+    let cancelObserved = false;
+    let closeBody = () => {};
+    const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+            controller.enqueue(bodyBytes.slice(0, maxBodySize));
+            controller.enqueue(bodyBytes.slice(maxBodySize));
+            closeBody = () => controller.close();
+        },
+        cancel() {
+            cancelObserved = true;
+        },
+    });
+
+    const responsePromise = handler(new Request("http://localhost/enqueue/streaming", {
+        method: "POST",
+        body,
+        headers: auth,
+    }));
+
+    let timeoutId: number | undefined;
+    try {
+        const response = await Promise.race([
+            responsePromise,
+            new Promise<undefined>((resolve) => {
+                timeoutId = setTimeout(() => resolve(undefined), 100);
+            }),
+        ]);
+        if (response === undefined) {
+            throw new Error("handler waited for the streaming request body to end");
+        }
+        assertEquals(response.status, 413);
+        assertEquals(cancelObserved, true);
+
+        const lengthResponse = await handler(new Request(
+            "http://localhost/length/streaming",
+            { headers: auth },
+        ));
+        assertEquals(await lengthResponse.text(), "0");
+    } finally {
+        if (timeoutId !== undefined) {
+            clearTimeout(timeoutId);
+        }
+        try {
+            closeBody();
+        } catch {
+            // The handler may have cancelled the body after detecting overflow.
+        }
+        await responsePromise.catch(() => {});
+    }
+});
+
+Deno.test("response body: exactly 1 MiB is accepted", async () => {
+    const handler = makeHandler();
+    const maxBodySize = 1024 * 1024;
+    const emptyPayloadBody = '{"payload":""}';
+    const body = `{"payload":"${"x".repeat(maxBodySize - emptyPayloadBody.length)}"}`;
+    assertEquals(new TextEncoder().encode(body).byteLength, maxBodySize);
+
+    const response = await handler(new Request("http://localhost/enqueue/exact-limit", {
+        method: "POST",
+        body,
+        headers: auth,
+    }));
+    assertEquals(response.status, 200);
+
+    const lengthResponse = await handler(new Request(
+        "http://localhost/length/exact-limit",
+        { headers: auth },
+    ));
+    assertEquals(await lengthResponse.text(), "1");
+});
+
+Deno.test("response body: streaming overflow ignores a small Content-Length", async () => {
+    const handler = makeHandler();
+    const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+            controller.enqueue(new Uint8Array(1024 * 1024));
+            controller.enqueue(new Uint8Array([0]));
+        },
+    });
+    const responsePromise = handler(new Request("http://localhost/enqueue/lying-length", {
+        method: "POST",
+        body,
+        headers: { ...auth, "content-length": "5" },
+    }));
+
+    const response = await responsePromise;
+    assertEquals(response.status, 413);
+
+    const lengthResponse = await handler(new Request(
+        "http://localhost/length/lying-length",
+        { headers: auth },
+    ));
+    assertEquals(await lengthResponse.text(), "0");
+});
+
 Deno.test("response body: missing payload key returns 'Missing payload key'", async () => {
     const handler = makeHandler();
     const res = await handler(new Request("http://localhost/enqueue/q", {
@@ -1936,4 +2039,3 @@ Deno.test("decoded queue name length validation applies to decoded name", async 
     assertEquals(deqRes.status, 400);
     assertEquals(await deqRes.text(), "Queue name too long");
 });
-
