@@ -354,3 +354,81 @@ Deno.test("e2e: Bearer tokens with multiple spaces and tabs authenticate (RFC 91
     }
 });
 
+Deno.test("e2e: URI-equivalent percent-encodings address the same queue and malformed names return 400", async () => {
+    const tempDir = await Deno.makeTempDir();
+    const token = "percent-encoding-test-token";
+
+    try {
+        const { child, port } = await startServer({
+            HOST: "127.0.0.1",
+            PORT: "0",
+            PERSIST: tempDir,
+            QUEUE_API_TOKEN: token,
+        });
+
+        try {
+            const auth = { "Authorization": `Bearer ${token}` };
+
+            // Enqueue via uppercase %C3%BC
+            const enq1 = await fetch(`http://127.0.0.1:${port}/enqueue/%C3%BC`, {
+                method: "POST",
+                headers: { ...auth, "Content-Type": "application/json" },
+                body: JSON.stringify({ payload: "first-e2e" }),
+            });
+            assertEquals(enq1.status, 200);
+            await enq1.body?.cancel();
+
+            // Enqueue via lowercase %c3%bc
+            const enq2 = await fetch(`http://127.0.0.1:${port}/enqueue/%c3%bc`, {
+                method: "POST",
+                headers: { ...auth, "Content-Type": "application/json" },
+                body: JSON.stringify({ payload: "second-e2e" }),
+            });
+            assertEquals(enq2.status, 200);
+            await enq2.body?.cancel();
+
+            // GET /queues returns one canonical decoded name "ü"
+            const listRes = await fetch(`http://127.0.0.1:${port}/queues`, { headers: auth });
+            assertEquals(listRes.status, 200);
+            assertEquals(await listRes.json(), ["ü"]);
+
+            // /length via encoded name
+            const lenRes = await fetch(`http://127.0.0.1:${port}/length/%C3%BC`, { headers: auth });
+            assertEquals(lenRes.status, 200);
+            assertEquals(await lenRes.text(), "2");
+
+            // /peek via lowercase encoded name
+            const peekRes = await fetch(`http://127.0.0.1:${port}/peek/%c3%bc`, { headers: auth });
+            assertEquals(peekRes.status, 200);
+            assertEquals(await peekRes.json(), "first-e2e");
+
+            // /dequeue via encoded names in FIFO order
+            const deq1 = await fetch(`http://127.0.0.1:${port}/dequeue/%c3%bc`, { headers: auth });
+            assertEquals(deq1.status, 200);
+            assertEquals(await deq1.json(), "first-e2e");
+
+            const deq2 = await fetch(`http://127.0.0.1:${port}/dequeue/%C3%BC`, { headers: auth });
+            assertEquals(deq2.status, 200);
+            assertEquals(await deq2.json(), "second-e2e");
+
+            // Malformed percent encoding returns 400 and creates no queues
+            const badEnq = await fetch(`http://127.0.0.1:${port}/enqueue/%ZZ`, {
+                method: "POST",
+                headers: { ...auth, "Content-Type": "application/json" },
+                body: JSON.stringify({ payload: "bad" }),
+            });
+            assertEquals(badEnq.status, 400);
+            await badEnq.body?.cancel();
+
+            const emptyListRes = await fetch(`http://127.0.0.1:${port}/queues`, { headers: auth });
+            assertEquals(emptyListRes.status, 200);
+            assertEquals(await emptyListRes.json(), []);
+        } finally {
+            await cleanupChild(child);
+        }
+    } finally {
+        await Deno.remove(tempDir, { recursive: true }).catch(() => {});
+    }
+});
+
+
