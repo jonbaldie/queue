@@ -52,7 +52,7 @@ To get the next payload from the `foo` queue, send a get request to `/dequeue/:q
 curl -X GET http://127.0.0.1:1991/dequeue/foo
 ```
 
-This returns the oldest added payload on queue `foo` as JSON and removes it, guaranteeing both the order and that each payload will only be read once. Strings, numbers, booleans, arrays, and objects all use `application/json` so a string `"0"` is distinct from the number `0`.
+This returns the oldest added payload on queue `foo` as JSON and removes it, guaranteeing both the order and that each payload will only be read once. Strings, numbers, booleans, arrays, and objects all use `application/json` so a string `"0"` is distinct from the number `0`. Numeric values that JavaScript cannot represent without loss are rejected with a `400` response.
 
 That's all you need to get started! 😎
 

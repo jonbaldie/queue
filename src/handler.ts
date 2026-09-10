@@ -6,6 +6,57 @@ import { RouteHandler, Router } from "./router.ts";
 const MAX_BODY_SIZE = 1024 * 1024; // 1 MB
 const LOG_ENCODER = new TextEncoder();
 
+class UnsupportedNumberError extends Error {
+    constructor() {
+        super("Payload contains an unsupported number");
+    }
+}
+
+function canonicalJsonNumber(source: string): string {
+    const match = /^(-?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(source);
+    if (match === null) {
+        return source;
+    }
+
+    const sign = match[1] === "-" ? "-" : "";
+    let digits = `${match[2]}${match[3] ?? ""}`.replace(/^0+/, "");
+    if (digits === "") {
+        return "0";
+    }
+
+    let exponent = Number(match[4] ?? "0") - (match[3]?.length ?? 0);
+    const digitsWithoutTrailingZeros = digits.replace(/0+$/, "");
+    exponent += digits.length - digitsWithoutTrailingZeros.length;
+    digits = digitsWithoutTrailingZeros;
+    return `${sign}${digits}e${exponent}`;
+}
+
+function isUnsupportedNumber(value: number, source: string): boolean {
+    if (!Number.isFinite(value)) {
+        return true;
+    }
+
+    const serializedValue = JSON.stringify(value)!;
+    return canonicalJsonNumber(source) !== canonicalJsonNumber(serializedValue);
+}
+
+function parseJsonBody(body: string) {
+    return JSON.parse(body, function (key: string, value: unknown) {
+        void key;
+        if (typeof value !== "number") {
+            return value;
+        }
+
+        // V8 supplies context.source at runtime; Deno's JSON.parse type still
+        // only declares the legacy two-argument reviver signature.
+        const context = arguments[2] as { source: string };
+        if (isUnsupportedNumber(value, context.source)) {
+            throw new UnsupportedNumberError();
+        }
+        return value;
+    });
+}
+
 async function readRequestBody(request: Request): Promise<string | Response> {
     const contentLength = request.headers.get("content-length");
     if (contentLength && parseInt(contentLength) > MAX_BODY_SIZE) {
@@ -80,7 +131,7 @@ function enqueueHandler(mgr: QueueManager<string>): RouteHandler {
             return body;
         }
         try {
-            const json = JSON.parse(body);
+            const json = parseJsonBody(body);
             if (json === null || typeof json !== "object") {
                 return new Response("Missing payload key", { status: 400 });
             }
@@ -96,12 +147,19 @@ function enqueueHandler(mgr: QueueManager<string>): RouteHandler {
             mgr.enqueue(queueName, json.payload);
             return new Response(`Payload successfully queued onto ${queueName}.`);
         } catch (error) {
-            if (error instanceof SyntaxError) {
-                return new Response("Invalid JSON", { status: 400 });
-            }
-            return queueNameErrorResponse(error);
+            return enqueueErrorResponse(error);
         }
     };
+}
+
+function enqueueErrorResponse(error: unknown): Response {
+    if (error instanceof SyntaxError) {
+        return new Response("Invalid JSON", { status: 400 });
+    }
+    if (error instanceof UnsupportedNumberError) {
+        return new Response(error.message, { status: 400 });
+    }
+    return queueNameErrorResponse(error);
 }
 
 function queueNameErrorResponse(error: unknown): Response {
