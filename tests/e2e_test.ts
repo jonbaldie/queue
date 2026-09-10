@@ -284,6 +284,30 @@ Deno.test("e2e: 405 responses include required Allow header (RFC 9110 §15.5.6)"
     }
 });
 
+Deno.test("e2e: 401 responses include required Bearer challenge (RFC 9110 §15.5.2)", async () => {
+    const tempDir = await Deno.makeTempDir();
+
+    try {
+        const { child, port } = await startServer({
+            HOST: "127.0.0.1",
+            PORT: "0",
+            PERSIST: tempDir,
+            QUEUE_API_TOKEN: "auth-challenge-test-token",
+        });
+
+        try {
+            const response = await fetch(`http://127.0.0.1:${port}/length/protected`);
+            assertEquals(response.status, 401);
+            assertEquals(response.headers.get("www-authenticate"), "Bearer");
+            assertEquals(await response.text(), "Unauthorized");
+        } finally {
+            await cleanupChild(child);
+        }
+    } finally {
+        await Deno.remove(tempDir, { recursive: true }).catch(() => {});
+    }
+});
+
 Deno.test("e2e: missing QUEUE_API_TOKEN fails before the server binds a port", async () => {
     const tempDir = await Deno.makeTempDir();
     try {
@@ -430,5 +454,4 @@ Deno.test("e2e: URI-equivalent percent-encodings address the same queue and malf
         await Deno.remove(tempDir, { recursive: true }).catch(() => {});
     }
 });
-
 

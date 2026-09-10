@@ -15,7 +15,10 @@ export function withAuth(apiToken: string): Middleware {
             const [scheme, ...rest] = (authHeader ?? "").trim().split(/\s+/);
             const token = rest.join(" ");
             if (!apiToken || !scheme || scheme.toLowerCase() !== "bearer" || !token || token !== apiToken) {
-                return new Response("Unauthorized", { status: 401 });
+                return new Response("Unauthorized", {
+                    status: 401,
+                    headers: { "WWW-Authenticate": "Bearer" },
+                });
             }
             return next(request, info);
         };
