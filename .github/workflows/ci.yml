@@ -67,7 +67,7 @@ jobs:
             --allow-sys \
             --allow-ffi \
             --node-modules-dir=auto \
-            mutation/mutasaurus_ci.ts
+            mutation/mutasaurus_ci.ts --workers 4
 
   mutation-stryker:
     name: Mutation testing (Stryker)
