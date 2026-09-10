@@ -128,7 +128,10 @@ function dequeueHandler(mgr: QueueManager<string>): RouteHandler {
             return queueResult.error;
         }
         try {
-            return itemResponse(mgr.dequeue(queueResult.name));
+            const item = request.method === "HEAD"
+                ? mgr.peek(queueResult.name)
+                : mgr.dequeue(queueResult.name);
+            return itemResponse(item);
         } catch (error) {
             return queueNameErrorResponse(error);
         }
