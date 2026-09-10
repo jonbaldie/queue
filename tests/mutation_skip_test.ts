@@ -67,16 +67,53 @@ async function createDocsOnlyChange(branchName: string, commitMessage: string) {
   return repo;
 }
 
+async function createMutationEngineRepo() {
+  const repo = await createTestRepo();
+  await Deno.writeTextFile(
+    join(repo.repoDir, "src", "config.ts"),
+    "export function config(value: number): number { return value + 1; }\n",
+  );
+
+  const testFiles = [
+    "config",
+    "e2e",
+    "handler",
+    "manager",
+    "persist",
+    "rate_limiter",
+    "router",
+  ];
+  for (const name of testFiles) {
+    const content = name === "config"
+      ? [
+        'import { assertEquals } from "jsr:@std/assert";',
+        'import { config } from "../src/config.ts";',
+        'Deno.test("config", () => assertEquals(config(1), 2));',
+        "",
+      ].join("\n")
+      : 'Deno.test("placeholder", () => {});\n';
+    await Deno.writeTextFile(
+      join(repo.repoDir, "tests", `${name}_test.ts`),
+      content,
+    );
+  }
+  await repo.runGit("add", ".");
+  await repo.runGit("commit", "-m", "Add executable mutation fixture");
+  return repo;
+}
+
 // Helper to run a mutation runner script
 async function runRunnerScript(
   scriptPath: string,
   repoDir: string,
   env: Record<string, string> = {},
   args: string[] = [],
+  runtimeArgs: string[] = [],
 ) {
   const cmd = new Deno.Command("deno", {
     args: [
       "run",
+      ...runtimeArgs,
       "--allow-run",
       "--allow-read",
       "--allow-write",
@@ -171,12 +208,33 @@ Deno.test("skip: mutasaurus accepts an explicit worker count", async () => {
   }
 });
 
+Deno.test("runner: mutasaurus invokes the real engine with an explicit worker count", async () => {
+  const { repoDir, cleanup } = await createMutationEngineRepo();
+  try {
+    const mutasaurusScript = join(Deno.cwd(), "mutation", "mutasaurus_ci.ts");
+    const result = await runRunnerScript(
+      mutasaurusScript,
+      repoDir,
+      { GITHUB_EVENT_NAME: "push" },
+      ["--workers", "1"],
+      ["--node-modules-dir=auto", "--allow-ffi", "--allow-sys"],
+    );
+
+    assertEquals(result.code, 0, `${result.stdout}\n${result.stderr}`);
+    assertStringIncludes(result.stdout, "Mutasaurus workers: 1");
+    assertStringIncludes(result.stdout, "Overall: 100% (1/1)");
+  } finally {
+    await cleanup();
+  }
+});
+
 Deno.test("skip: mutasaurus rejects invalid worker values before selection", async () => {
   const invalidArguments = [
     ["--workers", "0"],
     ["--workers", "-1"],
     ["--workers", "1.5"],
     ["--workers", "not-a-number"],
+    ["--workers", "9007199254740992"],
     ["--workers"],
   ];
 
@@ -262,6 +320,7 @@ Deno.test("skip: stryker rejects invalid concurrency values before selection", a
     ["--concurrency", "-1"],
     ["--concurrency", "1.5"],
     ["--concurrency", "not-a-number"],
+    ["--concurrency", "9007199254740992"],
     ["--concurrency"],
   ];
 

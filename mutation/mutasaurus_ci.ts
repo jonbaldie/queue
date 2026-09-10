@@ -1,18 +1,9 @@
 import { selectMutationTargets } from "./selector.ts";
-import { parsePositiveIntegerOption } from "./runner_options.ts";
+import { parsePositiveIntegerOptionOrExit } from "./runner_options.ts";
 
 const THRESHOLD = 80;
 
-function parseWorkers(): number {
-  try {
-    return parsePositiveIntegerOption(Deno.args, "workers", 1) ?? 1;
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    Deno.exit(1);
-  }
-}
-
-const workers = parseWorkers();
+const workers = parsePositiveIntegerOptionOrExit(Deno.args, "workers", 1) ?? 1;
 console.log(`Mutasaurus workers: ${workers}`);
 
 const selection = await selectMutationTargets();

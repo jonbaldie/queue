@@ -54,6 +54,19 @@ export function parsePositiveIntegerOption(
   return value;
 }
 
+export function parsePositiveIntegerOptionOrExit(
+  args: readonly string[],
+  optionName: string,
+  defaultValue?: number,
+): number | undefined {
+  try {
+    return parsePositiveIntegerOption(args, optionName, defaultValue);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    Deno.exit(1);
+  }
+}
+
 export function buildStrykerCommandArgs(
   configFilePath: string,
   concurrency?: number,

@@ -1,20 +1,11 @@
 import { selectMutationTargets } from "./selector.ts";
 import {
   buildStrykerCommandArgs,
-  parsePositiveIntegerOption,
+  parsePositiveIntegerOptionOrExit,
 } from "./runner_options.ts";
 import { join } from "jsr:@std/path/join";
 
-function parseConcurrency(): number | undefined {
-  try {
-    return parsePositiveIntegerOption(Deno.args, "concurrency");
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    Deno.exit(1);
-  }
-}
-
-const concurrency = parseConcurrency();
+const concurrency = parsePositiveIntegerOptionOrExit(Deno.args, "concurrency");
 console.log(
   `Stryker concurrency: ${
     concurrency === undefined ? "config default" : concurrency
