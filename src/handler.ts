@@ -9,7 +9,6 @@ const LOG_ENCODER = new TextEncoder();
 class UnsupportedNumberError extends Error {
     constructor() {
         super("Payload contains an unsupported number");
-        this.name = "UnsupportedNumberError";
     }
 }
 
@@ -32,17 +31,13 @@ function canonicalJsonNumber(source: string): string {
     return `${sign}${digits}e${exponent}`;
 }
 
-function isUnsupportedNumber(value: number, source?: string): boolean {
+function isUnsupportedNumber(value: number, source: string): boolean {
     if (!Number.isFinite(value)) {
         return true;
     }
-    if (source === undefined) {
-        return Number.isInteger(value) && !Number.isSafeInteger(value);
-    }
 
-    const serializedValue = JSON.stringify(value);
-    return serializedValue === undefined ||
-        canonicalJsonNumber(source) !== canonicalJsonNumber(serializedValue);
+    const serializedValue = JSON.stringify(value)!;
+    return canonicalJsonNumber(source) !== canonicalJsonNumber(serializedValue);
 }
 
 function parseJsonBody(body: string) {
@@ -54,8 +49,8 @@ function parseJsonBody(body: string) {
 
         // V8 supplies context.source at runtime; Deno's JSON.parse type still
         // only declares the legacy two-argument reviver signature.
-        const context = arguments[2] as { source?: string } | undefined;
-        if (isUnsupportedNumber(value, context?.source)) {
+        const context = arguments[2] as { source: string };
+        if (isUnsupportedNumber(value, context.source)) {
             throw new UnsupportedNumberError();
         }
         return value;

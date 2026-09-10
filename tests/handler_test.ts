@@ -1075,6 +1075,36 @@ Deno.test("API: accepts exactly representable large integer payloads", async () 
     assertEquals(await dequeueResponse.json(), 9007199254740992);
 });
 
+Deno.test("API: preserves equivalent JSON numeric spellings", async () => {
+    const cases = [
+        { name: "decimal", source: "1.0", value: 1 },
+        { name: "scientific", source: "1e3", value: 1000 },
+        { name: "uppercase-exponent", source: "1E+3", value: 1000 },
+        { name: "trailing-fraction-zeroes", source: "1.2300", value: 1.23 },
+        { name: "leading-fraction-zeroes", source: "0.0010", value: 0.001 },
+        { name: "negative-exponent", source: "-1.2300e+2", value: -123 },
+        { name: "zero-exponent", source: "0e400", value: 0 },
+    ];
+    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const handler = createHandler(mgr, API_TOKEN);
+
+    for (const testCase of cases) {
+        const queueName = `equivalent-${testCase.name}-queue`;
+        const enqueueResponse = await handler(new Request(`http://localhost:3000/enqueue/${queueName}`, {
+            method: "POST",
+            body: `{"payload":${testCase.source}}`,
+            headers: { ...authHeaders, "Content-Type": "application/json" },
+        }));
+        assertEquals(enqueueResponse.status, 200);
+
+        const dequeueResponse = await handler(new Request(`http://localhost:3000/dequeue/${queueName}`, {
+            headers: authHeaders,
+        }));
+        assertEquals(dequeueResponse.status, 200);
+        assertEquals(await dequeueResponse.json(), testCase.value);
+    }
+});
+
 Deno.test("API: rejects underflowing numeric payloads instead of changing them to zero", async () => {
     const mgr = new QueueManager(new Persistency.MemoryStore);
     const handler = createHandler(mgr, API_TOKEN);
