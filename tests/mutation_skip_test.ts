@@ -6,8 +6,10 @@ import {
 import { join } from "jsr:@std/path/join";
 
 // Helper to create real temporary Git repository
-async function createTestRepo() {
-  const repoDir = await Deno.makeTempDir({ prefix: "queue-skip-test-" });
+async function createTestRepo(directory?: string) {
+  const repoDir = directory === undefined
+    ? await Deno.makeTempDir({ prefix: "queue-skip-test-" })
+    : await Deno.makeTempDir({ dir: directory, prefix: "queue-skip-test-" });
 
   const runGit = async (...args: string[]) => {
     const cmd = new Deno.Command("git", {
@@ -99,6 +101,56 @@ async function createMutationEngineRepo() {
   }
   await repo.runGit("add", ".");
   await repo.runGit("commit", "-m", "Add executable mutation fixture");
+  return repo;
+}
+
+async function createStrykerEngineRepo() {
+  const repo = await createTestRepo(Deno.cwd());
+  await Deno.writeTextFile(
+    join(repo.repoDir, "src", "config.ts"),
+    "export function config(value: number): number { return value + 1; }\n",
+  );
+  await Deno.writeTextFile(
+    join(repo.repoDir, "tests", "config_test.ts"),
+    [
+      'import { assertEquals } from "jsr:@std/assert";',
+      'import { config } from "../src/config.ts";',
+      'Deno.test("config", () => assertEquals(config(1), 2));',
+      "",
+    ].join("\n"),
+  );
+  await Deno.writeTextFile(
+    join(repo.repoDir, "mutation", "stryker.config.json"),
+    JSON.stringify(
+      {
+        mutate: ["src/config.ts"],
+        testRunner: "command",
+        commandRunner: {
+          command: "deno test --allow-read --allow-env --no-check",
+        },
+        reporters: ["json", "clear-text"],
+        jsonReporter: { fileName: "mutation/stryker-report.json" },
+        coverageAnalysis: "off",
+        timeoutMS: 30000,
+        thresholds: { high: 0, low: 0, break: null },
+        concurrency: 2,
+      },
+      null,
+      2,
+    ),
+  );
+  await Deno.writeTextFile(
+    join(repo.repoDir, "mutation", "stryker_check.js"),
+    [
+      'const report = JSON.parse(require("node:fs").readFileSync("mutation/stryker-report.json", "utf8"));',
+      "const mutants = Object.values(report.files).flatMap((file) => file.mutants);",
+      'if (mutants.length === 0 || mutants.some((mutant) => mutant.status !== "Killed")) process.exit(1);',
+      'console.log("fixture check passed");',
+      "",
+    ].join("\n"),
+  );
+  await repo.runGit("add", ".");
+  await repo.runGit("commit", "-m", "Add executable Stryker fixture");
   return repo;
 }
 
@@ -223,6 +275,27 @@ Deno.test("runner: mutasaurus invokes the real engine with an explicit worker co
     assertEquals(result.code, 0, `${result.stdout}\n${result.stderr}`);
     assertStringIncludes(result.stdout, "Mutasaurus workers: 1");
     assertStringIncludes(result.stdout, "Overall: 100% (1/1)");
+  } finally {
+    await cleanup();
+  }
+});
+
+Deno.test("runner: stryker invokes the real engine with explicit concurrency", async () => {
+  const { repoDir, cleanup } = await createStrykerEngineRepo();
+  try {
+    const strykerScript = join(Deno.cwd(), "mutation", "stryker_ci.ts");
+    const result = await runRunnerScript(
+      strykerScript,
+      repoDir,
+      { GITHUB_EVENT_NAME: "push" },
+      ["--concurrency", "1"],
+    );
+
+    const output = `${result.stdout}\n${result.stderr}`;
+    assertEquals(result.code, 0, output);
+    assertStringIncludes(output, "Stryker concurrency: 1");
+    assertStringIncludes(output, "Creating 1 test runner process(es)");
+    assertStringIncludes(output, "fixture check passed");
   } finally {
     await cleanup();
   }
