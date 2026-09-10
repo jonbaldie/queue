@@ -78,7 +78,7 @@ export default class Manager<T = string> {
     }
 
     private validateName(name: string): void {
-        if (name.length > MAX_QUEUE_NAME_LENGTH) {
+        if (Array.from(name).length > MAX_QUEUE_NAME_LENGTH) {
             throw new QueueNameTooLongError();
         }
     }

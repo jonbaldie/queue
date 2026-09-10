@@ -2174,3 +2174,24 @@ Deno.test("decoded queue name length validation applies to decoded name", async 
     assertEquals(deqRes.status, 400);
     assertEquals(await deqRes.text(), "Queue name too long");
 });
+
+Deno.test("queue name length counts Unicode code points", async () => {
+    const handler = makeHandler();
+    const name128 = "😀".repeat(128);
+    const name129 = "😀".repeat(129);
+
+    const accepted = await handler(new Request(`http://localhost/enqueue/${encodeURIComponent(name128)}`, {
+        method: "POST",
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ payload: "accepted" }),
+    }));
+    assertEquals(accepted.status, 200);
+
+    const rejected = await handler(new Request(`http://localhost/enqueue/${encodeURIComponent(name129)}`, {
+        method: "POST",
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ payload: "rejected" }),
+    }));
+    assertEquals(rejected.status, 400);
+    assertEquals(await rejected.text(), "Queue name too long");
+});
