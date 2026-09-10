@@ -1,13 +1,23 @@
 import { selectMutationTargets } from "./selector.ts";
+import { parsePositiveIntegerOptionOrExit } from "./runner_options.ts";
 
 const THRESHOLD = 80;
+
+const workers = parsePositiveIntegerOptionOrExit(Deno.args, "workers", 1) ?? 1;
+console.log(`Mutasaurus workers: ${workers}`);
 
 const selection = await selectMutationTargets();
 
 const modeLabel = selection.mode === "full-suite"
-  ? `full-suite (${selection.isFallback ? "fail-closed fallback" : "intentional"})`
+  ? `full-suite (${
+    selection.isFallback ? "fail-closed fallback" : "intentional"
+  })`
   : selection.mode;
-console.log(`Comparison base: ${selection.base ?? "none"}${selection.mergeBase ? ` (${selection.mergeBase.slice(0, 8)})` : ""}`);
+console.log(
+  `Comparison base: ${selection.base ?? "none"}${
+    selection.mergeBase ? ` (${selection.mergeBase.slice(0, 8)})` : ""
+  }`,
+);
 console.log(`Mode: ${modeLabel}`);
 console.log(`Reason: ${selection.reason}`);
 
@@ -36,7 +46,7 @@ const mutasaurus = new Mutasaurus({
     "./tests/rate_limiter_test.ts",
     "./tests/router_test.ts",
   ],
-  workers: 4,
+  workers,
   noCheck: true,
   silent: true,
 });

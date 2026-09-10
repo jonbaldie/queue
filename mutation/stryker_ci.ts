@@ -1,12 +1,29 @@
 import { selectMutationTargets } from "./selector.ts";
+import {
+  buildStrykerCommandArgs,
+  parsePositiveIntegerOptionOrExit,
+} from "./runner_options.ts";
 import { join } from "jsr:@std/path/join";
+
+const concurrency = parsePositiveIntegerOptionOrExit(Deno.args, "concurrency");
+console.log(
+  `Stryker concurrency: ${
+    concurrency === undefined ? "config default" : concurrency
+  }`,
+);
 
 const selection = await selectMutationTargets();
 
 const modeLabel = selection.mode === "full-suite"
-  ? `full-suite (${selection.isFallback ? "fail-closed fallback" : "intentional"})`
+  ? `full-suite (${
+    selection.isFallback ? "fail-closed fallback" : "intentional"
+  })`
   : selection.mode;
-console.log(`Comparison base: ${selection.base ?? "none"}${selection.mergeBase ? ` (${selection.mergeBase.slice(0, 8)})` : ""}`);
+console.log(
+  `Comparison base: ${selection.base ?? "none"}${
+    selection.mergeBase ? ` (${selection.mergeBase.slice(0, 8)})` : ""
+  }`,
+);
 console.log(`Mode: ${modeLabel}`);
 console.log(`Reason: ${selection.reason}`);
 
@@ -32,14 +49,17 @@ if (selection.mode === "selected") {
     ...baseConfig,
     mutate: selection.paths,
   };
-  await Deno.writeTextFile(tmpConfigPath, JSON.stringify(scopedConfig, null, 2));
+  await Deno.writeTextFile(
+    tmpConfigPath,
+    JSON.stringify(scopedConfig, null, 2),
+  );
   configFileToRun = tmpConfigPath;
 }
 
 let exitCode = 0;
 try {
   const strykerCmd = new Deno.Command("npx", {
-    args: ["--no-install", "stryker", "run", configFileToRun],
+    args: buildStrykerCommandArgs(configFileToRun, concurrency),
     stdout: "inherit",
     stderr: "inherit",
   });

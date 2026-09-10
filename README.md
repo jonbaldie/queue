@@ -98,6 +98,16 @@ and excludes tests, mutation infrastructure, documentation, CI configuration,
 generated output, and development tooling. Findings and processing errors
 retain messcript's normal non-zero exit status.
 
+## Local mutation testing
+
+Run only one mutation engine at a time on a shared development host. Mutasaurus
+defaults to one worker for local runs. Run Stryker with worker concurrency one:
+
+```
+deno run --allow-all --node-modules-dir=auto mutation/mutasaurus_ci.ts
+deno run --allow-all --node-modules-dir=auto mutation/stryker_ci.ts --concurrency 1
+```
+
 To get the number of payloads pending on a queue, send a get request to `/length/:queue`
 
 ```
