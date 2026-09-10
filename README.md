@@ -20,15 +20,28 @@ Download the latest executable for your OS, and then `mv` it to a directory with
 * [Apple (Intel)](https://d22pgfyez1vmkm.cloudfront.net/x86_64-apple-darwin/queue)
 * [Apple (Silicon)](https://d22pgfyez1vmkm.cloudfront.net/aarch64-apple-darwin/queue)
 
-Simply run `queue` to start up the server, listening on http://127.0.0.1:3000 by default.
+The `QUEUE_API_TOKEN` environment variable is required. Replace the placeholder
+with a strong secret, then run the executable:
+
+```
+QUEUE_API_TOKEN=replace-with-a-secret-token queue
+```
+
+The server will listen on http://127.0.0.1:3000 by default.
 
 It might be easier to use the Docker image like so:
 
 ```
-docker run -d -e HOST=127.0.0.1 -e PORT=1991 jonbaldie/queue
+docker run -d \
+  -e QUEUE_API_TOKEN=replace-with-a-secret-token \
+  -e HOST=0.0.0.0 \
+  -e PORT=1991 \
+  -p 1991:1991 \
+  jonbaldie/queue
 ```
 
-It will then listen to http://127.0.0.1:1991.
+It will then be available at http://127.0.0.1:1991. Use the same token in
+the `Authorization` header when making requests.
 
 Note the use of environment variables to change the listening address - these also work for the executable.
 
@@ -39,7 +52,7 @@ Once started, you interact with the server using HTTP requests.
 To queue up your first payload, send a post request to `/enqueue/:queue` with the payload in your request's JSON body
 
 ```
-curl -X POST -H "Content-Type: application/json" -d '{"payload": "bar"}' http://127.0.0.1:1991/enqueue/foo
+curl -X POST -H "Authorization: Bearer replace-with-a-secret-token" -H "Content-Type: application/json" -d '{"payload": "bar"}' http://127.0.0.1:1991/enqueue/foo
 ```
 
 The server has also just created the `foo` queue for you, if it didn't already exist, making the interface easier.
@@ -49,7 +62,7 @@ You're best setting up a publisher script in your application to write payloads 
 To get the next payload from the `foo` queue, send a get request to `/dequeue/:queue`
 
 ```
-curl -X GET http://127.0.0.1:1991/dequeue/foo
+curl -X GET -H "Authorization: Bearer replace-with-a-secret-token" http://127.0.0.1:1991/dequeue/foo
 ```
 
 This returns the oldest added payload on queue `foo` as JSON and removes it, guaranteeing both the order and that each payload will only be read once. Strings, numbers, booleans, arrays, and objects all use `application/json` so a string `"0"` is distinct from the number `0`. Numeric values that JavaScript cannot represent without loss are rejected with a `400` response.
@@ -88,7 +101,7 @@ retain messcript's normal non-zero exit status.
 To get the number of payloads pending on a queue, send a get request to `/length/:queue`
 
 ```
-curl -X GET http://127.0.0.1:1991/length/foo
+curl -X GET -H "Authorization: Bearer replace-with-a-secret-token" http://127.0.0.1:1991/length/foo
 ```
 
 ## Demo
@@ -110,7 +123,7 @@ Persistency is opt-in. That means that by default this server will not remember 
 To get persistency, simply add the `--persist` option when starting up the server, and it will write changes to a binary log file:
 
 ```
-docker run -d -e PORT=1991 -e HOST=0.0.0.0 -e PERSIST=/mnt/ jonbaldie/queue /usr/bin/queue --persist
+docker run -d -e QUEUE_API_TOKEN=replace-with-a-secret-token -e PORT=1991 -e HOST=0.0.0.0 -e PERSIST=/mnt/ -p 1991:1991 jonbaldie/queue /usr/bin/queue --persist
 ```
 
 If the server sees that the `persist.dat` file exists on startup, it will replay the binary log and then rewrite the file as a snapshot of remaining items.
