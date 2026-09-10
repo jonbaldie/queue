@@ -1775,10 +1775,15 @@ Deno.test("HEAD /dequeue/:queue on empty queue returns 204 with empty body", asy
     assertEquals(await res.text(), "");
 });
 
-Deno.test("HEAD /dequeue/:queue on non-empty queue returns 200 with headers and empty body", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore());
-    mgr.enqueue("test-queue", "payload-1");
-    const handler = createHandler(mgr, API_TOKEN);
+Deno.test("HEAD /dequeue/:queue preserves the queued item", async () => {
+    const handler = makeHandler();
+
+    const enqueue = await handler(new Request("http://localhost/enqueue/test-queue", {
+        method: "POST",
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ payload: "payload-1" }),
+    }));
+    assertEquals(enqueue.status, 200);
 
     const res = await handler(new Request("http://localhost/dequeue/test-queue", {
         method: "HEAD",
@@ -1788,7 +1793,12 @@ Deno.test("HEAD /dequeue/:queue on non-empty queue returns 200 with headers and 
     assertEquals(res.headers.get("content-type"), "application/json");
     assertEquals(res.body, null);
     assertEquals(await res.text(), "");
-    assertEquals(mgr.length("test-queue"), 0);
+
+    const dequeue = await handler(new Request("http://localhost/dequeue/test-queue", {
+        headers: authHeaders,
+    }));
+    assertEquals(dequeue.status, 200);
+    assertEquals(await dequeue.json(), "payload-1");
 });
 
 Deno.test("HEAD /enqueue/:queue returns 405 Method Not Allowed", async () => {
