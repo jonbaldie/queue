@@ -1018,6 +1018,101 @@ Deno.test("dequeue returns application/json for number payload", async () => {
     assertEquals(await response.json(), 42);
 });
 
+Deno.test("API: rejects non-finite numeric payloads instead of corrupting them", async () => {
+    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const handler = createHandler(mgr, API_TOKEN);
+
+    const enqueueResponse = await handler(new Request("http://localhost:3000/enqueue/numeric-queue", {
+        method: "POST",
+        body: '{"payload":1e400}',
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+    }));
+
+    assertEquals(enqueueResponse.status, 400);
+    assertEquals(await enqueueResponse.text(), "Payload contains an unsupported number");
+
+    const dequeueResponse = await handler(new Request("http://localhost:3000/dequeue/numeric-queue", {
+        headers: authHeaders,
+    }));
+    assertEquals(dequeueResponse.status, 204);
+});
+
+Deno.test("API: rejects unsafe integer payloads instead of rounding them", async () => {
+    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const handler = createHandler(mgr, API_TOKEN);
+
+    const enqueueResponse = await handler(new Request("http://localhost:3000/enqueue/unsafe-integer-queue", {
+        method: "POST",
+        body: '{"payload":9007199254740993}',
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+    }));
+
+    assertEquals(enqueueResponse.status, 400);
+    assertEquals(await enqueueResponse.text(), "Payload contains an unsupported number");
+
+    const dequeueResponse = await handler(new Request("http://localhost:3000/dequeue/unsafe-integer-queue", {
+        headers: authHeaders,
+    }));
+    assertEquals(dequeueResponse.status, 204);
+});
+
+Deno.test("API: accepts exactly representable large integer payloads", async () => {
+    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const handler = createHandler(mgr, API_TOKEN);
+
+    const enqueueResponse = await handler(new Request("http://localhost:3000/enqueue/exact-large-integer-queue", {
+        method: "POST",
+        body: '{"payload":9007199254740992}',
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+    }));
+
+    assertEquals(enqueueResponse.status, 200);
+
+    const dequeueResponse = await handler(new Request("http://localhost:3000/dequeue/exact-large-integer-queue", {
+        headers: authHeaders,
+    }));
+    assertEquals(dequeueResponse.status, 200);
+    assertEquals(await dequeueResponse.json(), 9007199254740992);
+});
+
+Deno.test("API: rejects underflowing numeric payloads instead of changing them to zero", async () => {
+    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const handler = createHandler(mgr, API_TOKEN);
+
+    const enqueueResponse = await handler(new Request("http://localhost:3000/enqueue/underflow-queue", {
+        method: "POST",
+        body: '{"payload":1e-400}',
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+    }));
+
+    assertEquals(enqueueResponse.status, 400);
+    assertEquals(await enqueueResponse.text(), "Payload contains an unsupported number");
+
+    const dequeueResponse = await handler(new Request("http://localhost:3000/dequeue/underflow-queue", {
+        headers: authHeaders,
+    }));
+    assertEquals(dequeueResponse.status, 204);
+});
+
+Deno.test("API: rejects rounded decimal payloads instead of changing their precision", async () => {
+    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const handler = createHandler(mgr, API_TOKEN);
+
+    const enqueueResponse = await handler(new Request("http://localhost:3000/enqueue/decimal-precision-queue", {
+        method: "POST",
+        body: '{"payload":1.234567890123456789}',
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+    }));
+
+    assertEquals(enqueueResponse.status, 400);
+    assertEquals(await enqueueResponse.text(), "Payload contains an unsupported number");
+
+    const dequeueResponse = await handler(new Request("http://localhost:3000/dequeue/decimal-precision-queue", {
+        headers: authHeaders,
+    }));
+    assertEquals(dequeueResponse.status, 204);
+});
+
 Deno.test("dequeue returns application/json for boolean payload", async () => {
     const mgr = new QueueManager(new Persistency.MemoryStore);
     const handler = createHandler(mgr, API_TOKEN);

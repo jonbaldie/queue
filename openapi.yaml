@@ -73,7 +73,7 @@ paths:
               type: object
               properties:
                 payload:
-                  description: The data to be enqueued. Can be any valid JSON type (string, object, etc.).
+                  description: The data to be enqueued. Can be any JSON type (string, object, etc.); numeric values that cannot be represented without loss are rejected.
               required:
                 - payload
       responses:
@@ -84,7 +84,7 @@ paths:
               schema:
                 type: string
         '400':
-          description: Bad Request - Invalid JSON or Queue name too long
+          description: Bad Request - Invalid JSON, unsupported number, or Queue name too long
         '401':
           description: Unauthorized
         '413':
