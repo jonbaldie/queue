@@ -18,44 +18,49 @@ export interface Config {
     persistEnabled: boolean;
 }
 
+function parsePort(value: string | undefined): number {
+    if (!value) return 3000;
+    if (!/^\d+$/.test(value)) {
+        throw new ConfigError("PORT must be a valid integer between 0 and 65535");
+    }
+    const p = Number(value);
+    if (!Number.isInteger(p) || p < 0 || p > 65535) {
+        throw new ConfigError("PORT must be a valid integer between 0 and 65535");
+    }
+    return p;
+}
+
+function parsePositiveInt(name: string, value: string | undefined, defaultValue: number): number {
+    if (!value) return defaultValue;
+    if (!/^\d+$/.test(value)) {
+        throw new ConfigError(`${name} must be a positive integer`);
+    }
+    const num = Number(value);
+    if (!Number.isInteger(num) || num <= 0) {
+        throw new ConfigError(`${name} must be a positive integer`);
+    }
+    return num;
+}
+
+function parseApiToken(value: string | undefined): string {
+    const apiToken = value?.trim();
+    if (!apiToken) {
+        throw new ConfigError("QUEUE_API_TOKEN must be a non-empty string");
+    }
+    return apiToken;
+}
+
 export function parseConfig(env: Record<string, string | undefined>, args: string[]): Config {
     const flags = parseArgs(args, {
         boolean: ["persist"],
         default: { persist: false },
     });
 
-    let port = 3000;
-    if (env["PORT"]) {
-        if (!/^\d+$/.test(env["PORT"])) {
-            throw new ConfigError("PORT must be a valid integer between 0 and 65535");
-        }
-        const p = Number(env["PORT"]);
-        if (!Number.isInteger(p) || p < 0 || p > 65535) {
-            throw new ConfigError("PORT must be a valid integer between 0 and 65535");
-        }
-        port = p;
-    }
-
-    const parsePositiveInt = (name: string, value: string | undefined, defaultValue: number): number => {
-        if (!value) return defaultValue;
-        if (!/^\d+$/.test(value)) {
-            throw new ConfigError(`${name} must be a positive integer`);
-        }
-        const num = Number(value);
-        if (!Number.isInteger(num) || num <= 0) {
-            throw new ConfigError(`${name} must be a positive integer`);
-        }
-        return num;
-    };
-
+    const port = parsePort(env["PORT"]);
     const queueDepthLimit = parsePositiveInt("QUEUE_DEPTH_LIMIT", env["QUEUE_DEPTH_LIMIT"], 10000);
     const queueCountLimit = parsePositiveInt("QUEUE_COUNT_LIMIT", env["QUEUE_COUNT_LIMIT"], 1000);
     const rateLimitRequests = parsePositiveInt("RATE_LIMIT_REQUESTS", env["RATE_LIMIT_REQUESTS"], 100);
-
-    const apiToken = env["QUEUE_API_TOKEN"];
-    if (!apiToken) {
-        throw new ConfigError("QUEUE_API_TOKEN must be a non-empty string");
-    }
+    const apiToken = parseApiToken(env["QUEUE_API_TOKEN"]);
 
     return {
         host: env["HOST"] || "localhost",
@@ -68,3 +73,4 @@ export function parseConfig(env: Record<string, string | undefined>, args: strin
         persistEnabled: flags.persist,
     };
 }
+

@@ -357,6 +357,36 @@ Deno.test("auth: health remains public when configured token is empty", async ()
     assertEquals(res.status, 200);
 });
 
+Deno.test("auth: whitespace-only configured token rejects all requests to protected endpoints", async () => {
+    const handler = makeHandler(undefined, undefined, 100, "   ");
+    const headers = [
+        undefined,
+        "Bearer",
+        "Bearer ",
+        "Bearer   ",
+        "Bearer\t",
+        "Bearer test",
+        "Bearer   ",
+    ];
+    for (const header of headers) {
+        const res = await handler(new Request("http://localhost/queues", {
+            headers: header ? { "Authorization": header } : {},
+        }));
+        assertEquals(res.status, 401, `header "${header}" should be rejected when api token is whitespace-only`);
+        assertEquals(res.headers.get("WWW-Authenticate"), "Bearer");
+    }
+});
+
+Deno.test("auth: configured token with leading or trailing whitespace authenticates matching credentials", async () => {
+    const handler = makeHandler(undefined, undefined, 100, "  padded-token  ");
+    const res = await handler(new Request("http://localhost/queues", {
+        headers: { "Authorization": "Bearer padded-token" },
+    }));
+    assertEquals(res.status, 200);
+});
+
+
+
 
 Deno.test("response body: rate limited returns 'Too many requests'", async () => {
     const handler = makeHandler(undefined, undefined, 1);

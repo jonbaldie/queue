@@ -337,6 +337,48 @@ Deno.test("e2e: empty QUEUE_API_TOKEN fails before the server binds a port", asy
     }
 });
 
+Deno.test("e2e: whitespace-only QUEUE_API_TOKEN fails before the server binds a port", async () => {
+    const tempDir = await Deno.makeTempDir();
+    try {
+        const output = await assertDoesNotBind({
+            HOST: "127.0.0.1",
+            PORT: "0",
+            PERSIST: tempDir,
+            QUEUE_API_TOKEN: "   ",
+        });
+        assertEquals(output.includes("QUEUE_API_TOKEN must be a non-empty string"), true);
+    } finally {
+        await Deno.remove(tempDir, { recursive: true }).catch(() => {});
+    }
+});
+
+Deno.test("e2e: QUEUE_API_TOKEN with leading and trailing whitespace authenticates requests", async () => {
+    const tempDir = await Deno.makeTempDir();
+    const token = "padded-token";
+
+    try {
+        const { child, port } = await startServer({
+            HOST: "127.0.0.1",
+            PORT: "0",
+            PERSIST: tempDir,
+            QUEUE_API_TOKEN: `  ${token}  `,
+        });
+
+        try {
+            const res = await fetch(`http://127.0.0.1:${port}/queues`, {
+                headers: { "Authorization": `Bearer ${token}` },
+            });
+            assertEquals(res.status, 200);
+            await res.body?.cancel();
+        } finally {
+            await cleanupChild(child);
+        }
+    } finally {
+        await Deno.remove(tempDir, { recursive: true }).catch(() => {});
+    }
+});
+
+
 Deno.test("e2e: Bearer tokens with multiple spaces and tabs authenticate (RFC 9110 §11.1)", async () => {
     const tempDir = await Deno.makeTempDir();
     const token = "auth-whitespace-token";
