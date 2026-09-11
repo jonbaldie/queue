@@ -1,6 +1,11 @@
 import { assertEquals, assertThrows } from "jsr:@std/assert@1.0";
 import { parseConfig, ConfigError } from "../src/config.ts";
 
+Deno.test("ConfigError - has name ConfigError", () => {
+    const err = new ConfigError("test");
+    assertEquals(err.name, "ConfigError");
+});
+
 Deno.test("parseConfig - returns defaults when only QUEUE_API_TOKEN is provided", () => {
     const config = parseConfig({ QUEUE_API_TOKEN: "test-token" }, []);
     assertEquals(config.host, "localhost");
@@ -77,4 +82,16 @@ Deno.test("parseConfig - throws ConfigError when QUEUE_API_TOKEN is missing", ()
 
 Deno.test("parseConfig - throws ConfigError when QUEUE_API_TOKEN is empty", () => {
     assertThrows(() => parseConfig({ QUEUE_API_TOKEN: "" }, []), ConfigError, "QUEUE_API_TOKEN must be a non-empty string");
+});
+
+Deno.test("parseConfig - throws ConfigError when QUEUE_API_TOKEN is whitespace-only", () => {
+    assertThrows(() => parseConfig({ QUEUE_API_TOKEN: " " }, []), ConfigError, "QUEUE_API_TOKEN must be a non-empty string");
+    assertThrows(() => parseConfig({ QUEUE_API_TOKEN: "   " }, []), ConfigError, "QUEUE_API_TOKEN must be a non-empty string");
+    assertThrows(() => parseConfig({ QUEUE_API_TOKEN: "\t" }, []), ConfigError, "QUEUE_API_TOKEN must be a non-empty string");
+    assertThrows(() => parseConfig({ QUEUE_API_TOKEN: " \t \r\n " }, []), ConfigError, "QUEUE_API_TOKEN must be a non-empty string");
+});
+
+Deno.test("parseConfig - trims leading and trailing whitespace from QUEUE_API_TOKEN", () => {
+    const config = parseConfig({ QUEUE_API_TOKEN: "  my-secret-token  " }, []);
+    assertEquals(config.apiToken, "my-secret-token");
 });

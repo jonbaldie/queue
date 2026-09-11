@@ -6,6 +6,7 @@ export type Middleware = (next: HttpHandler) => HttpHandler;
 const HEALTH_PATTERN = new URLPattern({ pathname: "/health{/}?" });
 
 export function withAuth(apiToken: string): Middleware {
+    const trimmedToken = apiToken?.trim();
     return (next: HttpHandler) => {
         return (request: Request, info?: Deno.ServeHandlerInfo) => {
             if (HEALTH_PATTERN.exec(request.url)) {
@@ -14,7 +15,7 @@ export function withAuth(apiToken: string): Middleware {
             const authHeader = request.headers.get("Authorization");
             const [scheme, ...rest] = (authHeader ?? "").trim().split(/\s+/);
             const token = rest.join(" ");
-            if (!apiToken || !scheme || scheme.toLowerCase() !== "bearer" || !token || token !== apiToken) {
+            if (!trimmedToken || !scheme || scheme.toLowerCase() !== "bearer" || !token || token !== trimmedToken) {
                 return new Response("Unauthorized", {
                     status: 401,
                     headers: { "WWW-Authenticate": "Bearer" },
@@ -24,6 +25,7 @@ export function withAuth(apiToken: string): Middleware {
         };
     };
 }
+
 
 export function withRateLimit(limiter: RateLimiter): Middleware {
     return (next: HttpHandler) => {
