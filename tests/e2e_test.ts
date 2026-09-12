@@ -497,3 +497,33 @@ Deno.test("e2e: URI-equivalent percent-encodings address the same queue and malf
     }
 });
 
+Deno.test("e2e: default HOST binds 127.0.0.1 and accepts IPv4 loopback requests (#104)", async () => {
+    const tempDir = await Deno.makeTempDir();
+    const token = "default-host-test-token";
+
+    try {
+        const { child, port } = await startServer({
+            PORT: "0",
+            PERSIST: tempDir,
+            QUEUE_API_TOKEN: token,
+        });
+
+        try {
+            const healthRes = await fetch(`http://127.0.0.1:${port}/health`);
+            assertEquals(healthRes.status, 200);
+            const healthJson = await healthRes.json();
+            assertEquals(healthJson, { status: "ok" });
+
+            const queuesRes = await fetch(`http://127.0.0.1:${port}/queues`, {
+                headers: { "Authorization": `Bearer ${token}` },
+            });
+            assertEquals(queuesRes.status, 200);
+            assertEquals(await queuesRes.json(), []);
+        } finally {
+            await cleanupChild(child);
+        }
+    } finally {
+        await Deno.remove(tempDir, { recursive: true }).catch(() => {});
+    }
+});
+

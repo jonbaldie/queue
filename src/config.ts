@@ -63,7 +63,7 @@ export function parseConfig(env: Record<string, string | undefined>, args: strin
     const apiToken = parseApiToken(env["QUEUE_API_TOKEN"]);
 
     return {
-        host: env["HOST"] || "localhost",
+        host: env["HOST"] || "127.0.0.1",
         port,
         persistDir: env["PERSIST"] || Deno.cwd(),
         apiToken,
