@@ -527,3 +527,188 @@ Deno.test("e2e: default HOST binds 127.0.0.1 and accepts IPv4 loopback requests 
     }
 });
 
+function persistAuth(token: string) {
+    return { "Authorization": `Bearer ${token}` };
+}
+
+async function persistEnqueue(port: number, token: string, queue: string, payload: string) {
+    const res = await fetch(`http://127.0.0.1:${port}/enqueue/${queue}`, {
+        method: "POST",
+        headers: { ...persistAuth(token), "Content-Type": "application/json" },
+        body: JSON.stringify({ payload }),
+    });
+    assertEquals(res.status, 200);
+    await res.text();
+}
+
+async function persistDequeue(port: number, token: string, queue: string): Promise<{ status: number; body: unknown }> {
+    const res = await fetch(`http://127.0.0.1:${port}/dequeue/${queue}`, {
+        headers: persistAuth(token),
+    });
+    if (res.status === 204) {
+        await res.body?.cancel();
+        return { status: 204, body: null };
+    }
+    return { status: res.status, body: await res.json() };
+}
+
+async function persistDrain(port: number, token: string, queue: string): Promise<unknown[]> {
+    const items: unknown[] = [];
+    while (true) {
+        const got = await persistDequeue(port, token, queue);
+        if (got.status === 204) break;
+        items.push(got.body);
+    }
+    return items;
+}
+
+Deno.test("e2e: crash recovery with a tighter depth limit restores remaining FIFO (#105)", async () => {
+    const tempDir = await Deno.makeTempDir();
+    const token = "crash-depth-limit-token";
+    let first: Deno.ChildProcess | undefined;
+    let second: Deno.ChildProcess | undefined;
+    try {
+        const started = await startServer({
+            HOST: "127.0.0.1",
+            PORT: "0",
+            PERSIST: tempDir,
+            QUEUE_API_TOKEN: token,
+            QUEUE_DEPTH_LIMIT: "100",
+        });
+        first = started.child;
+        for (const item of ["item-1", "item-2", "item-3", "item-4", "item-5"]) {
+            await persistEnqueue(started.port, token, "jobs", item);
+        }
+        assertEquals((await persistDequeue(started.port, token, "jobs")).body, "item-1");
+        assertEquals((await persistDequeue(started.port, token, "jobs")).body, "item-2");
+        first.kill("SIGKILL");
+        await first.status;
+
+        const recovered = await startServer({
+            HOST: "127.0.0.1",
+            PORT: "0",
+            PERSIST: tempDir,
+            QUEUE_API_TOKEN: token,
+            QUEUE_DEPTH_LIMIT: "3",
+        });
+        second = recovered.child;
+        const overflow = await fetch(`http://127.0.0.1:${recovered.port}/enqueue/jobs`, {
+            method: "POST",
+            headers: { ...persistAuth(token), "Content-Type": "application/json" },
+            body: JSON.stringify({ payload: "item-6" }),
+        });
+        assertEquals(overflow.status, 507);
+        await overflow.text();
+        assertEquals(await persistDrain(recovered.port, token, "jobs"), ["item-3", "item-4", "item-5"]);
+    } finally {
+        if (first) await cleanupChild(first);
+        if (second) await cleanupChild(second);
+        await Deno.remove(tempDir, { recursive: true }).catch(() => {});
+    }
+});
+
+Deno.test("e2e: crash recovery with a tighter count limit restores remaining queues (#105)", async () => {
+    const tempDir = await Deno.makeTempDir();
+    const token = "crash-count-limit-token";
+    let first: Deno.ChildProcess | undefined;
+    let second: Deno.ChildProcess | undefined;
+    try {
+        const started = await startServer({
+            HOST: "127.0.0.1",
+            PORT: "0",
+            PERSIST: tempDir,
+            QUEUE_API_TOKEN: token,
+            QUEUE_COUNT_LIMIT: "10",
+        });
+        first = started.child;
+        await persistEnqueue(started.port, token, "q1", "a");
+        await persistEnqueue(started.port, token, "q2", "b");
+        assertEquals((await persistDequeue(started.port, token, "q1")).body, "a");
+        first.kill("SIGKILL");
+        await first.status;
+
+        const recovered = await startServer({
+            HOST: "127.0.0.1",
+            PORT: "0",
+            PERSIST: tempDir,
+            QUEUE_API_TOKEN: token,
+            QUEUE_COUNT_LIMIT: "1",
+        });
+        second = recovered.child;
+        const queues = await fetch(`http://127.0.0.1:${recovered.port}/queues`, {
+            headers: persistAuth(token),
+        });
+        assertEquals(await queues.json(), ["q2"]);
+        const overflow = await fetch(`http://127.0.0.1:${recovered.port}/enqueue/q3`, {
+            method: "POST",
+            headers: { ...persistAuth(token), "Content-Type": "application/json" },
+            body: JSON.stringify({ payload: "c" }),
+        });
+        assertEquals(overflow.status, 507);
+        await overflow.text();
+        await persistEnqueue(recovered.port, token, "q2", "c");
+        assertEquals((await persistDequeue(recovered.port, token, "q1")).status, 204);
+        assertEquals((await persistDequeue(recovered.port, token, "q2")).body, "b");
+        assertEquals((await persistDequeue(recovered.port, token, "q2")).body, "c");
+    } finally {
+        if (first) await cleanupChild(first);
+        if (second) await cleanupChild(second);
+        await Deno.remove(tempDir, { recursive: true }).catch(() => {});
+    }
+});
+
+Deno.test("e2e: crash recovery snapshot under a tighter limit does not permanently drop remaining items (#105)", async () => {
+    const tempDir = await Deno.makeTempDir();
+    const token = "crash-limit-snapshot-token";
+    let first: Deno.ChildProcess | undefined;
+    let second: Deno.ChildProcess | undefined;
+    let third: Deno.ChildProcess | undefined;
+    try {
+        const started = await startServer({
+            HOST: "127.0.0.1",
+            PORT: "0",
+            PERSIST: tempDir,
+            QUEUE_API_TOKEN: token,
+            QUEUE_DEPTH_LIMIT: "100",
+        });
+        first = started.child;
+        for (const item of ["item-1", "item-2", "item-3", "item-4", "item-5"]) {
+            await persistEnqueue(started.port, token, "jobs", item);
+        }
+        assertEquals((await persistDequeue(started.port, token, "jobs")).body, "item-1");
+        assertEquals((await persistDequeue(started.port, token, "jobs")).body, "item-2");
+        first.kill("SIGKILL");
+        await first.status;
+
+        const tight = await startServer({
+            HOST: "127.0.0.1",
+            PORT: "0",
+            PERSIST: tempDir,
+            QUEUE_API_TOKEN: token,
+            QUEUE_DEPTH_LIMIT: "3",
+        });
+        second = tight.child;
+        const lengthRes = await fetch(`http://127.0.0.1:${tight.port}/length/jobs`, {
+            headers: persistAuth(token),
+        });
+        assertEquals(await lengthRes.text(), "3");
+        second.kill("SIGKILL");
+        await second.status;
+
+        const original = await startServer({
+            HOST: "127.0.0.1",
+            PORT: "0",
+            PERSIST: tempDir,
+            QUEUE_API_TOKEN: token,
+            QUEUE_DEPTH_LIMIT: "100",
+        });
+        third = original.child;
+        assertEquals(await persistDrain(original.port, token, "jobs"), ["item-3", "item-4", "item-5"]);
+    } finally {
+        if (first) await cleanupChild(first);
+        if (second) await cleanupChild(second);
+        if (third) await cleanupChild(third);
+        await Deno.remove(tempDir, { recursive: true }).catch(() => {});
+    }
+});
+
