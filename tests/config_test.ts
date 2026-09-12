@@ -100,3 +100,31 @@ Deno.test("parseConfig - trims leading and trailing whitespace from QUEUE_API_TO
     const config = parseConfig({ QUEUE_API_TOKEN: "  my-secret-token  " }, []);
     assertEquals(config.apiToken, "my-secret-token");
 });
+
+Deno.test("parseConfig - throws ConfigError when QUEUE_API_TOKEN contains internal whitespace", () => {
+    const invalidTokens = [
+        "alpha\tbeta",
+        "alpha  beta",
+        "alpha beta",
+        "alpha\nbeta",
+        "alpha\r\nbeta",
+        "  alpha\tbeta  ",
+        "alpha\vbeta",
+        "alpha\fbeta",
+    ];
+    for (const token of invalidTokens) {
+        assertThrows(
+            () => parseConfig({ QUEUE_API_TOKEN: token }, []),
+            ConfigError,
+            "QUEUE_API_TOKEN contains invalid whitespace",
+            `token ${JSON.stringify(token)} should be rejected`,
+        );
+    }
+});
+
+Deno.test("parseConfig - accepts tokens without internal whitespace", () => {
+    const validTokens = ["my-secret-token", "abc123", "a", "tok_en.with~punctuation+/=", "  padded-token  "];
+    for (const token of validTokens) {
+        assertEquals(parseConfig({ QUEUE_API_TOKEN: token }, []).apiToken, token.trim());
+    }
+});

@@ -712,3 +712,24 @@ Deno.test("e2e: crash recovery snapshot under a tighter limit does not permanent
     }
 });
 
+Deno.test("e2e: QUEUE_API_TOKEN with internal whitespace fails before the server binds a port", async () => {
+    for (const token of ["alpha\tbeta", "alpha  beta", "alpha beta"]) {
+        const tempDir = await Deno.makeTempDir();
+        try {
+            const output = await assertDoesNotBind({
+                HOST: "127.0.0.1",
+                PORT: "0",
+                PERSIST: tempDir,
+                QUEUE_API_TOKEN: token,
+            });
+            assertEquals(
+                output.includes("QUEUE_API_TOKEN contains invalid whitespace"),
+                true,
+                `token ${JSON.stringify(token)} should be rejected at startup, got: ${output}`,
+            );
+        } finally {
+            await Deno.remove(tempDir, { recursive: true }).catch(() => {});
+        }
+    }
+});
+

@@ -47,6 +47,14 @@ function parseApiToken(value: string | undefined): string {
     if (!apiToken) {
         throw new ConfigError("QUEUE_API_TOKEN must be a non-empty string");
     }
+    // Bearer credentials (RFC 6750 §2.1, RFC 9110 §11.1) carry no internal
+    // whitespace, and request parsing collapses whitespace when splitting the
+    // scheme from the token. A configured token containing any would therefore
+    // never match an incoming header, locking out every authenticated endpoint
+    // while /health still reports the server as up. Fail closed at startup.
+    if (/\s/.test(apiToken)) {
+        throw new ConfigError("QUEUE_API_TOKEN contains invalid whitespace");
+    }
     return apiToken;
 }
 
