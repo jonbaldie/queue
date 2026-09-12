@@ -362,26 +362,73 @@ Deno.test("length of unknown queue does not consume a queue slot", () => {
     assertEquals("bar", mgr.dequeue("real"));
 });
 
-Deno.test("load does not throw or exceed depth when the log is deeper than the limit", () => {
+Deno.test("load restores remaining items when the log is deeper than the new limit", () => {
     const persist = new Persistency.MemoryStore();
     persist.saveEvent("jobs", "a", true);
     persist.saveEvent("jobs", "b", true);
 
     const mgr = new QueueManager(persist, 1, 10);
     mgr.load();
-    assertEquals(mgr.length("jobs"), 1);
+    assertEquals(mgr.length("jobs"), 2);
+    assertEquals(mgr.canEnqueue("jobs"), false);
     assertEquals(mgr.dequeue("jobs"), "a");
+    assertEquals(mgr.dequeue("jobs"), "b");
 });
 
-Deno.test("load does not exceed queue count when the log has more queues than the limit", () => {
+Deno.test("load restores remaining queues when the log has more queues than the new limit", () => {
     const persist = new Persistency.MemoryStore();
     persist.saveEvent("one", "a", true);
     persist.saveEvent("two", "b", true);
 
     const mgr = new QueueManager(persist, 10, 1);
     mgr.load();
-    assertEquals(mgr.listQueues(), ["one"]);
+    assertEquals(mgr.listQueues(), ["one", "two"]);
+    assertEquals(mgr.canEnqueue("three"), false);
     assertEquals(mgr.dequeue("one"), "a");
+    assertEquals(mgr.dequeue("two"), "b");
+});
+
+Deno.test("load of an uncompacted crash log with a tighter depth limit restores remaining FIFO", () => {
+    const tmp = Deno.makeTempDirSync();
+    try {
+        const store = new Persistency.FileStore();
+        store.dir(tmp);
+        store.saveEvent("jobs", "item-1", true);
+        store.saveEvent("jobs", "item-2", true);
+        store.saveEvent("jobs", "item-3", true);
+        store.saveEvent("jobs", "item-4", true);
+        store.saveEvent("jobs", "item-5", true);
+        store.saveEvent("jobs", "item-1", false);
+        store.saveEvent("jobs", "item-2", false);
+        const mgr = new QueueManager(store, 3, 1000);
+        mgr.load();
+        assertEquals(mgr.dequeue("jobs"), "item-3");
+        assertEquals(mgr.dequeue("jobs"), "item-4");
+        assertEquals(mgr.dequeue("jobs"), "item-5");
+        assertEquals(mgr.dequeue("jobs"), undefined);
+        store.close();
+    } finally {
+        Deno.removeSync(tmp, { recursive: true });
+    }
+});
+
+Deno.test("load of an uncompacted crash log with a tighter count limit restores remaining queues", () => {
+    const tmp = Deno.makeTempDirSync();
+    try {
+        const store = new Persistency.FileStore();
+        store.dir(tmp);
+        store.saveEvent("q1", "a", true);
+        store.saveEvent("q2", "b", true);
+        store.saveEvent("q1", "a", false);
+        const mgr = new QueueManager(store, 10000, 1);
+        mgr.load();
+        assertEquals(mgr.listQueues(), ["q2"]);
+        assertEquals(mgr.dequeue("q1"), undefined);
+        assertEquals(mgr.dequeue("q2"), "b");
+        store.close();
+    } finally {
+        Deno.removeSync(tmp, { recursive: true });
+    }
 });
 
 Deno.test("enqueue after cleanup restores queue", () => {
@@ -559,16 +606,6 @@ Deno.test("manager persistEnabled=false skips saveEvent on enqueue", () => {
     const mgr = new QueueManager(persist, 10000, 1000, false);
     mgr.enqueue("q", "item");
     assertEquals(persist.loadState().length, 0);
-});
-
-Deno.test("manager load skips events exceeding queue depth limit", () => {
-    const persist = new Persistency.MemoryStore();
-    persist.saveEvent("q", "a", true);
-    persist.saveEvent("q", "b", true);
-    const mgr = new QueueManager(persist, 1, 1000);
-    mgr.load();
-    assertEquals(mgr.length("q"), 1);
-    assertEquals(mgr.dequeue("q"), "a");
 });
 
 Deno.test("manager load skips events with neither enqueue nor dequeue", () => {

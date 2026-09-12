@@ -194,13 +194,7 @@ export default class Manager<T = string> {
 
     private applyLoadedEnqueue(event: QueueEvent<T>): void {
         const existing = this.find(event.queue);
-        if (!existing && !this.canCreateQueue()) {
-            return;
-        }
         const queue = existing || new FIFOQueue<T>();
-        if (queue.length >= this.queueDepthLimit) {
-            return;
-        }
         if (!existing) {
             this.register(event.queue, queue);
         }
