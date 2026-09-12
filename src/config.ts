@@ -47,6 +47,9 @@ function parseApiToken(value: string | undefined): string {
     if (!apiToken) {
         throw new ConfigError("QUEUE_API_TOKEN must be a non-empty string");
     }
+    if (/\s/.test(apiToken)) {
+        throw new ConfigError("QUEUE_API_TOKEN contains invalid whitespace");
+    }
     return apiToken;
 }
 
@@ -73,4 +76,3 @@ export function parseConfig(env: Record<string, string | undefined>, args: strin
         persistEnabled: flags.persist,
     };
 }
-
