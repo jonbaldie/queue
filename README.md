@@ -20,8 +20,12 @@ Download the latest executable for your OS, and then `mv` it to a directory with
 * [Apple (Intel)](https://d22pgfyez1vmkm.cloudfront.net/x86_64-apple-darwin/queue)
 * [Apple (Silicon)](https://d22pgfyez1vmkm.cloudfront.net/aarch64-apple-darwin/queue)
 
-The `QUEUE_API_TOKEN` environment variable is required. Replace the placeholder
-with a strong secret, then run the executable:
+The `QUEUE_API_TOKEN` environment variable is required. It must not contain
+whitespace: Bearer credentials carry none, so a token with an internal space,
+tab or newline could never be presented in an `Authorization` header, and the
+server refuses to start rather than boot into a state where every authenticated
+request is rejected. Leading and trailing whitespace is trimmed. Replace the
+placeholder with a strong secret, then run the executable:
 
 ```
 QUEUE_API_TOKEN=replace-with-a-secret-token queue
