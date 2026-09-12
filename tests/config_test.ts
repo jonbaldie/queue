@@ -8,7 +8,7 @@ Deno.test("ConfigError - has name ConfigError", () => {
 
 Deno.test("parseConfig - returns defaults when only QUEUE_API_TOKEN is provided", () => {
     const config = parseConfig({ QUEUE_API_TOKEN: "test-token" }, []);
-    assertEquals(config.host, "localhost");
+    assertEquals(config.host, "127.0.0.1");
     assertEquals(config.port, 3000);
     assertEquals(typeof config.persistDir, "string");
     assertEquals(config.apiToken, "test-token");
@@ -28,6 +28,11 @@ Deno.test("parseConfig - parses string environment variables correctly", () => {
     assertEquals(config.host, "0.0.0.0");
     assertEquals(config.persistDir, "/tmp/persist");
     assertEquals(config.apiToken, "my-secret-token");
+});
+
+Deno.test("parseConfig - defaults host to 127.0.0.1 when HOST is empty string", () => {
+    const config = parseConfig({ QUEUE_API_TOKEN: "test-token", HOST: "" }, []);
+    assertEquals(config.host, "127.0.0.1");
 });
 
 Deno.test("parseConfig - parses numeric environment variables correctly", () => {
