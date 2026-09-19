@@ -121,24 +121,33 @@ export class FileStore<T = string> implements QueueStore<T> {
         const oldHandle = this.writeHandle!;
         oldHandle.lockSync(true);
         try {
-            const temp = Deno.openSync(this.tempPath, { write: true, create: true, truncate: true });
-            try {
-                this.writeEvents(temp, events);
-                temp.syncSync();
-            } catch (error) {
-                temp.close();
-                Deno.removeSync(this.tempPath);
-                throw error;
-            }
-            temp.close();
+            this.writeTempSnapshot(events);
             Deno.renameSync(this.tempPath, this.path);
-            this.syncDirectory();
         } finally {
             oldHandle.unlockSync();
         }
-        // The old handle still points at the replaced file; reopen lazily.
+        // The old handle still points at the replaced file; drop it before
+        // anything else can fail so later appends go to the new log.
         oldHandle.close();
         this.writeHandle = null;
+        this.syncDirectory();
+    }
+
+    private writeTempSnapshot(events: Array<QueueEvent<T>>): void {
+        const temp = Deno.openSync(this.tempPath, { write: true, create: true, truncate: true });
+        try {
+            this.writeEvents(temp, events);
+            temp.syncSync();
+        } catch (error) {
+            temp.close();
+            try {
+                Deno.removeSync(this.tempPath);
+            } catch {
+                // Keep the original error; a stale temp file is overwritten next save.
+            }
+            throw error;
+        }
+        temp.close();
     }
 
     // Persist the rename itself so it survives power loss, not just a kill.

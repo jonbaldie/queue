@@ -313,6 +313,7 @@ Deno.test("manager save() interrupted mid-snapshot keeps every logged item", () 
     reader.dir(tmpDir);
     assertEquals(reader.loadState().map((e) => e.payload), ["a", "b", "c"]);
     reader.close();
+    assertEquals([...Deno.readDirSync(tmpDir)].map((e) => e.name), ["persist.dat"]);
     Deno.removeSync(tmpDir, { recursive: true });
 });
 
