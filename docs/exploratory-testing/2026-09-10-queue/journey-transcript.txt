@@ -1,0 +1,48 @@
+Exploratory live journey evidence
+Date: 2026-09-10
+Checkout: 2cb528accce134cd3dcc96d47468293f42446a83
+Runtime: Deno 2.7.6
+Interface: real HTTP requests to clean local Deno.serve processes
+
+FIFO journey
+  GET /health (no auth)                         200 {"status":"ok"}
+  GET /health/ (no auth)                       200 {"status":"ok"}
+  GET /queues (valid Bearer)                   200 []
+  POST /enqueue/work x4                        200 each
+  GET /length/work                             200 4
+  GET /peek/work                               200 "first"
+  GET /length/work after peek                  200 4
+  GET /dequeue/work                            200 "first", {"order":2}, false, 0
+  GET /dequeue/work when empty                 204, empty body
+  GET /queues after drain                      200 []
+  POST /queues (valid Bearer)                  405, Allow: GET
+  malformed percent queue name                400, no queue created
+  %C3%BC and %c3%bc                            200 each, one queue named ü
+  literal %C3%BC via %25C3%25BC               200, separate literal-name queue
+
+Validation, authentication, and limits journey
+  invalid JSON / missing payload / null        400 each, no queue mutation
+  QUEUE_DEPTH_LIMIT=2: third enqueue           507; length remained 2
+  freed depth capacity then retry              200
+  QUEUE_COUNT_LIMIT=2: third active queue      507
+  drained one queue then retry                 200
+  body exactly 1 MiB                           200
+  body over 1 MiB                              413; /length/over-body = 0
+  RATE_LIMIT_REQUESTS=2: requests 1/2         200, 200
+  third protected request                     429
+  /health after limit                          200
+
+Persistence and restart journey
+  --persist, PERSIST=temp directory without trailing slash
+  enqueue one, enqueue two, dequeue one        200, 200, 200 "one"
+  graceful SIGTERM snapshot                   one enqueue event for "two"
+  restart against same directory               /length = 1, /peek = "two"
+  dequeue after restart                        200 "two"
+  length after drain                           200 0
+
+Known duplicate observed, not filed again
+  HEAD /dequeue/head-work returned 200 with an empty body, then
+  /length/head-work changed from 1 to 0 and a subsequent GET returned 204.
+  This is the already-closed GitHub issue #89. The checkout is three commits
+  behind origin/main, which contains the later non-mutating HEAD fix, so this
+  pass records it but does not create a duplicate issue.

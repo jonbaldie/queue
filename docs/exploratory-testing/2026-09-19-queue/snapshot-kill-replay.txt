@@ -1,0 +1,18 @@
+### run 1
+[2026-09-19T00:50:10.261Z] persist dir /var/folders/9v/25q4rqd16xl41cf2y18wtnsc0000gn/T/qx-snapshot-392cd27f03d4b1ee, 200 items of ~1000000 bytes
+[2026-09-19T00:50:10.765Z] acknowledged enqueues: 200; length=200
+[2026-09-19T00:50:10.776Z] after crash persist.dat size=200004890
+[2026-09-19T00:50:12.704Z] killed restart while persist.dat size=0 (was 200004890); size now=0
+[2026-09-19T00:50:12.759Z] after recovery: length=0 (acknowledged 200); persist.dat size=0
+### run 2
+[2026-09-19T00:50:12.789Z] persist dir /var/folders/9v/25q4rqd16xl41cf2y18wtnsc0000gn/T/qx-snapshot-6a55ecaf4a330bef, 200 items of ~1000000 bytes
+[2026-09-19T00:50:13.241Z] acknowledged enqueues: 200; length=200
+[2026-09-19T00:50:13.248Z] after crash persist.dat size=200004890
+[2026-09-19T00:50:15.108Z] killed restart while persist.dat size=0 (was 200004890); size now=0
+[2026-09-19T00:50:15.164Z] after recovery: length=0 (acknowledged 200); persist.dat size=0
+### run 3
+[2026-09-19T00:50:15.186Z] persist dir /var/folders/9v/25q4rqd16xl41cf2y18wtnsc0000gn/T/qx-snapshot-5af6c5b095cee663, 200 items of ~1000000 bytes
+[2026-09-19T00:50:15.756Z] acknowledged enqueues: 200; length=200
+[2026-09-19T00:50:15.764Z] after crash persist.dat size=200004890
+[2026-09-19T00:50:17.622Z] killed restart while persist.dat size=0 (was 200004890); size now=0
+[2026-09-19T00:50:17.676Z] after recovery: length=0 (acknowledged 200); persist.dat size=0

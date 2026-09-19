@@ -141,3 +141,5 @@ If the server sees that the `persist.dat` file exists on startup, it will replay
 When using Docker, it might be useful to add `persist.dat` as a persistent volume to keep your binary logs safe.
 
 It should go without saying, but try not to edit `persist.dat`, because it might result in weird behaviour.
+
+Known persistence issues found during exploratory testing are recorded in [docs/exploratory-testing](docs/exploratory-testing/README.md).

@@ -1,0 +1,20 @@
+## Intervention: PERSIST unset (defaults to WORKDIR /queue, deno-owned); no volume. Same container across stop/start.
+status: Up 3 seconds
+Payload successfully queued onto jobs. [200]
+Payload successfully queued onto jobs. [200]
+Payload successfully queued onto jobs. [200]
+dequeue: "one" [200]
+$ docker stop qx-ok (SIGTERM) && docker start qx-ok
+Listening on 0.0.0.0:1991
+Received SIGTERM, shutting down gracefully...
+Flushing data to persist.dat...
+Goodbye!
+Listening on 0.0.0.0:1991
+length: 2 [200]
+dequeue: "two" [200]
+enqueue four: Payload successfully queued onto jobs. [200]
+$ docker kill qx-ok (SIGKILL) && docker start qx-ok
+length: 2 [200]
+dequeue: "three" [200]
+dequeue: "four" [200]
+dequeue:  [204]
