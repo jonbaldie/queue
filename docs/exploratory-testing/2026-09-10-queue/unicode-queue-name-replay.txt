@@ -1,0 +1,16 @@
+Exploratory live evidence: queue-name Unicode length boundary
+Date: 2026-09-10
+Checkout: 2cb528accce134cd3dcc96d47468293f42446a83
+Interface: real Deno.serve process over HTTP, no mocks
+
+Each name was URI-encoded with encodeURIComponent and sent to the public
+authenticated POST /enqueue/<queue> endpoint with {"payload":"x"}.
+
+                         code points  UTF-16 units  observed result
+128 x 😀                         128          256    400 Queue name too long
+128 x ü                          128          128    200
+ 64 x 😀                          64          128    200
+ 65 x 😀                          65          130    400 Queue name too long
+
+The complete boundary matrix was repeated on three fresh server instances
+with the same results on every run. ASCII 129 characters also returned 400.

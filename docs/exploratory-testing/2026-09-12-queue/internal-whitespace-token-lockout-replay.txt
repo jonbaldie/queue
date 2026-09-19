@@ -1,0 +1,7 @@
+Testing consecutive clean server instances for internal whitespace lockout:
+run=1 token="alpha\tbeta" port=49573 health=200 all_locked_out=true
+run=1 token="alpha  beta" port=49575 health=200 all_locked_out=true
+run=2 token="alpha\tbeta" port=49577 health=200 all_locked_out=true
+run=2 token="alpha  beta" port=49580 health=200 all_locked_out=true
+run=3 token="alpha\tbeta" port=49582 health=200 all_locked_out=true
+run=3 token="alpha  beta" port=49584 health=200 all_locked_out=true

@@ -1,0 +1,33 @@
+Exploratory live evidence: whitespace-only QUEUE_API_TOKEN accepts startup and permanently locks out authenticated endpoints
+Date: 2026-09-11
+Checkout: 855fd38fc3889271287274303712618f263b2f22
+Interface: real Deno.serve process over HTTP, no mocks
+
+Environment on each fresh server:
+  HOST: 127.0.0.1
+  PORT: 0
+  QUEUE_API_TOKEN: "   " (and " ", "\t", "  \t  ")
+
+Observed behavior on all three clean runs:
+  1. Server binds port and logs: Listening on 127.0.0.1:<port>
+  2. Public health check GET /health returns 200 OK {"status":"ok"}
+  3. Every authenticated endpoint (/queues, /enqueue/q, /dequeue/q, /peek/q, /length/q)
+     returns 401 Unauthorized for all client Authorization headers:
+     - No header: 401 Unauthorized
+     - Authorization: Bearer: 401 Unauthorized
+     - Authorization: Bearer <spaces>: 401 Unauthorized
+     - Authorization: Bearer <configured-token>: 401 Unauthorized
+     - Authorization: Bearer <any-token>: 401 Unauthorized
+
+run=1 port=57428 health=200 queues=401 enqueue=401 locked_out=true
+run=2 port=57436 health=200 queues=401 enqueue=401 locked_out=true
+run=3 port=57444 health=200 queues=401 enqueue=401 locked_out=true
+
+Root cause:
+  src/config.ts:56-58 checks truthiness with `if (!apiToken)` instead of checking for non-whitespace content.
+  Whitespace strings (" ", "   ", "\t") evaluate to truthy, so parseConfig accepts the value without throwing.
+  In src/middleware.ts:15-17, incoming Authorization credentials are split and trimmed with:
+    const [scheme, ...rest] = (authHeader ?? "").trim().split(/\s+/);
+    const token = rest.join(" ");
+  Because all whitespace is stripped or condensed, token can never be whitespace-only, and token === apiToken
+  can never evaluate to true.
