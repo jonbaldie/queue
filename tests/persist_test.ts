@@ -203,6 +203,98 @@ Deno.test("persist FileStore.clear() truncates existing content", () => {
     Deno.removeSync(tmpDir, { recursive: true });
 });
 
+// ── FileStore.replace() ──────────────────────────────────────────────────────
+
+Deno.test("persist FileStore.replace() swaps the log for exactly the snapshot, in order", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const p = new Persistency.FileStore();
+    p.dir(tmpDir + "/");
+    p.saveEvent("q", "old-1", true);
+    p.saveEvent("q", "old-2", true);
+    p.replace([
+        { queue: "q", payload: "a", enqueue: true, dequeue: false },
+        { queue: "r", payload: "b", enqueue: true, dequeue: false },
+    ]);
+    assertEquals(p.loadState(), [
+        { queue: "q", payload: "a", enqueue: true, dequeue: false },
+        { queue: "r", payload: "b", enqueue: true, dequeue: false },
+    ]);
+    p.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("persist FileStore.replace([]) empties an existing log", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const p = new Persistency.FileStore();
+    p.dir(tmpDir + "/");
+    p.saveEvent("q", "old", true);
+    p.replace([]);
+    assertEquals(p.loadState(), []);
+    assertEquals(Deno.statSync(tmpDir + "/persist.dat").size, 0);
+    p.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("persist FileStore.replace() leaves no temp file behind", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const p = new Persistency.FileStore();
+    p.dir(tmpDir + "/");
+    p.replace([{ queue: "q", payload: "a", enqueue: true, dequeue: false }]);
+    assertEquals(Array.from(Deno.readDirSync(tmpDir)).map((entry) => entry.name), ["persist.dat"]);
+    p.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("persist FileStore.replace() discards a stale temp file from an earlier crash", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    Deno.writeTextFileSync(
+        tmpDir + "/persist.dat.tmp",
+        JSON.stringify({ queue: "q", payload: "stale", enqueue: true, dequeue: false }) + "\n",
+    );
+    const p = new Persistency.FileStore();
+    p.dir(tmpDir + "/");
+    p.replace([]);
+    assertEquals(p.loadState(), []);
+    p.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("persist FileStore.saveEvent() after replace() appends to the new log", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const p = new Persistency.FileStore();
+    p.dir(tmpDir + "/");
+    p.saveEvent("q", "old", true);
+    p.replace([{ queue: "q", payload: "a", enqueue: true, dequeue: false }]);
+    p.saveEvent("q", "b", true);
+    assertEquals(p.loadState().map((event) => event.payload), ["a", "b"]);
+    p.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("persist FileStore.replace() keeps the old log intact until the snapshot is complete", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const p = new Persistency.FileStore<unknown>();
+    p.dir(tmpDir + "/");
+    p.saveEvent("q", "old", true);
+    // BigInt cannot be serialised, so the snapshot write fails partway.
+    assertThrows(() => p.replace([
+        { queue: "q", payload: "a", enqueue: true, dequeue: false },
+        { queue: "q", payload: 1n, enqueue: true, dequeue: false },
+    ]));
+    assertEquals(p.loadState().map((event) => event.payload), ["old"]);
+    p.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("persist MemoryStore.replace() swaps the events for a copy of the snapshot", () => {
+    const p = new Persistency.MemoryStore();
+    p.saveEvent("q", "old", true);
+    const snapshot = [{ queue: "q", payload: "a", enqueue: true, dequeue: false }];
+    p.replace(snapshot);
+    snapshot.push({ queue: "q", payload: "b", enqueue: true, dequeue: false });
+    assertEquals(p.loadState(), [{ queue: "q", payload: "a", enqueue: true, dequeue: false }]);
+});
+
 // ── FileStore.loadState() with large data ────────────────────────────────────
 
 Deno.test("persist FileStore.loadState() reads large file correctly", () => {

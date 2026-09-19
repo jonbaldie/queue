@@ -32,6 +32,7 @@ function parseLine<T>(line: string): QueueEvent<T> | undefined {
 export interface QueueStore<T = string> {
     saveEvent(queueName: string, payload: T, isEnqueue: boolean): void;
     saveBatch(events: Array<QueueEvent<T>>): void;
+    replace(events: Array<QueueEvent<T>>): void;
     loadState(): Array<QueueEvent<T>>;
     clear(): void;
     dir(dir: string): void;
@@ -79,22 +80,61 @@ export class FileStore<T = string> implements QueueStore<T> {
         }
     }
 
+    private writeEvents(file: Deno.FsFile, events: Array<QueueEvent<T>>): void {
+        for (const event of events) {
+            const line = JSON.stringify({
+                queue: event.queue,
+                payload: event.payload,
+                enqueue: event.enqueue,
+                dequeue: event.dequeue
+            });
+            file.writeSync(this.encoder.encode(line + "\n"));
+        }
+    }
+
     public saveBatch(events: Array<QueueEvent<T>>): void {
         if (events.length === 0) return;
         this.ensureOpen();
         this.writeHandle!.lockSync(true);
         try {
-            for (const event of events) {
-                const line = JSON.stringify({
-                    queue: event.queue,
-                    payload: event.payload,
-                    enqueue: event.enqueue,
-                    dequeue: event.dequeue
-                });
-                this.writeHandle!.writeSync(this.encoder.encode(line + "\n"));
-            }
+            this.writeEvents(this.writeHandle!, events);
         } finally {
             this.writeHandle!.unlockSync();
+        }
+    }
+
+    // Swap persist.dat for a snapshot of events without ever leaving it
+    // incomplete: the snapshot is written and synced to a temp file, then
+    // renamed over persist.dat. A crash at any point leaves either the old
+    // log or the full snapshot on disk.
+    public replace(events: Array<QueueEvent<T>>): void {
+        this.ensureOpen();
+        const oldLog = this.writeHandle!;
+        oldLog.lockSync(true);
+        try {
+            const tempPath = this.path + ".tmp";
+            const snapshot = Deno.openSync(tempPath, { write: true, create: true, truncate: true });
+            try {
+                this.writeEvents(snapshot, events);
+                snapshot.syncSync();
+            } finally {
+                snapshot.close();
+            }
+            Deno.renameSync(tempPath, this.path);
+            this.syncDirectory();
+        } finally {
+            oldLog.unlockSync();
+        }
+        // The append handle still points at the replaced file; reopen lazily.
+        this.close();
+    }
+
+    private syncDirectory(): void {
+        const directory = Deno.openSync(this.directory || ".", { read: true });
+        try {
+            directory.syncSync();
+        } finally {
+            directory.close();
         }
     }
 
@@ -190,6 +230,10 @@ export class MemoryStore<T = string> implements QueueStore<T> {
         for (const event of events) {
             this.events.push(event);
         }
+    }
+
+    public replace(events: Array<QueueEvent<T>>): void {
+        this.events = [...events];
     }
 
     public clear(): void {
