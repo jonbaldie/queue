@@ -142,8 +142,11 @@ export class FileStore<T = string> implements QueueStore<T> {
             temp.close();
             try {
                 Deno.removeSync(this.tempPath);
-            } catch {
+            } catch (cleanupError) {
                 // Keep the original error; a stale temp file is overwritten next save.
+                Deno.stderr.writeSync(this.encoder.encode(
+                    `Could not remove ${this.tempPath}: ${cleanupError}\n`,
+                ));
             }
             throw error;
         }
