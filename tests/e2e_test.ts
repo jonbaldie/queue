@@ -14,10 +14,10 @@ function makeHandler(token = API_TOKEN, rateLimit = 100) {
     return createHandler(mgr, token, rateLimit);
 }
 
-async function startServer(env: Record<string, string>): Promise<{ child: Deno.ChildProcess; port: number }> {
+async function startServer(env: Record<string, string>, script = "main.ts"): Promise<{ child: Deno.ChildProcess; port: number }> {
     const decoder = new TextDecoder();
     const child = new Deno.Command(Deno.execPath(), {
-        args: ["run", "--allow-all", "main.ts", "--persist"],
+        args: ["run", "--allow-all", script, "--persist"],
         cwd: ".",
         env,
         stdout: "piped",
@@ -765,6 +765,76 @@ Deno.test("e2e: crash recovery snapshot under a tighter limit does not permanent
         if (first) await cleanupChild(first);
         if (second) await cleanupChild(second);
         if (third) await cleanupChild(third);
+        await Deno.remove(tempDir, { recursive: true }).catch(() => {});
+    }
+});
+
+async function assertCrashesOnFirstWrite(child: Deno.ChildProcess): Promise<void> {
+    const timeoutId = setTimeout(() => {
+        try { child.kill("SIGKILL"); } catch { /* ignore */ }
+    }, 5000);
+    const status = await child.status;
+    clearTimeout(timeoutId);
+    assertEquals(status.code, 137, "the crash harness never reached a file write");
+}
+
+Deno.test("e2e: a crash during the startup snapshot rewrite keeps every acknowledged item (#115)", async () => {
+    const tempDir = await Deno.makeTempDir();
+    const token = "startup-snapshot-crash-token";
+    const env = { HOST: "127.0.0.1", PORT: "0", PERSIST: tempDir, QUEUE_API_TOKEN: token };
+    let first: Deno.ChildProcess | undefined;
+    let crashing: Deno.ChildProcess | undefined;
+    let recovered: Deno.ChildProcess | undefined;
+    try {
+        const started = await startServer(env);
+        first = started.child;
+        for (const item of ["item-1", "item-2", "item-3"]) {
+            await persistEnqueue(started.port, token, "jobs", item);
+        }
+        first.kill("SIGKILL");
+        await first.status;
+
+        crashing = new Deno.Command(Deno.execPath(), {
+            args: ["run", "--allow-all", "tests/fixtures/crash_on_first_write.ts", "--persist"],
+            cwd: ".",
+            env: { ...env, CRASH_ON_FIRST_WRITE: "startup" },
+            stdout: "null",
+            stderr: "null",
+        }).spawn();
+        await assertCrashesOnFirstWrite(crashing);
+
+        const restarted = await startServer(env);
+        recovered = restarted.child;
+        assertEquals(await persistDrain(restarted.port, token, "jobs"), ["item-1", "item-2", "item-3"]);
+    } finally {
+        if (first) await cleanupChild(first);
+        if (crashing) try { crashing.kill("SIGKILL"); } catch { /* ignore */ }
+        if (recovered) await cleanupChild(recovered);
+        await Deno.remove(tempDir, { recursive: true }).catch(() => {});
+    }
+});
+
+Deno.test("e2e: a crash during the shutdown snapshot flush keeps every acknowledged item (#115)", async () => {
+    const tempDir = await Deno.makeTempDir();
+    const token = "shutdown-snapshot-crash-token";
+    const env = { HOST: "127.0.0.1", PORT: "0", PERSIST: tempDir, QUEUE_API_TOKEN: token };
+    let crashing: Deno.ChildProcess | undefined;
+    let recovered: Deno.ChildProcess | undefined;
+    try {
+        const started = await startServer({ ...env, CRASH_ON_FIRST_WRITE: "shutdown" }, "tests/fixtures/crash_on_first_write.ts");
+        crashing = started.child;
+        for (const item of ["item-1", "item-2", "item-3"]) {
+            await persistEnqueue(started.port, token, "jobs", item);
+        }
+        crashing.kill("SIGTERM");
+        await assertCrashesOnFirstWrite(crashing);
+
+        const restarted = await startServer(env);
+        recovered = restarted.child;
+        assertEquals(await persistDrain(restarted.port, token, "jobs"), ["item-1", "item-2", "item-3"]);
+    } finally {
+        if (crashing) await cleanupChild(crashing);
+        if (recovered) await cleanupChild(recovered);
         await Deno.remove(tempDir, { recursive: true }).catch(() => {});
     }
 });
