@@ -289,6 +289,70 @@ Deno.test("manager save() on empty manager writes nothing", () => {
     Deno.removeSync(tmpDir, { recursive: true });
 });
 
+// ── manager save() is atomic (#115) ──────────────────────────────────────────
+
+Deno.test("manager save() interrupted mid-snapshot keeps every logged item", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const persist = new Persistency.FileStore<unknown>();
+    persist.dir(tmpDir);
+
+    // Serialises normally while enqueued, then fails once armed, standing in
+    // for a crash or full disk partway through the snapshot write.
+    let armed = false;
+    const fragile = { toJSON: () => { if (armed) throw new Error("disk full"); return "c"; } };
+
+    const mgr = new QueueManager<unknown>(persist);
+    mgr.enqueue("q", "a");
+    mgr.enqueue("q", "b");
+    mgr.enqueue("q", fragile);
+    armed = true;
+    assertThrows(() => mgr.save(), Error, "disk full");
+    persist.close();
+
+    const reader = new Persistency.FileStore<unknown>();
+    reader.dir(tmpDir);
+    assertEquals(reader.loadState().map((e) => e.payload), ["a", "b", "c"]);
+    reader.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("manager save() leaves the log appendable and no temp file behind", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir);
+
+    const mgr = new QueueManager(persist);
+    mgr.enqueue("q", "a");
+    mgr.enqueue("q", "b");
+    mgr.dequeue("q");
+    mgr.save();
+    mgr.enqueue("q", "c");
+    persist.close();
+
+    const reader = new Persistency.FileStore();
+    reader.dir(tmpDir);
+    assertEquals(reader.loadState().map((e) => e.payload), ["b", "c"]);
+    reader.close();
+    assertEquals([...Deno.readDirSync(tmpDir)].map((e) => e.name), ["persist.dat"]);
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("manager save() overwrites a stale temp file from an earlier crash", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    Deno.writeTextFileSync(tmpDir + "/persist.dat.tmp", "stale garbage that is longer than the snapshot\n");
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir);
+
+    const mgr = new QueueManager(persist);
+    mgr.enqueue("q", "a");
+    mgr.save();
+
+    assertEquals(persist.loadState().map((e) => e.payload), ["a"]);
+    assertEquals([...Deno.readDirSync(tmpDir)].map((e) => e.name), ["persist.dat"]);
+    persist.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
 // ── manager enqueue log has correct flags ─────────────────────────────────────
 
 Deno.test("manager enqueue log: enqueue=true dequeue=false", () => {
