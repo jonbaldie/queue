@@ -1,0 +1,22 @@
+Exploratory live evidence: missing WWW-Authenticate challenge
+Date: 2026-09-10
+Checkout: 2cb528accce134cd3dcc96d47468293f42446a83
+Interface: real Deno.serve process over HTTP, no mocks
+
+Request on each fresh server:
+  GET /length/protected
+  no Authorization header
+
+Observed response on all three clean runs:
+  status: 401
+  body: Unauthorized
+  www-authenticate: <absent>
+  content-type: text/plain;charset=UTF-8
+
+run=1 status=401 www-authenticate=null body=Unauthorized
+run=2 status=401 www-authenticate=null body=Unauthorized
+run=3 status=401 www-authenticate=null body=Unauthorized
+
+The service was started with HOST=127.0.0.1, PORT=0, and a non-empty
+QUEUE_API_TOKEN. /health remained publicly reachable, while the protected
+request without credentials was rejected.

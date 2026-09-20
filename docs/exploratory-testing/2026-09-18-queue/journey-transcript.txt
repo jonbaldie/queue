@@ -1,0 +1,172 @@
+=== Starting Journey 1: Core FIFO, Multi-Queue Isolation, Payload Fidelity & Edge Values ===
+{"journey":"j1-fifo","name":"health-get","result":{"status":200,"body":"{\"status\":\"ok\"}","headers":{"content-length":"15","content-type":"application/json"}},"expectation":"200 OK without auth"}
+{"journey":"j1-fifo","name":"health-head","result":{"status":200,"body":"","headers":{"content-type":"application/json"}},"expectation":"200 OK without auth, no body"}
+{"journey":"j1-fifo","name":"health-trailing-slash","result":{"status":200,"body":"{\"status\":\"ok\"}","headers":{"content-length":"15","content-type":"application/json"}},"expectation":"200 OK without auth"}
+{"journey":"j1-fifo","name":"initial-queues","result":{"status":200,"body":"[]","headers":{"content-length":"2","content-type":"application/json"}},"expectation":"200 []"}
+{"journey":"j1-fifo","name":"enqueue-string-ascii","result":{"status":200,"body":"Payload successfully queued onto orders.","headers":{"content-length":"40","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 acknowledged"}
+{"journey":"j1-fifo","name":"enqueue-string-unicode","result":{"status":200,"body":"Payload successfully queued onto orders.","headers":{"content-length":"40","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 acknowledged"}
+{"journey":"j1-fifo","name":"enqueue-string-empty","result":{"status":200,"body":"Payload successfully queued onto orders.","headers":{"content-length":"40","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 acknowledged"}
+{"journey":"j1-fifo","name":"enqueue-string-newlines","result":{"status":200,"body":"Payload successfully queued onto orders.","headers":{"content-length":"40","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 acknowledged"}
+{"journey":"j1-fifo","name":"enqueue-string-json-escapes","result":{"status":200,"body":"Payload successfully queued onto orders.","headers":{"content-length":"40","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 acknowledged"}
+{"journey":"j1-fifo","name":"enqueue-number-zero","result":{"status":200,"body":"Payload successfully queued onto orders.","headers":{"content-length":"40","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 acknowledged"}
+{"journey":"j1-fifo","name":"enqueue-number-negative-zero","result":{"status":200,"body":"Payload successfully queued onto orders.","headers":{"content-length":"40","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 acknowledged"}
+{"journey":"j1-fifo","name":"enqueue-number-pos-int","result":{"status":200,"body":"Payload successfully queued onto orders.","headers":{"content-length":"40","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 acknowledged"}
+{"journey":"j1-fifo","name":"enqueue-number-neg-int","result":{"status":200,"body":"Payload successfully queued onto orders.","headers":{"content-length":"40","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 acknowledged"}
+{"journey":"j1-fifo","name":"enqueue-number-float","result":{"status":200,"body":"Payload successfully queued onto orders.","headers":{"content-length":"40","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 acknowledged"}
+{"journey":"j1-fifo","name":"enqueue-number-exp-pos","result":{"status":200,"body":"Payload successfully queued onto orders.","headers":{"content-length":"40","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 acknowledged"}
+{"journey":"j1-fifo","name":"enqueue-number-exp-neg","result":{"status":200,"body":"Payload successfully queued onto orders.","headers":{"content-length":"40","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 acknowledged"}
+{"journey":"j1-fifo","name":"enqueue-number-max-safe","result":{"status":200,"body":"Payload successfully queued onto orders.","headers":{"content-length":"40","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 acknowledged"}
+{"journey":"j1-fifo","name":"enqueue-number-min-safe","result":{"status":200,"body":"Payload successfully queued onto orders.","headers":{"content-length":"40","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 acknowledged"}
+{"journey":"j1-fifo","name":"enqueue-boolean-true","result":{"status":200,"body":"Payload successfully queued onto orders.","headers":{"content-length":"40","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 acknowledged"}
+{"journey":"j1-fifo","name":"enqueue-boolean-false","result":{"status":200,"body":"Payload successfully queued onto orders.","headers":{"content-length":"40","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 acknowledged"}
+{"journey":"j1-fifo","name":"enqueue-object-empty","result":{"status":200,"body":"Payload successfully queued onto orders.","headers":{"content-length":"40","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 acknowledged"}
+{"journey":"j1-fifo","name":"enqueue-object-simple","result":{"status":200,"body":"Payload successfully queued onto orders.","headers":{"content-length":"40","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 acknowledged"}
+{"journey":"j1-fifo","name":"enqueue-object-nested","result":{"status":200,"body":"Payload successfully queued onto orders.","headers":{"content-length":"40","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 acknowledged"}
+{"journey":"j1-fifo","name":"enqueue-object-with-proto-key","result":{"status":200,"body":"Payload successfully queued onto orders.","headers":{"content-length":"40","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 acknowledged"}
+{"journey":"j1-fifo","name":"enqueue-array-empty","result":{"status":200,"body":"Payload successfully queued onto orders.","headers":{"content-length":"40","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 acknowledged"}
+{"journey":"j1-fifo","name":"enqueue-array-mixed","result":{"status":200,"body":"Payload successfully queued onto orders.","headers":{"content-length":"40","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 acknowledged"}
+{"journey":"j1-fifo","name":"enqueue-notifications","result":{"status":200,"body":"Payload successfully queued onto notifications.","headers":{"content-length":"47","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 acknowledged"}
+{"journey":"j1-fifo","name":"queues-list","result":{"status":200,"body":"[\"orders\",\"notifications\"]","headers":{"content-length":"26","content-type":"application/json"}},"expectation":"200 [\"orders\", \"notifications\"]"}
+{"journey":"j1-fifo","name":"length-orders","result":{"status":200,"body":"22","headers":{"content-length":"2","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 text/plain 22"}
+{"journey":"j1-fifo","name":"length-notifications","result":{"status":200,"body":"1","headers":{"content-length":"1","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 text/plain 1"}
+{"journey":"j1-fifo","name":"peek-orders-get","result":{"status":200,"body":"\"order-101\"","headers":{"content-length":"11","content-type":"application/json"}},"expectation":"200 \"order-101\""}
+{"journey":"j1-fifo","name":"peek-orders-head","result":{"status":200,"body":"","headers":{"content-type":"application/json"}},"expectation":"200 no body"}
+{"journey":"j1-fifo","name":"dequeue-orders-head","result":{"status":200,"body":"","headers":{"content-type":"application/json"}},"expectation":"200 no body (non-consuming)"}
+{"journey":"j1-fifo","name":"length-orders-after-head","result":{"status":200,"body":"22","headers":{"content-length":"2","content-type":"text/plain;charset=UTF-8"}},"expectation":"still 22"}
+{"journey":"j1-fifo","name":"dequeue-string-ascii","result":{"status":200,"body":"\"order-101\"","headers":{"content-length":"11","content-type":"application/json"}},"expectation":"200 matching \"order-101\""}
+{"journey":"j1-fifo","name":"dequeue-string-unicode","result":{"status":200,"body":"\"🔥 rocket 🚀 ñoño 漢字\"","headers":{"content-length":"32","content-type":"application/json"}},"expectation":"200 matching \"🔥 rocket 🚀 ñoño 漢字\""}
+{"journey":"j1-fifo","name":"dequeue-string-empty","result":{"status":200,"body":"\"\"","headers":{"content-length":"2","content-type":"application/json"}},"expectation":"200 matching \"\""}
+{"journey":"j1-fifo","name":"dequeue-string-newlines","result":{"status":200,"body":"\"line1\\nline2\\r\\nline3\"","headers":{"content-length":"23","content-type":"application/json"}},"expectation":"200 matching \"line1\\nline2\\r\\nline3\""}
+{"journey":"j1-fifo","name":"dequeue-string-json-escapes","result":{"status":200,"body":"\"\\\"quoted\\\" and \\\\backslashed\\\\\"","headers":{"content-length":"32","content-type":"application/json"}},"expectation":"200 matching \"\\\"quoted\\\" and \\\\backslashed\\\\\""}
+{"journey":"j1-fifo","name":"dequeue-number-zero","result":{"status":200,"body":"0","headers":{"content-length":"1","content-type":"application/json"}},"expectation":"200 matching 0"}
+{"journey":"j1-fifo","name":"dequeue-number-negative-zero","result":{"status":200,"body":"0","headers":{"content-length":"1","content-type":"application/json"}},"expectation":"200 matching 0"}
+{"journey":"j1-fifo","name":"dequeue-number-pos-int","result":{"status":200,"body":"42","headers":{"content-length":"2","content-type":"application/json"}},"expectation":"200 matching 42"}
+{"journey":"j1-fifo","name":"dequeue-number-neg-int","result":{"status":200,"body":"-42","headers":{"content-length":"3","content-type":"application/json"}},"expectation":"200 matching -42"}
+{"journey":"j1-fifo","name":"dequeue-number-float","result":{"status":200,"body":"3.14159","headers":{"content-length":"7","content-type":"application/json"}},"expectation":"200 matching 3.14159"}
+{"journey":"j1-fifo","name":"dequeue-number-exp-pos","result":{"status":200,"body":"100000","headers":{"content-length":"6","content-type":"application/json"}},"expectation":"200 matching 100000"}
+{"journey":"j1-fifo","name":"dequeue-number-exp-neg","result":{"status":200,"body":"0.00001","headers":{"content-length":"7","content-type":"application/json"}},"expectation":"200 matching 0.00001"}
+{"journey":"j1-fifo","name":"dequeue-number-max-safe","result":{"status":200,"body":"9007199254740991","headers":{"content-length":"16","content-type":"application/json"}},"expectation":"200 matching 9007199254740991"}
+{"journey":"j1-fifo","name":"dequeue-number-min-safe","result":{"status":200,"body":"-9007199254740991","headers":{"content-length":"17","content-type":"application/json"}},"expectation":"200 matching -9007199254740991"}
+{"journey":"j1-fifo","name":"dequeue-boolean-true","result":{"status":200,"body":"true","headers":{"content-length":"4","content-type":"application/json"}},"expectation":"200 matching true"}
+{"journey":"j1-fifo","name":"dequeue-boolean-false","result":{"status":200,"body":"false","headers":{"content-length":"5","content-type":"application/json"}},"expectation":"200 matching false"}
+{"journey":"j1-fifo","name":"dequeue-object-empty","result":{"status":200,"body":"{}","headers":{"content-length":"2","content-type":"application/json"}},"expectation":"200 matching {}"}
+{"journey":"j1-fifo","name":"dequeue-object-simple","result":{"status":200,"body":"{\"item\":\"widget\",\"count\":5}","headers":{"content-length":"27","content-type":"application/json"}},"expectation":"200 matching {\"item\":\"widget\",\"count\":5}"}
+{"journey":"j1-fifo","name":"dequeue-object-nested","result":{"status":200,"body":"{\"user\":{\"id\":1,\"active\":true,\"tags\":[\"a\",\"b\"]}}","headers":{"content-length":"48","content-type":"application/json"}},"expectation":"200 matching {\"user\":{\"id\":1,\"active\":true,\"tags\":[\"a\",\"b\"]}}"}
+{"journey":"j1-fifo","name":"dequeue-object-with-proto-key","result":{"status":200,"body":"{\"standard\":123}","headers":{"content-length":"16","content-type":"application/json"}},"expectation":"200 matching {\"standard\":123}"}
+{"journey":"j1-fifo","name":"dequeue-array-empty","result":{"status":200,"body":"[]","headers":{"content-length":"2","content-type":"application/json"}},"expectation":"200 matching []"}
+{"journey":"j1-fifo","name":"dequeue-array-mixed","result":{"status":200,"body":"[1,\"two\",false,null,{\"nested\":true}]","headers":{"content-length":"36","content-type":"application/json"}},"expectation":"200 matching [1,\"two\",false,null,{\"nested\":true}]"}
+{"journey":"j1-fifo","name":"dequeue-orders-empty","result":{"status":204,"body":"","headers":{}},"expectation":"204 No Content"}
+{"journey":"j1-fifo","name":"peek-orders-empty","result":{"status":204,"body":"","headers":{}},"expectation":"204 No Content"}
+{"journey":"j1-fifo","name":"length-orders-empty","result":{"status":200,"body":"0","headers":{"content-length":"1","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 0"}
+{"journey":"j1-fifo","name":"queues-after-orders-drained","result":{"status":200,"body":"[\"notifications\"]","headers":{"content-length":"17","content-type":"application/json"}},"expectation":"200 [\"notifications\"]"}
+{"journey":"j1-fifo","name":"dequeue-notifications","result":{"status":200,"body":"\"user-registered\"","headers":{"content-length":"17","content-type":"application/json"}},"expectation":"200 \"user-registered\""}
+{"journey":"j1-fifo","name":"queues-after-all-drained","result":{"status":200,"body":"[]","headers":{"content-length":"2","content-type":"application/json"}},"expectation":"200 []"}
+=== Starting Journey 2: Protocol, Validation, Authentication, Limits & Error Paths ===
+{"journey":"j2-protocol","name":"auth-missing-header","result":{"status":401,"body":"Unauthorized","headers":{"content-length":"12","content-type":"text/plain;charset=UTF-8","www-authenticate":"Bearer"}},"expectation":"401 with WWW-Authenticate: Bearer"}
+{"journey":"j2-protocol","name":"auth-invalid-scheme","result":{"status":401,"body":"Unauthorized","headers":{"content-length":"12","content-type":"text/plain;charset=UTF-8","www-authenticate":"Bearer"}},"expectation":"401 with WWW-Authenticate: Bearer"}
+{"journey":"j2-protocol","name":"auth-wrong-token","result":{"status":401,"body":"Unauthorized","headers":{"content-length":"12","content-type":"text/plain;charset=UTF-8","www-authenticate":"Bearer"}},"expectation":"401 with WWW-Authenticate: Bearer"}
+{"journey":"j2-protocol","name":"auth-scheme-lowercase","result":{"status":200,"body":"[]","headers":{"content-length":"2","content-type":"application/json"}},"expectation":"200 OK"}
+{"journey":"j2-protocol","name":"auth-scheme-uppercase","result":{"status":200,"body":"[]","headers":{"content-length":"2","content-type":"application/json"}},"expectation":"200 OK"}
+{"journey":"j2-protocol","name":"auth-multiple-spaces","result":{"status":200,"body":"[]","headers":{"content-length":"2","content-type":"application/json"}},"expectation":"200 OK"}
+{"journey":"j2-protocol","name":"auth-tab-delimited","result":{"status":200,"body":"[]","headers":{"content-length":"2","content-type":"application/json"}},"expectation":"200 OK"}
+{"journey":"j2-protocol","name":"mna-health-post","result":{"status":405,"body":"Method not allowed","headers":{"allow":"GET","content-length":"18","content-type":"text/plain;charset=UTF-8"}},"expectation":"405 Allow: GET"}
+{"journey":"j2-protocol","name":"mna-queues-post","result":{"status":405,"body":"Method not allowed","headers":{"allow":"GET","content-length":"18","content-type":"text/plain;charset=UTF-8"}},"expectation":"405 Allow: GET"}
+{"journey":"j2-protocol","name":"mna-queues-delete","result":{"status":405,"body":"Method not allowed","headers":{"allow":"GET","content-length":"18","content-type":"text/plain;charset=UTF-8"}},"expectation":"405 Allow: GET"}
+{"journey":"j2-protocol","name":"mna-enqueue-get","result":{"status":405,"body":"Method not allowed","headers":{"allow":"POST","content-length":"18","content-type":"text/plain;charset=UTF-8"}},"expectation":"405 Allow: POST"}
+{"journey":"j2-protocol","name":"mna-dequeue-post","result":{"status":405,"body":"Method not allowed","headers":{"allow":"GET","content-length":"18","content-type":"text/plain;charset=UTF-8"}},"expectation":"405 Allow: GET"}
+{"journey":"j2-protocol","name":"mna-peek-post","result":{"status":405,"body":"Method not allowed","headers":{"allow":"GET","content-length":"18","content-type":"text/plain;charset=UTF-8"}},"expectation":"405 Allow: GET"}
+{"journey":"j2-protocol","name":"mna-length-post","result":{"status":405,"body":"Method not allowed","headers":{"allow":"GET","content-length":"18","content-type":"text/plain;charset=UTF-8"}},"expectation":"405 Allow: GET"}
+{"journey":"j2-protocol","name":"not-found-unknown","result":{"status":404,"body":"Not found.","headers":{"content-length":"10","content-type":"text/plain;charset=UTF-8"}},"expectation":"404 Not found."}
+{"journey":"j2-protocol","name":"not-found-enqueue-base","result":{"status":404,"body":"Not found.","headers":{"content-length":"10","content-type":"text/plain;charset=UTF-8"}},"expectation":"404 Not found."}
+{"journey":"j2-protocol","name":"not-found-enqueue-slash","result":{"status":404,"body":"Not found.","headers":{"content-length":"10","content-type":"text/plain;charset=UTF-8"}},"expectation":"404 Not found."}
+{"journey":"j2-protocol","name":"not-found-dequeue-slash","result":{"status":404,"body":"Not found.","headers":{"content-length":"10","content-type":"text/plain;charset=UTF-8"}},"expectation":"404 Not found."}
+{"journey":"j2-protocol","name":"val-empty-body","result":{"status":400,"body":"Invalid JSON","headers":{"content-length":"12","content-type":"text/plain;charset=UTF-8"}},"expectation":"400 Invalid JSON"}
+{"journey":"j2-protocol","name":"val-malformed-json","result":{"status":400,"body":"Invalid JSON","headers":{"content-length":"12","content-type":"text/plain;charset=UTF-8"}},"expectation":"400 Invalid JSON"}
+{"journey":"j2-protocol","name":"val-missing-payload-key","result":{"status":400,"body":"Missing payload key","headers":{"content-length":"19","content-type":"text/plain;charset=UTF-8"}},"expectation":"400 Missing payload key"}
+{"journey":"j2-protocol","name":"val-empty-object","result":{"status":400,"body":"Missing payload key","headers":{"content-length":"19","content-type":"text/plain;charset=UTF-8"}},"expectation":"400 Missing payload key"}
+{"journey":"j2-protocol","name":"val-array-body","result":{"status":400,"body":"Missing payload key","headers":{"content-length":"19","content-type":"text/plain;charset=UTF-8"}},"expectation":"400 Missing payload key"}
+{"journey":"j2-protocol","name":"val-primitive-number","result":{"status":400,"body":"Missing payload key","headers":{"content-length":"19","content-type":"text/plain;charset=UTF-8"}},"expectation":"400 Missing payload key"}
+{"journey":"j2-protocol","name":"val-null-payload","result":{"status":400,"body":"Null payload not allowed","headers":{"content-length":"24","content-type":"text/plain;charset=UTF-8"}},"expectation":"400 Null payload not allowed"}
+{"journey":"j2-protocol","name":"val-unsafe-number-overflow","result":{"status":400,"body":"Payload contains an unsupported number","headers":{"content-length":"38","content-type":"text/plain;charset=UTF-8"}},"expectation":"400 Payload contains an unsupported number"}
+{"journey":"j2-protocol","name":"val-unsafe-number-underflow","result":{"status":400,"body":"Payload contains an unsupported number","headers":{"content-length":"38","content-type":"text/plain;charset=UTF-8"}},"expectation":"400 Payload contains an unsupported number"}
+{"journey":"j2-protocol","name":"val-overflow-number","result":{"status":400,"body":"Payload contains an unsupported number","headers":{"content-length":"38","content-type":"text/plain;charset=UTF-8"}},"expectation":"400 Payload contains an unsupported number"}
+{"journey":"j2-protocol","name":"val-name-128-chars","result":{"status":200,"body":"Payload successfully queued onto xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.","headers":{"content-type":"text/plain;charset=UTF-8"}},"expectation":"200 OK"}
+{"journey":"j2-protocol","name":"val-name-129-chars","result":{"status":400,"body":"Queue name too long","headers":{"content-length":"19","content-type":"text/plain;charset=UTF-8"}},"expectation":"400 Queue name too long"}
+{"journey":"j2-protocol","name":"val-name-bad-percent","result":{"status":400,"body":"Invalid queue name","headers":{"content-length":"18","content-type":"text/plain;charset=UTF-8"}},"expectation":"400 Invalid queue name"}
+{"journey":"j2-protocol","name":"body-exact-1mb","result":{"status":200,"body":"Payload successfully queued onto size.","headers":{"content-length":"38","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 OK"}
+{"journey":"j2-protocol","name":"body-over-1mb","result":{"status":413,"body":"Payload too large","headers":{"content-length":"17","content-type":"text/plain;charset=UTF-8"}},"expectation":"413 Payload too large"}
+{"journey":"j2-protocol","name":"depth-1","result":{"status":200,"body":"Payload successfully queued onto depth-q.","headers":{"content-length":"41","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 OK"}
+{"journey":"j2-protocol","name":"depth-2","result":{"status":200,"body":"Payload successfully queued onto depth-q.","headers":{"content-length":"41","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 OK"}
+{"journey":"j2-protocol","name":"depth-3","result":{"status":200,"body":"Payload successfully queued onto depth-q.","headers":{"content-length":"41","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 OK"}
+{"journey":"j2-protocol","name":"depth-4-rejected","result":{"status":507,"body":"Queue full or too many queues","headers":{"content-length":"29","content-type":"text/plain;charset=UTF-8"}},"expectation":"507 Queue full or too many queues"}
+{"journey":"j2-protocol","name":"depth-length-is-3","result":{"status":200,"body":"3","headers":{"content-length":"1","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 3"}
+{"journey":"j2-protocol","name":"depth-dequeue-free","result":{"status":200,"body":"1","headers":{"content-length":"1","content-type":"application/json"}},"expectation":"200 1"}
+{"journey":"j2-protocol","name":"depth-retry-succeeds","result":{"status":200,"body":"Payload successfully queued onto depth-q.","headers":{"content-length":"41","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 OK after capacity freed"}
+{"journey":"j2-protocol","name":"count-q2-create","result":{"status":200,"body":"Payload successfully queued onto q2.","headers":{"content-length":"36","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 OK"}
+{"journey":"j2-protocol","name":"count-q3-rejected","result":{"status":507,"body":"Queue full or too many queues","headers":{"content-length":"29","content-type":"text/plain;charset=UTF-8"}},"expectation":"507 Queue full or too many queues"}
+{"journey":"j2-protocol","name":"count-q2-drain","result":{"status":200,"body":"\"item-q2\"","headers":{"content-length":"9","content-type":"application/json"}},"expectation":"200 item-q2"}
+{"journey":"j2-protocol","name":"count-q3-retry-succeeds","result":{"status":200,"body":"Payload successfully queued onto q3.","headers":{"content-length":"36","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 OK after queue freed"}
+--- Testing Rate Limiting ---
+{"journey":"j2-ratelimit","name":"req-1","result":{"status":200,"body":"[]","headers":{"content-length":"2","content-type":"application/json"}},"expectation":"200 OK"}
+{"journey":"j2-ratelimit","name":"req-2","result":{"status":200,"body":"[]","headers":{"content-length":"2","content-type":"application/json"}},"expectation":"200 OK"}
+{"journey":"j2-ratelimit","name":"req-3","result":{"status":200,"body":"[]","headers":{"content-length":"2","content-type":"application/json"}},"expectation":"200 OK"}
+{"journey":"j2-ratelimit","name":"req-4","result":{"status":200,"body":"[]","headers":{"content-length":"2","content-type":"application/json"}},"expectation":"200 OK"}
+{"journey":"j2-ratelimit","name":"req-5","result":{"status":200,"body":"[]","headers":{"content-length":"2","content-type":"application/json"}},"expectation":"200 OK"}
+{"journey":"j2-ratelimit","name":"req-6-blocked","result":{"status":429,"body":"Too many requests","headers":{"content-length":"17","content-type":"text/plain;charset=UTF-8"}},"expectation":"429 Too many requests"}
+{"journey":"j2-ratelimit","name":"health-bypass","result":{"status":200,"body":"{\"status\":\"ok\"}","headers":{"content-length":"15","content-type":"application/json"}},"expectation":"200 OK bypasses rate limit"}
+=== Starting Journey 3: Persistence, Clean Restarts & Crash Recovery ===
+--- Part A: Clean graceful restart ---
+{"journey":"j3-persist","name":"clean-snapshot-content","result":{"status":200,"body":"{\"queue\":\"p1\",\"payload\":\"beta\",\"enqueue\":true,\"dequeue\":false}\n{\"queue\":\"p2\",\"payload\":\"gamma\",\"enqueue\":true,\"dequeue\":false}","headers":{}},"expectation":"snapshot contains only remaining items (beta on p1, gamma on p2)"}
+{"journey":"j3-persist","name":"server2-queues","result":{"status":200,"body":"[\"p1\",\"p2\"]","headers":{"content-length":"11","content-type":"application/json"}},"expectation":"200 [\"p1\", \"p2\"]"}
+{"journey":"j3-persist","name":"server2-p1-len","result":{"status":200,"body":"1","headers":{"content-length":"1","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 1"}
+{"journey":"j3-persist","name":"server2-p2-len","result":{"status":200,"body":"1","headers":{"content-length":"1","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 1"}
+{"journey":"j3-persist","name":"server2-p1-dequeue","result":{"status":200,"body":"\"beta\"","headers":{"content-length":"6","content-type":"application/json"}},"expectation":"200 \"beta\""}
+{"journey":"j3-persist","name":"server2-p2-dequeue","result":{"status":200,"body":"\"gamma\"","headers":{"content-length":"7","content-type":"application/json"}},"expectation":"200 \"gamma\""}
+{"journey":"j3-persist","name":"server2-queues-empty","result":{"status":200,"body":"[]","headers":{"content-length":"2","content-type":"application/json"}},"expectation":"200 []"}
+--- Part B: Crash recovery (SIGKILL) ---
+{"journey":"j3-persist","name":"crash-raw-log-lines","result":{"status":200,"body":"lines=4","headers":{}},"expectation":"4 lines (3 enqueues + 1 dequeue)"}
+{"journey":"j3-persist","name":"recovery-queues","result":{"status":200,"body":"[\"tasks\"]","headers":{"content-length":"9","content-type":"application/json"}},"expectation":"200 [\"tasks\"]"}
+{"journey":"j3-persist","name":"recovery-length","result":{"status":200,"body":"2","headers":{"content-length":"1","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 2"}
+{"journey":"j3-persist","name":"recovery-deq-1","result":{"status":200,"body":"\"task-2\"","headers":{"content-length":"8","content-type":"application/json"}},"expectation":"200 \"task-2\""}
+{"journey":"j3-persist","name":"recovery-deq-2","result":{"status":200,"body":"\"task-3\"","headers":{"content-length":"8","content-type":"application/json"}},"expectation":"200 \"task-3\""}
+{"journey":"j3-persist","name":"recovery-deq-empty","result":{"status":204,"body":"","headers":{}},"expectation":"204 No Content"}
+--- Part C: Crash recovery with corrupted lines in persist.dat ---
+{"journey":"j3-persist","name":"corrupt-recovery-queues","result":{"status":200,"body":"[\"good\"]","headers":{"content-length":"8","content-type":"application/json"}},"expectation":"200 [\"good\"]"}
+{"journey":"j3-persist","name":"corrupt-recovery-length","result":{"status":200,"body":"1","headers":{"content-length":"1","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 1"}
+{"journey":"j3-persist","name":"corrupt-recovery-dequeue","result":{"status":200,"body":"\"item-2\"","headers":{"content-length":"8","content-type":"application/json"}},"expectation":"200 \"item-2\""}
+{"journey":"j3-persist","name":"corrupt-recovery-drained","result":{"status":204,"body":"","headers":{}},"expectation":"204 No Content"}
+=== Starting Journey 4: Concurrency, URL Encoding & Boundary Edge Cases ===
+--- Testing concurrent enqueues ---
+{"journey":"j4-concurrency","name":"concurrent-50-enqueues","result":{"status":200,"body":"successCount=50","headers":{}},"expectation":"All 50 enqueues return 200"}
+{"journey":"j4-concurrency","name":"concurrent-lengths","result":{"status":200,"body":"cq1=25, cq2=25","headers":{}},"expectation":"cq1 has 25 items, cq2 has 25 items"}
+--- Testing concurrent dequeues ---
+{"journey":"j4-concurrency","name":"concurrent-50-dequeues","result":{"status":200,"body":"all200=true, uniqueCount=50","headers":{}},"expectation":"All 50 unique items dequeued without loss or duplicates"}
+--- Testing percent encoding variations ---
+{"journey":"j4-encoding","name":"space-enqueue","result":{"status":200,"body":"Payload successfully queued onto my queue.","headers":{"content-length":"42","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 OK"}
+{"journey":"j4-encoding","name":"space-length","result":{"status":200,"body":"1","headers":{"content-length":"1","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 1"}
+{"journey":"j4-encoding","name":"space-dequeue","result":{"status":200,"body":"\"space-test\"","headers":{"content-length":"12","content-type":"application/json"}},"expectation":"200 \"space-test\""}
+{"journey":"j4-encoding","name":"plus-literal-enqueue","result":{"status":200,"body":"Payload successfully queued onto plus+test.","headers":{"content-length":"43","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 OK"}
+{"journey":"j4-encoding","name":"plus-encoded-enqueue","result":{"status":200,"body":"Payload successfully queued onto plus+test.","headers":{"content-length":"43","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 OK"}
+{"journey":"j4-encoding","name":"plus-queues-list","result":{"status":200,"body":"[\"plus+test\"]","headers":{"content-length":"13","content-type":"application/json"}},"expectation":"200 with queue 'plus+test' having both items"}
+{"journey":"j4-encoding","name":"plus-length","result":{"status":200,"body":"2","headers":{"content-length":"1","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 2"}
+{"journey":"j4-encoding","name":"slash-enqueue","result":{"status":200,"body":"Payload successfully queued onto sub/queue.","headers":{"content-length":"43","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 OK"}
+{"journey":"j4-encoding","name":"slash-queues-list","result":{"status":200,"body":"[\"sub/queue\"]","headers":{"content-length":"13","content-type":"application/json"}},"expectation":"200 [\"sub/queue\"]"}
+{"journey":"j4-encoding","name":"slash-length","result":{"status":200,"body":"1","headers":{"content-length":"1","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 1"}
+{"journey":"j4-encoding","name":"slash-dequeue","result":{"status":200,"body":"\"slash-test\"","headers":{"content-length":"12","content-type":"application/json"}},"expectation":"200 \"slash-test\""}
+{"journey":"j4-encoding","name":"hash-enqueue","result":{"status":200,"body":"Payload successfully queued onto hash#test.","headers":{"content-length":"43","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 OK"}
+{"journey":"j4-encoding","name":"hash-length","result":{"status":200,"body":"1","headers":{"content-length":"1","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 1"}
+{"journey":"j4-encoding","name":"hash-dequeue","result":{"status":200,"body":"\"hash-test\"","headers":{"content-length":"11","content-type":"application/json"}},"expectation":"200 \"hash-test\""}
+{"journey":"j4-encoding","name":"question-enqueue","result":{"status":200,"body":"Payload successfully queued onto q?test.","headers":{"content-length":"40","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 OK"}
+{"journey":"j4-encoding","name":"question-length","result":{"status":200,"body":"1","headers":{"content-length":"1","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 1"}
+{"journey":"j4-encoding","name":"question-dequeue","result":{"status":200,"body":"\"q-test\"","headers":{"content-length":"8","content-type":"application/json"}},"expectation":"200 \"q-test\""}
+{"journey":"j4-encoding","name":"percent-enqueue","result":{"status":200,"body":"Payload successfully queued onto 100%.","headers":{"content-length":"38","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 OK"}
+{"journey":"j4-encoding","name":"percent-length","result":{"status":200,"body":"1","headers":{"content-length":"1","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 1"}
+{"journey":"j4-encoding","name":"percent-dequeue","result":{"status":200,"body":"\"percent-test\"","headers":{"content-length":"14","content-type":"application/json"}},"expectation":"200 \"percent-test\""}
+{"journey":"j4-encoding","name":"null-byte-enqueue","result":{"status":200,"body":"Payload successfully queued onto null\u0000byte.","headers":{"content-length":"43","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 OK"}
+{"journey":"j4-encoding","name":"null-byte-length","result":{"status":200,"body":"1","headers":{"content-length":"1","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 1"}
+{"journey":"j4-encoding","name":"null-byte-dequeue","result":{"status":200,"body":"\"null-test\"","headers":{"content-length":"11","content-type":"application/json"}},"expectation":"200 \"null-test\""}
+{"journey":"j4-encoding","name":"emoji-enqueue","result":{"status":200,"body":"Payload successfully queued onto 🔥.","headers":{"content-length":"38","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 OK"}
+{"journey":"j4-encoding","name":"emoji-length","result":{"status":200,"body":"1","headers":{"content-length":"1","content-type":"text/plain;charset=UTF-8"}},"expectation":"200 1"}
+{"journey":"j4-encoding","name":"emoji-dequeue","result":{"status":200,"body":"\"fire-test\"","headers":{"content-length":"11","content-type":"application/json"}},"expectation":"200 \"fire-test\""}
+
+=== All exploratory journeys completed successfully ===

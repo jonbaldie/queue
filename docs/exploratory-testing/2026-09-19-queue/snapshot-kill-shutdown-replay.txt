@@ -1,0 +1,10 @@
+### run 1 (MODE=shutdown)
+[2026-09-19T00:50:29.587Z] persist dir /var/folders/9v/25q4rqd16xl41cf2y18wtnsc0000gn/T/qx-snapshot-1a28d36ff4527ab1, 200 items of ~1000000 bytes
+[2026-09-19T00:50:30.147Z] acknowledged enqueues: 200; length=200
+[2026-09-19T00:50:30.160Z] SIGTERM then SIGKILL during shutdown flush at size=0 (was 200004890); size now=1000023
+[2026-09-19T00:50:30.273Z] after recovery: length=1 (acknowledged 200)
+### run 2 (MODE=shutdown)
+[2026-09-19T00:50:30.304Z] persist dir /var/folders/9v/25q4rqd16xl41cf2y18wtnsc0000gn/T/qx-snapshot-8596b1da53e316ec, 200 items of ~1000000 bytes
+[2026-09-19T00:50:30.782Z] acknowledged enqueues: 200; length=200
+[2026-09-19T00:50:30.794Z] SIGTERM then SIGKILL during shutdown flush at size=0 (was 200004890); size now=0
+[2026-09-19T00:50:30.848Z] after recovery: length=0 (acknowledged 200)

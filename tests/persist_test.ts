@@ -289,6 +289,132 @@ Deno.test("manager save() on empty manager writes nothing", () => {
     Deno.removeSync(tmpDir, { recursive: true });
 });
 
+Deno.test("manager save() interrupted mid-snapshot keeps every logged item", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir + "/");
+
+    const mgr = new QueueManager(persist);
+    const crashing: Record<string, unknown> = { id: "head" };
+    mgr.enqueue("jobs", crashing as unknown as string);
+    mgr.enqueue("jobs", "a");
+    mgr.enqueue("jobs", "b");
+    mgr.enqueue("jobs", "c");
+    crashing.toJSON = () => {
+        throw new Error("interrupted mid-snapshot");
+    };
+
+    try {
+        mgr.save();
+    } catch (error) {
+        assertEquals((error as Error).message, "interrupted mid-snapshot");
+    }
+    persist.close();
+
+    const recover = new Persistency.FileStore();
+    recover.dir(tmpDir + "/");
+    const recovered = new QueueManager(recover);
+    recovered.load();
+    assertEquals(recovered.dequeue("jobs") as unknown, { id: "head" });
+    assertEquals(recovered.dequeue("jobs"), "a");
+    assertEquals(recovered.dequeue("jobs"), "b");
+    assertEquals(recovered.dequeue("jobs"), "c");
+    let tempExists = false;
+    try {
+        Deno.statSync(tmpDir + "/persist.dat.tmp");
+        tempExists = true;
+    } catch { /* expected */ }
+    assertEquals(tempExists, false);
+    recover.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("manager enqueue after save appends to the replaced persist file", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir + "/");
+
+    const mgr = new QueueManager(persist);
+    mgr.enqueue("q", "a");
+    mgr.save();
+    mgr.enqueue("q", "b");
+    persist.close();
+
+    const recover = new Persistency.FileStore();
+    recover.dir(tmpDir + "/");
+    const recovered = new QueueManager(recover);
+    recovered.load();
+    assertEquals(recovered.dequeue("q"), "a");
+    assertEquals(recovered.dequeue("q"), "b");
+    recover.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("manager save() leaves no temp snapshot file", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir + "/");
+
+    const mgr = new QueueManager(persist);
+    mgr.enqueue("q", "kept");
+    mgr.save();
+    persist.close();
+
+    let tempExists = false;
+    try {
+        Deno.statSync(tmpDir + "/persist.dat.tmp");
+        tempExists = true;
+    } catch { /* expected */ }
+    assertEquals(tempExists, false);
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("FileStore.replace overwrites a stale temp file", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    Deno.writeTextFileSync(tmpDir + "/persist.dat.tmp", "stale-junk\n");
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir + "/");
+
+    const mgr = new QueueManager(persist);
+    mgr.enqueue("q", "fresh");
+    mgr.save();
+    persist.close();
+
+    const recover = new Persistency.FileStore();
+    recover.dir(tmpDir + "/");
+    assertEquals(recover.loadState().map((event) => event.payload), ["fresh"]);
+    let tempExists = false;
+    try {
+        Deno.statSync(tmpDir + "/persist.dat.tmp");
+        tempExists = true;
+    } catch { /* expected */ }
+    assertEquals(tempExists, false);
+    recover.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("FileStore.loadState does not read persist.dat.tmp", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const line = JSON.stringify({ queue: "q", payload: "only-in-tmp", enqueue: true, dequeue: false }) + "\n";
+    Deno.writeTextFileSync(tmpDir + "/persist.dat.tmp", line);
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir + "/");
+    assertEquals(persist.loadState(), []);
+    persist.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("persist MemoryStore.replace() replaces existing events", () => {
+    const p = new Persistency.MemoryStore();
+    p.saveEvent("q", "old", true);
+    p.replace([
+        { queue: "q", payload: "new", enqueue: true, dequeue: false },
+    ]);
+    const events = p.loadState();
+    assertEquals(events.length, 1);
+    assertEquals(events[0].payload, "new");
+});
+
 // ── manager enqueue log has correct flags ─────────────────────────────────────
 
 Deno.test("manager enqueue log: enqueue=true dequeue=false", () => {

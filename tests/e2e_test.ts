@@ -379,6 +379,36 @@ Deno.test("e2e: internal whitespace in QUEUE_API_TOKEN fails before the server b
     }
 });
 
+Deno.test("e2e: QUEUE_API_TOKEN with invalid characters fails before the server binds a port", async () => {
+    const invalidTokens = [
+        { name: "Euro sign", value: "alpha_€" },
+        { name: "emoji", value: "alpha_🔑" },
+        { name: "em dash", value: "alpha_—" },
+        { name: "Latin-1 non-ASCII character", value: "alpha_é" },
+        { name: "ASCII escape character", value: `alpha_${String.fromCharCode(0x1b)}` },
+        { name: "ASCII bell character", value: `alpha_${String.fromCharCode(0x07)}` },
+    ];
+
+    for (const invalidToken of invalidTokens) {
+        const tempDir = await Deno.makeTempDir();
+        try {
+            const output = await assertDoesNotBind({
+                HOST: "127.0.0.1",
+                PORT: "0",
+                PERSIST: tempDir,
+                QUEUE_API_TOKEN: invalidToken.value,
+            });
+            assertEquals(
+                output.includes("QUEUE_API_TOKEN contains invalid characters"),
+                true,
+                `${invalidToken.name} should be rejected with a specific configuration error`,
+            );
+        } finally {
+            await Deno.remove(tempDir, { recursive: true }).catch(() => {});
+        }
+    }
+});
+
 Deno.test("e2e: QUEUE_API_TOKEN with leading and trailing whitespace authenticates requests", async () => {
     const tempDir = await Deno.makeTempDir();
     const token = "padded-token";

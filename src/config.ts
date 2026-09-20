@@ -50,6 +50,13 @@ function parseApiToken(value: string | undefined): string {
     if (/\s/.test(apiToken)) {
         throw new ConfigError("QUEUE_API_TOKEN contains invalid whitespace");
     }
+    // Bearer credentials use the ASCII token68 syntax (RFC 6750 §2.1 and
+    // RFC 9110 §11.1). Rejecting anything outside that syntax before starting
+    // the server prevents credentials that HTTP clients cannot represent or
+    // that the protocol cannot preserve from locking out every API endpoint.
+    if (!/^[A-Za-z0-9._~+\/-]+=*$/u.test(apiToken)) {
+        throw new ConfigError("QUEUE_API_TOKEN contains invalid characters");
+    }
     return apiToken;
 }
 

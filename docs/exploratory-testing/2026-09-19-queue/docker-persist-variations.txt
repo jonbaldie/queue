@@ -1,0 +1,44 @@
+## Variation A: published image, README command verbatim (only host port changed)
+docker.io/jonbaldie/queue:latest
+published image created 2022-08-15T12:38:03.973401908Z
+WARNING: The requested image's platform (linux/amd64) does not match the detected host platform (linux/arm64/v8) and no specific platform was requested
+status: Exited (1) 2 seconds ago
+Loading in data from persist.dat...
+
+error: NotFound: No such file or directory (os error 2), open '/mnt/persist.dat'
+    at Object.opSync (deno:core/01_core.js:168:12)
+
+## Variation B: named volume mounted at /mnt (README: 'add persist.dat as a persistent volume')
+status: Exited (1) 3 seconds ago
+Loading in data from persist.dat...
+
+error: Uncaught (in promise) PermissionDenied: Permission denied (os error 13): open '/mnt/persist.dat'
+
+## Variation C (workaround, disclosed intervention): PERSIST=/queue/data/ (deno-owned), named volume, stop/start
+status: Exited (1) 3 seconds ago
+curl: (7) Failed to connect to 127.0.0.1 port 19994 after 0 ms: Couldn't connect to server
+ [000]
+curl: (7) Failed to connect to 127.0.0.1 port 19994 after 0 ms: Couldn't connect to server
+ [000]
+curl: (7) Failed to connect to 127.0.0.1 port 19994 after 0 ms: Couldn't connect to server
+ [000]
+curl: (7) Failed to connect to 127.0.0.1 port 19994 after 0 ms: Couldn't connect to server
+ [000]
+$ docker stop qx-ok && docker start qx-ok
+curl: (7) Failed to connect to 127.0.0.1 port 19994 after 0 ms: Couldn't connect to server
+ [000]
+curl: (7) Failed to connect to 127.0.0.1 port 19994 after 0 ms: Couldn't connect to server
+ [000]
+curl: (7) Failed to connect to 127.0.0.1 port 19994 after 0 ms: Couldn't connect to server
+ [000]
+curl: (7) Failed to connect to 127.0.0.1 port 19994 after 0 ms: Couldn't connect to server
+ [000]
+$ docker rm -f qx-ok; recreate container on same volume
+curl: (2) no URL specified
+curl: try 'curl --help' or 'curl --manual' for more information
+curl: (7) Failed to connect to 127.0.0.1 port 19994 after 0 ms: Couldn't connect to server
+ [000]
+Error response from daemon: cannot kill container: qx-ok: container 8d3a6163aab1938af26e49157a8ab7339085d9b13ec8d8a4156dcf013adac14d is not running
+after docker kill (SIGKILL) + start:
+curl: (7) Failed to connect to 127.0.0.1 port 19994 after 0 ms: Couldn't connect to server
+ [000]

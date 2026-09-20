@@ -1,0 +1,15 @@
+## deno run --allow-all main.ts, QUEUE_API_TOKEN=explore-token PORT=19995, commit e0d2108, no persistence
+$ printf %s "{\"payload\":\"caf�\"}"  (Latin-1 encoded é, as sent by a Windows-1252/ISO-8859-1 client)
+00000000: 7b22 7061 796c 6f61 6422 3a22 6361 66e9  {"payload":"caf.
+00000010: 227d                                     "}
+enqueue: Payload successfully queued onto latin1. [200]
+dequeue: "caf�"
+00000000: 2263 6166 efbf bd22                      "caf..."
+## Lone continuation byte / truncated multibyte sequence inside a string
+enqueue: Payload successfully queued onto bad. [200]
+dequeue: 00000000: 2261 efbf bd62 efbf bd22                 "a...b..."
+## Comparison: invalid bytes outside a string are rejected
+enqueue: Invalid JSON [400]
+## Comparison: valid UTF-8 café round-trips
+enqueue: Payload successfully queued onto utf8. [200]
+dequeue: "café"

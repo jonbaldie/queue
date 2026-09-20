@@ -1,0 +1,10 @@
+Testing consecutive clean server instances for non-ASCII / non-ByteString token lockout:
+run=1 token="secret_€" case="Euro currency sign (€, U+20AC, code point > 255)" port=55534 health=200 fetch=error(Failed to construct 'Request': 'headers' of 'RequestInit' (Argument 2) is not a valid ByteString) curl=401 all_locked_out=true
+run=1 token="token_🔑" case="Unicode emoji (🔑, U+1F511, code point > 255)" port=55537 health=200 fetch=error(Failed to construct 'Request': 'headers' of 'RequestInit' (Argument 2) is not a valid ByteString) curl=401 all_locked_out=true
+run=1 token="token_" case="ASCII control escape (\x1b, code point 27)" port=55540 health=200 fetch=error(failed to parse header value) curl=400 all_locked_out=true
+run=2 token="secret_€" case="Euro currency sign (€, U+20AC, code point > 255)" port=55543 health=200 fetch=error(Failed to construct 'Request': 'headers' of 'RequestInit' (Argument 2) is not a valid ByteString) curl=401 all_locked_out=true
+run=2 token="token_🔑" case="Unicode emoji (🔑, U+1F511, code point > 255)" port=55546 health=200 fetch=error(Failed to construct 'Request': 'headers' of 'RequestInit' (Argument 2) is not a valid ByteString) curl=401 all_locked_out=true
+run=2 token="token_" case="ASCII control escape (\x1b, code point 27)" port=55550 health=200 fetch=error(failed to parse header value) curl=400 all_locked_out=true
+run=3 token="secret_€" case="Euro currency sign (€, U+20AC, code point > 255)" port=55553 health=200 fetch=error(Failed to construct 'Request': 'headers' of 'RequestInit' (Argument 2) is not a valid ByteString) curl=401 all_locked_out=true
+run=3 token="token_🔑" case="Unicode emoji (🔑, U+1F511, code point > 255)" port=55557 health=200 fetch=error(Failed to construct 'Request': 'headers' of 'RequestInit' (Argument 2) is not a valid ByteString) curl=401 all_locked_out=true
+run=3 token="token_" case="ASCII control escape (\x1b, code point 27)" port=55560 health=200 fetch=error(failed to parse header value) curl=400 all_locked_out=true
