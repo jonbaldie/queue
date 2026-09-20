@@ -165,14 +165,15 @@ export default class Manager<T = string> {
     }
 
     public save(): void {
-        this.store.clear();
         const events: QueueEvent<T>[] = [];
         for (const [name, queue] of this.queues) {
             for (const item of queue) {
                 events.push({ queue: name, payload: item, enqueue: true, dequeue: false });
             }
         }
-        this.store.saveBatch(events);
+        // Atomic replace: clearing the log first would leave a window in which
+        // a crash loses every acknowledged item (issue #115).
+        this.store.snapshot(events);
     }
 
     public load(): void {

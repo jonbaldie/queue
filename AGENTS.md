@@ -48,6 +48,16 @@ Deno.writeFileSync(this.directory + "persist.dat", new Uint8Array());
 
 This prevents "file not found" errors in tests.
 
+## Snapshot Durability — Critical
+
+`Manager.save()` (every `--persist` startup and every graceful shutdown)
+replaces the whole log. It MUST go through `QueueStore.snapshot()`, which
+writes `persist.dat.tmp`, fsyncs it, renames it over `persist.dat` and fsyncs
+the directory. Never truncate or rewrite `persist.dat` in place: that leaves a
+window in which a SIGKILL, OOM kill or power loss destroys every acknowledged
+item (issue #115). `tests/persist_crash_test.ts` guards this with real
+SIGKILLs against the real server.
+
 ## Mutation Testing Strategy
 
 Test off-by-one errors, FIFO order, operator mutations, and boundary conditions explicitly.
