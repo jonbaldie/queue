@@ -518,3 +518,158 @@ Deno.test("FileStore.loadState skips non-event JSON records", () => {
     persist.close();
     Deno.removeSync(tmpDir, { recursive: true });
 });
+
+// ── snapshot(): atomic whole-log replacement (issue #115) ────────────────────
+
+Deno.test("persist FileStore.snapshot() replaces the log rather than appending", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const p = new Persistency.FileStore();
+    p.dir(tmpDir);
+    p.saveEvent("q", "stale", true);
+    p.snapshot([{ queue: "q", payload: "fresh", enqueue: true, dequeue: false }]);
+    assertEquals(p.loadState().map((e) => e.payload), ["fresh"]);
+    p.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("persist FileStore.snapshot() writes every field of every event in order", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const p = new Persistency.FileStore();
+    p.dir(tmpDir);
+    p.snapshot([
+        { queue: "a", payload: "one", enqueue: true, dequeue: false },
+        { queue: "b", payload: "two", enqueue: false, dequeue: true },
+        { queue: "a", payload: "three", enqueue: true, dequeue: false },
+    ]);
+    assertEquals(
+        p.loadState().map((e) => [e.queue, e.payload, e.enqueue, e.dequeue]),
+        [
+            ["a", "one", true, false],
+            ["b", "two", false, true],
+            ["a", "three", true, false],
+        ],
+    );
+    p.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("persist FileStore.snapshot([]) empties the log and still creates the file", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const p = new Persistency.FileStore();
+    p.dir(tmpDir);
+    p.saveEvent("q", "stale", true);
+    p.snapshot([]);
+    assertEquals(p.loadState(), []);
+    assertEquals(Deno.statSync(tmpDir + "/persist.dat").size, 0);
+    p.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("persist FileStore.snapshot() creates persist.dat when it does not exist", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const p = new Persistency.FileStore();
+    p.dir(tmpDir + "/nested/");
+    p.snapshot([{ queue: "q", payload: "only", enqueue: true, dequeue: false }]);
+    assertEquals(p.loadState().map((e) => e.payload), ["only"]);
+    p.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("persist FileStore.snapshot() leaves no scratch file behind", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const p = new Persistency.FileStore();
+    p.dir(tmpDir);
+    p.snapshot([{ queue: "q", payload: "only", enqueue: true, dequeue: false }]);
+    assertEquals(
+        Array.from(Deno.readDirSync(tmpDir)).map((entry) => entry.name).sort(),
+        ["persist.dat"],
+    );
+    p.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("persist FileStore appends after a snapshot land in the replacement file", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const p = new Persistency.FileStore();
+    p.dir(tmpDir);
+    p.saveEvent("q", "stale", true);
+    p.snapshot([{ queue: "q", payload: "kept", enqueue: true, dequeue: false }]);
+    p.saveEvent("q", "later", true);
+    assertEquals(p.loadState().map((e) => e.payload), ["kept", "later"]);
+    p.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("persist FileStore.snapshot() round-trips a batch larger than the write buffer", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const p = new Persistency.FileStore();
+    p.dir(tmpDir);
+    // ~300 KiB in total, so the buffered writer flushes several times and the
+    // final partial buffer still has to be written.
+    const events = [];
+    for (let i = 0; i < 300; i++) {
+        events.push({ queue: "q", payload: `${i}:${"x".repeat(1000)}`, enqueue: true, dequeue: false });
+    }
+    p.snapshot(events);
+    const loaded = p.loadState();
+    assertEquals(loaded.length, 300);
+    assertEquals(loaded[0].payload, events[0].payload);
+    assertEquals(loaded[299].payload, events[299].payload);
+    p.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("persist FileStore.snapshot() keeps the previous log intact when the write fails", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const p = new Persistency.FileStore<unknown>();
+    p.dir(tmpDir);
+    p.saveEvent("q", "durable", true);
+    // A payload that cannot be serialised aborts the snapshot part way.
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    assertThrows(() =>
+        p.snapshot([
+            { queue: "q", payload: "durable", enqueue: true, dequeue: false },
+            { queue: "q", payload: circular, enqueue: true, dequeue: false },
+        ])
+    );
+    assertEquals(p.loadState().map((e) => e.payload), ["durable"]);
+    assertEquals(
+        Array.from(Deno.readDirSync(tmpDir)).map((entry) => entry.name).sort(),
+        ["persist.dat"],
+    );
+    p.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("persist MemoryStore.snapshot() replaces the events rather than appending", () => {
+    const p = new Persistency.MemoryStore();
+    p.saveEvent("q", "stale", true);
+    p.snapshot([{ queue: "q", payload: "fresh", enqueue: true, dequeue: false }]);
+    assertEquals(p.loadState().map((e) => e.payload), ["fresh"]);
+});
+
+Deno.test("persist MemoryStore.snapshot() copies the batch it is given", () => {
+    const p = new Persistency.MemoryStore();
+    const events = [{ queue: "q", payload: "kept", enqueue: true, dequeue: false }];
+    p.snapshot(events);
+    events.push({ queue: "q", payload: "added later", enqueue: true, dequeue: false });
+    assertEquals(p.loadState().map((e) => e.payload), ["kept"]);
+});
+
+Deno.test("persist Manager.save() replaces the log with only the remaining items", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const p = new Persistency.FileStore();
+    p.dir(tmpDir);
+    const mgr = new QueueManager(p);
+    mgr.enqueue("q", "first");
+    mgr.enqueue("q", "second");
+    mgr.dequeue("q");
+    mgr.save();
+    assertEquals(
+        p.loadState().map((e) => [e.payload, e.enqueue]),
+        [["second", true]],
+    );
+    p.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});

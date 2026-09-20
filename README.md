@@ -138,6 +138,8 @@ docker run -d -e QUEUE_API_TOKEN=replace-with-a-secret-token -e PORT=1991 -e HOS
 
 If the server sees that the `persist.dat` file exists on startup, it will replay the binary log and then rewrite the file as a snapshot of remaining items.
 
+That snapshot rewrite is atomic: the server writes `persist.dat.tmp` alongside it, flushes it to disk, and renames it over `persist.dat`. Until the rename, the previous log stays complete, so a kill at any point — SIGKILL after a stop grace period, an OOM kill, a power cut — never loses an item the API has already acknowledged.
+
 The Docker image runs as the non-root `deno` user and ships a `/data` directory owned by that user, declared as a volume and used as the default `PERSIST` path. Mount a named volume there to keep your binary log across container recreation, e.g. `-v queue-data:/data`. If you point `PERSIST` somewhere else, that directory must be writable by the `deno` user (uid 1993).
 
 It should go without saying, but try not to edit `persist.dat`, because it might result in weird behaviour.
