@@ -132,7 +132,11 @@ export class FileStore<T = string> implements QueueStore<T> {
         } catch (error) {
             try {
                 Deno.removeSync(this.tempPath);
-            } catch { /* nothing to clean up */ }
+            } catch (removeError) {
+                // Best effort: the scratch file may never have been created,
+                // and the next snapshot truncates whatever is left of it.
+                void removeError;
+            }
             throw error;
         } finally {
             this.writeHandle!.unlockSync();
