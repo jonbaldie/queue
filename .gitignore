@@ -1,4 +1,5 @@
 /persist.dat
+/persist.dat.tmp
 /queue
 /target/
 /node_modules/

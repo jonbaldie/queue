@@ -136,7 +136,7 @@ To get persistency, simply add the `--persist` option when starting up the serve
 docker run -d -e QUEUE_API_TOKEN=replace-with-a-secret-token -e PORT=1991 -e HOST=0.0.0.0 -e PERSIST=/data/ -p 1991:1991 jonbaldie/queue /usr/bin/queue --persist
 ```
 
-If the server sees that the `persist.dat` file exists on startup, it will replay the binary log and then rewrite the file as a snapshot of remaining items.
+If the server sees that the `persist.dat` file exists on startup, it will replay the binary log and then rewrite the file as a snapshot of remaining items. The snapshot is written to a temporary file in the same directory and renamed over `persist.dat`, so a crash during the rewrite cannot destroy the log. Mount the `PERSIST` *directory* as a volume, not `persist.dat` itself — a bind-mounted file cannot be replaced by rename.
 
 The Docker image runs as the non-root `deno` user and ships a `/data` directory owned by that user, declared as a volume and used as the default `PERSIST` path. Mount a named volume there to keep your binary log across container recreation, e.g. `-v queue-data:/data`. If you point `PERSIST` somewhere else, that directory must be writable by the `deno` user (uid 1993).
 

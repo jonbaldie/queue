@@ -165,14 +165,13 @@ export default class Manager<T = string> {
     }
 
     public save(): void {
-        this.store.clear();
         const events: QueueEvent<T>[] = [];
         for (const [name, queue] of this.queues) {
             for (const item of queue) {
                 events.push({ queue: name, payload: item, enqueue: true, dequeue: false });
             }
         }
-        this.store.saveBatch(events);
+        this.store.replace(events);
     }
 
     public load(): void {
