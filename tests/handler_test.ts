@@ -637,6 +637,61 @@ Deno.test("enqueue of nested JSON within the parser's depth still succeeds", asy
     assertEquals(await dequeueRes.text(), payload);
 });
 
+Deno.test("enqueue accepts JSON nested exactly to the maximum depth", async () => {
+    const handler = makeHandler();
+    // The enclosing {"payload": ...} object is the first level.
+    const payload = `${"[".repeat(2999)}${"]".repeat(2999)}`;
+    const res = await handler(new Request("http://localhost/enqueue/q", {
+        method: "POST",
+        body: `{"payload":${payload}}`,
+        headers: auth,
+    }));
+    assertEquals(res.status, 200);
+
+    const dequeueRes = await handler(new Request("http://localhost/dequeue/q", {
+        headers: auth,
+    }));
+    assertEquals(await dequeueRes.text(), payload);
+});
+
+Deno.test("enqueue rejects JSON nested one level beyond the maximum depth", async () => {
+    const nestedArrays = `${"[".repeat(3000)}${"]".repeat(3000)}`;
+    const nestedObjects = `${'{"a":'.repeat(3000)}1${"}".repeat(3000)}`;
+    for (const payload of [nestedArrays, nestedObjects]) {
+        const handler = makeHandler();
+        const res = await handler(new Request("http://localhost/enqueue/q", {
+            method: "POST",
+            body: `{"payload":${payload}}`,
+            headers: auth,
+        }));
+        assertEquals(res.status, 400);
+        assertEquals(await res.text(), "Invalid JSON");
+
+        const dequeueRes = await handler(new Request("http://localhost/dequeue/q", {
+            headers: auth,
+        }));
+        assertEquals(dequeueRes.status, 204);
+    }
+});
+
+Deno.test("enqueue measures depth per branch, not across sibling containers", async () => {
+    const handler = makeHandler();
+    const nestedArrays = `${"[".repeat(2998)}${"]".repeat(2998)}`;
+    const nestedObjects = `${'{"a":'.repeat(2998)}1${"}".repeat(2998)}`;
+    const payload = `[${nestedArrays},${nestedObjects},${nestedArrays}]`;
+    const res = await handler(new Request("http://localhost/enqueue/q", {
+        method: "POST",
+        body: `{"payload":${payload}}`,
+        headers: auth,
+    }));
+    assertEquals(res.status, 200);
+
+    const dequeueRes = await handler(new Request("http://localhost/dequeue/q", {
+        headers: auth,
+    }));
+    assertEquals(await dequeueRes.text(), payload);
+});
+
 Deno.test("enqueue of a JSON primitive returns 400 instead of throwing", async () => {
     const handler = makeHandler();
     const res = await handler(new Request("http://localhost/enqueue/q", {
@@ -1206,6 +1261,68 @@ Deno.test("API: rejects rounded decimal payloads instead of changing their preci
         headers: authHeaders,
     }));
     assertEquals(dequeueResponse.status, 204);
+});
+
+Deno.test("API: accepts and round-trips short integers of up to 15 digits", async () => {
+    const handler = makeHandler();
+    const payload = [0, 7, -7, 42, 123456789012345, 999999999999999, -999999999999999];
+    const enqueueResponse = await handler(new Request("http://localhost:3000/enqueue/short-integers", {
+        method: "POST",
+        body: `{"payload":[${payload.join(",")}]}`,
+        headers: authHeaders,
+    }));
+    assertEquals(enqueueResponse.status, 200);
+
+    const dequeueResponse = await handler(new Request("http://localhost:3000/dequeue/short-integers", {
+        headers: authHeaders,
+    }));
+    assertEquals(await dequeueResponse.json(), payload);
+});
+
+Deno.test("API: rejects an unsupported number wherever it appears in the body", async () => {
+    const payloads = [
+        "[1,2,3,9007199254740993]",
+        '{"key":-9007199254740993}',
+        "[12345678901234567890]",
+        "[1.00000000000000000001]",
+        "[1e400]",
+        "[-1E+400]",
+        "[1e-400]",
+        '["a\\"b",1e400]',
+        '["a\\\\",1e400]',
+        '{"a\\"":[9007199254740993]}',
+    ];
+    for (const payload of payloads) {
+        const handler = makeHandler();
+        const enqueueResponse = await handler(new Request("http://localhost:3000/enqueue/unsupported", {
+            method: "POST",
+            body: `{"payload":${payload}}`,
+            headers: authHeaders,
+        }));
+        assertEquals(enqueueResponse.status, 400, payload);
+        assertEquals(await enqueueResponse.text(), "Payload contains an unsupported number");
+
+        const dequeueResponse = await handler(new Request("http://localhost:3000/dequeue/unsupported", {
+            headers: authHeaders,
+        }));
+        assertEquals(dequeueResponse.status, 204);
+    }
+});
+
+Deno.test("API: number-like text inside strings is not treated as a number", async () => {
+    const handler = makeHandler();
+    const payload = { "1e400": "9007199254740993", "text": "-1.234567890123456789 \" 1e-400" };
+    const enqueueResponse = await handler(new Request("http://localhost:3000/enqueue/number-like-strings", {
+        method: "POST",
+        body: JSON.stringify({ payload }),
+        headers: authHeaders,
+    }));
+    assertEquals(enqueueResponse.status, 200);
+
+    const dequeueResponse = await handler(new Request("http://localhost:3000/dequeue/number-like-strings", {
+        headers: authHeaders,
+    }));
+    assertEquals(await dequeueResponse.json(), payload);
 });
 
 Deno.test("dequeue returns application/json for boolean payload", async () => {

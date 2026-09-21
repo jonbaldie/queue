@@ -42,32 +42,44 @@ function isUnsupportedNumber(value: number, source: string): boolean {
     return canonicalJsonNumber(source) !== canonicalJsonNumber(serializedValue);
 }
 
+// Matches every string, bracket, and number in a valid JSON text, so digits
+// inside strings are never mistaken for numbers.
+const JSON_TOKEN = /"[^"\\]*(?:\\.[^"\\]*)*"|[[{]|[\]}]|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g;
+// Integers of at most 15 digits are below 2^53, so they always parse exactly.
+const EXACT_INTEGER = /^-?\d{1,15}$/;
+const MAX_JSON_DEPTH = 3000;
+
 function parseJsonBody(body: string) {
-    try {
-        return JSON.parse(body, rejectUnsupportedNumbers);
-    } catch (error) {
-        // V8 applies the reviver recursively, so deeply nested JSON overflows
-        // the stack; treat it as unparseable input rather than a server fault.
-        if (error instanceof RangeError) {
-            throw new JsonNestingTooDeepError();
+    const json = JSON.parse(body);
+    validateJsonSource(body);
+    return json;
+}
+
+// Checks the source text rather than using a JSON.parse reviver: V8 calls a
+// reviver once per value, which costs far more than one scan of the text.
+function validateJsonSource(source: string): void {
+    let depth = 0;
+    for (const [token] of source.matchAll(JSON_TOKEN)) {
+        if (token === "[" || token === "{") {
+            depth++;
+            if (depth > MAX_JSON_DEPTH) {
+                throw new JsonNestingTooDeepError();
+            }
+        } else if (token === "]" || token === "}") {
+            depth--;
+        } else if (token[0] !== '"') {
+            rejectUnsupportedNumber(token);
         }
-        throw error;
     }
 }
 
-function rejectUnsupportedNumbers(key: string, value: unknown) {
-    void key;
-    if (typeof value !== "number") {
-        return value;
+function rejectUnsupportedNumber(source: string): void {
+    if (EXACT_INTEGER.test(source)) {
+        return;
     }
-
-    // V8 supplies context.source at runtime; Deno's JSON.parse type still
-    // only declares the legacy two-argument reviver signature.
-    const context = arguments[2] as { source: string };
-    if (isUnsupportedNumber(value, context.source)) {
+    if (isUnsupportedNumber(Number(source), source)) {
         throw new UnsupportedNumberError();
     }
-    return value;
 }
 
 async function readRequestBody(request: Request): Promise<string | Response> {
