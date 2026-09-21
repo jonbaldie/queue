@@ -69,6 +69,21 @@ export class RateLimiter {
         }
     }
 
+    // Index of the first timestamp still inside the window (ts > cutoff).
+    // Timestamps are sorted ascending, so stale entries always form a prefix.
+    private firstFreshIndex(timestamps: number[], cutoff: number): number {
+        let lo = 0, hi = timestamps.length;
+        while (lo < hi) {
+            const mid = (lo + hi) >>> 1;
+            if (timestamps[mid] > cutoff) {
+                hi = mid;
+            } else {
+                lo = mid + 1;
+            }
+        }
+        return lo;
+    }
+
     public isAllowed(request: Request, remoteAddr?: string): boolean {
         const ip = this.getClientIp(request, remoteAddr);
         const now = Date.now();
@@ -84,23 +99,12 @@ export class RateLimiter {
         // Get or create timestamp list for this IP
         let timestamps = this.requestTimestamps.get(ip) || [];
 
-        // Timestamps are sorted ascending, so stale entries always form a
-        // prefix. Fast path: the newest timestamp is fresh → nothing stale,
-        // O(1). Otherwise binary search the first fresh timestamp — O(log n)
-        // — and count the window without filtering or copying it.
-        let firstFresh = 0;
-        if (timestamps.length > 0 && timestamps[0] <= cutoff) {
-            let lo = 0, hi = timestamps.length;
-            while (lo < hi) {
-                const mid = (lo + hi) >>> 1;
-                if (timestamps[mid] > cutoff) {
-                    hi = mid;
-                } else {
-                    lo = mid + 1;
-                }
-            }
-            firstFresh = lo;
-        }
+        // Fast path: the newest timestamp is fresh → nothing stale, O(1).
+        // Otherwise binary search the first fresh timestamp — O(log n) — and
+        // count the window without filtering or copying it.
+        const firstFresh = timestamps.length > 0 && timestamps[0] <= cutoff
+            ? this.firstFreshIndex(timestamps, cutoff)
+            : 0;
         const freshCount = timestamps.length - firstFresh;
 
         if (freshCount === 0) {
