@@ -1173,6 +1173,92 @@ Deno.test("API: rejects rounded decimal payloads instead of changing their preci
     assertEquals(dequeueResponse.status, 204);
 });
 
+async function enqueueRawBody(handler: (request: Request) => Promise<Response>, queueName: string, body: string) {
+    return await handler(new Request(`http://localhost:3000/enqueue/${queueName}`, {
+        method: "POST",
+        body,
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+    }));
+}
+
+Deno.test("API: accepts and round-trips integers at the exact-integer fast-path boundary", async () => {
+    const cases = ["999999999999999", "-999999999999999", "0", "-0", "7"];
+    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const handler = createHandler(mgr, API_TOKEN);
+
+    for (const source of cases) {
+        const enqueueResponse = await enqueueRawBody(handler, "fast-path-queue", `{"payload":[${source}]}`);
+        assertEquals(enqueueResponse.status, 200, source);
+
+        const dequeueResponse = await handler(new Request("http://localhost:3000/dequeue/fast-path-queue", {
+            headers: authHeaders,
+        }));
+        assertEquals(await dequeueResponse.json(), [Number(source)], source);
+    }
+});
+
+Deno.test("API: rejects lossy numbers wherever they appear outside strings", async () => {
+    const bodies = [
+        '{"payload":-9007199254740993}',
+        '{"payload":[1,2,9007199254740993]}',
+        '{"payload":{"a":{"b":[0.1,1.234567890123456789]}}}',
+        '{"payload":["quote \\" inside",9007199254740993]}',
+        '{"payload":["backslash \\\\",9007199254740993]}',
+        '{"payload":[1e400]}',
+        '{"payload":[1e-400]}',
+        '{"payload":"ok","extra":9007199254740993}',
+    ];
+    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const handler = createHandler(mgr, API_TOKEN);
+
+    for (const body of bodies) {
+        const enqueueResponse = await enqueueRawBody(handler, "lossy-anywhere-queue", body);
+        assertEquals(enqueueResponse.status, 400, body);
+        assertEquals(await enqueueResponse.text(), "Payload contains an unsupported number", body);
+    }
+
+    const dequeueResponse = await handler(new Request("http://localhost:3000/dequeue/lossy-anywhere-queue", {
+        headers: authHeaders,
+    }));
+    assertEquals(dequeueResponse.status, 204);
+});
+
+Deno.test("API: does not treat digits inside strings or keys as numbers", async () => {
+    const body = '{"payload":{"9007199254740993":"1e400 \\" 1.234567890123456789","n":[1.5,-2e3]}}';
+    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const handler = createHandler(mgr, API_TOKEN);
+
+    const enqueueResponse = await enqueueRawBody(handler, "string-digits-queue", body);
+    assertEquals(enqueueResponse.status, 200);
+
+    const dequeueResponse = await handler(new Request("http://localhost:3000/dequeue/string-digits-queue", {
+        headers: authHeaders,
+    }));
+    assertEquals(await dequeueResponse.json(), JSON.parse(body).payload);
+});
+
+Deno.test("API: enqueues a near-1 MB number-dense body without per-number CPU blowup", async () => {
+    const numbers = Array.from({ length: 500_000 }, (_, index) => index % 10);
+    const body = JSON.stringify({ payload: numbers });
+    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const handler = createHandler(mgr, API_TOKEN);
+
+    // Warm up so the measured run is not dominated by JIT compilation.
+    await enqueueRawBody(handler, "warmup-queue", body);
+    const started = performance.now();
+    const enqueueResponse = await enqueueRawBody(handler, "number-dense-queue", body);
+    const elapsed = performance.now() - started;
+
+    assertEquals(enqueueResponse.status, 200);
+    // The reviver-based validation took ~250-370 ms here; the linear scan takes a few ms.
+    assertEquals(elapsed < 100, true, `number-dense enqueue took ${elapsed.toFixed(1)} ms`);
+
+    const dequeueResponse = await handler(new Request("http://localhost:3000/dequeue/number-dense-queue", {
+        headers: authHeaders,
+    }));
+    assertEquals(await dequeueResponse.json(), numbers);
+});
+
 Deno.test("dequeue returns application/json for boolean payload", async () => {
     const mgr = new QueueManager(new Persistency.MemoryStore);
     const handler = createHandler(mgr, API_TOKEN);
