@@ -41,20 +41,31 @@ function isUnsupportedNumber(value: number, source: string): boolean {
 }
 
 function parseJsonBody(body: string) {
-    return JSON.parse(body, function (key: string, value: unknown) {
-        void key;
-        if (typeof value !== "number") {
-            return value;
+    try {
+        return JSON.parse(body, rejectUnsupportedNumbers);
+    } catch (error) {
+        // V8 applies the reviver recursively, so deeply nested JSON overflows
+        // the stack; treat it as unparseable input rather than a server fault.
+        if (error instanceof RangeError) {
+            throw new SyntaxError("JSON nested too deeply");
         }
+        throw error;
+    }
+}
 
-        // V8 supplies context.source at runtime; Deno's JSON.parse type still
-        // only declares the legacy two-argument reviver signature.
-        const context = arguments[2] as { source: string };
-        if (isUnsupportedNumber(value, context.source)) {
-            throw new UnsupportedNumberError();
-        }
+function rejectUnsupportedNumbers(key: string, value: unknown) {
+    void key;
+    if (typeof value !== "number") {
         return value;
-    });
+    }
+
+    // V8 supplies context.source at runtime; Deno's JSON.parse type still
+    // only declares the legacy two-argument reviver signature.
+    const context = arguments[2] as { source: string };
+    if (isUnsupportedNumber(value, context.source)) {
+        throw new UnsupportedNumberError();
+    }
+    return value;
 }
 
 async function readRequestBody(request: Request): Promise<string | Response> {

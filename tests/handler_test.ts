@@ -602,6 +602,41 @@ Deno.test("response body: invalid JSON returns 'Invalid JSON'", async () => {
     assertEquals(await res.text(), "Invalid JSON");
 });
 
+Deno.test("enqueue of JSON nested beyond the parser's stack depth returns 400 and leaves the queue unchanged", async () => {
+    const handler = makeHandler();
+    const depth = 100_000;
+    const res = await handler(new Request("http://localhost/enqueue/q", {
+        method: "POST",
+        body: `{"payload":${"[".repeat(depth)}${"]".repeat(depth)}}`,
+        headers: auth,
+    }));
+    assertEquals(res.status, 400);
+    assertEquals(await res.text(), "Invalid JSON");
+
+    const dequeueRes = await handler(new Request("http://localhost/dequeue/q", {
+        headers: auth,
+    }));
+    assertEquals(dequeueRes.status, 204);
+});
+
+Deno.test("enqueue of nested JSON within the parser's depth still succeeds", async () => {
+    const handler = makeHandler();
+    const depth = 100;
+    const payload = `${"[".repeat(depth)}${"]".repeat(depth)}`;
+    const res = await handler(new Request("http://localhost/enqueue/q", {
+        method: "POST",
+        body: `{"payload":${payload}}`,
+        headers: auth,
+    }));
+    assertEquals(res.status, 200);
+
+    const dequeueRes = await handler(new Request("http://localhost/dequeue/q", {
+        headers: auth,
+    }));
+    assertEquals(dequeueRes.status, 200);
+    assertEquals(await dequeueRes.text(), payload);
+});
+
 Deno.test("enqueue of a JSON primitive returns 400 instead of throwing", async () => {
     const handler = makeHandler();
     const res = await handler(new Request("http://localhost/enqueue/q", {
