@@ -12,6 +12,8 @@ class UnsupportedNumberError extends Error {
     }
 }
 
+class JsonNestingTooDeepError extends Error {}
+
 function canonicalJsonNumber(source: string): string {
     const match = /^(-?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(source);
     if (match === null) {
@@ -47,7 +49,7 @@ function parseJsonBody(body: string) {
         // V8 applies the reviver recursively, so deeply nested JSON overflows
         // the stack; treat it as unparseable input rather than a server fault.
         if (error instanceof RangeError) {
-            throw new SyntaxError("JSON nested too deeply");
+            throw new JsonNestingTooDeepError();
         }
         throw error;
     }
@@ -164,7 +166,7 @@ function enqueueHandler(mgr: QueueManager<string>): RouteHandler {
 }
 
 function enqueueErrorResponse(error: unknown): Response {
-    if (error instanceof SyntaxError) {
+    if (error instanceof SyntaxError || error instanceof JsonNestingTooDeepError) {
         return new Response("Invalid JSON", { status: 400 });
     }
     if (error instanceof UnsupportedNumberError) {
