@@ -19,6 +19,7 @@ const productionUnits = new Map([
   ["queue-manager", ["src/manager.ts"]],
   ["persist-engine", ["src/persist.ts"]],
   ["http-handler", ["src/handler.ts"]],
+  ["request-body", ["src/request_body.ts"]],
   ["entrypoint", ["main.ts"]],
 ]);
 const requiredComplexityRules = [

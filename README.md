@@ -84,8 +84,8 @@ npm run quality:unit -- configuration
 ```
 
 The available units are `configuration`, `router`, `middleware`,
-`rate-limiter`, `queue-manager`, `persist-engine`, `http-handler`, and
-`entrypoint`. Run the complete production gate with:
+`rate-limiter`, `queue-manager`, `persist-engine`, `http-handler`,
+`request-body`, and `entrypoint`. Run the complete production gate with:
 
 ```
 npm run quality:production
