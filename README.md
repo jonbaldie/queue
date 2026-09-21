@@ -57,6 +57,8 @@ curl -X POST -H "Authorization: Bearer replace-with-a-secret-token" -H "Content-
 
 The server has also just created the `foo` queue for you, if it didn't already exist, making the interface easier.
 
+Request bodies nested more than 3,000 levels deep are rejected with a `400` response.
+
 You're best setting up a publisher script in your application to write payloads using the enqueue endpoint, and then subscriber scripts in your application can read those payloads using the dequeue endpoint.
 
 To get the next payload from the `foo` queue, send a get request to `/dequeue/:queue`
