@@ -602,6 +602,40 @@ Deno.test("response body: invalid JSON returns 'Invalid JSON'", async () => {
     assertEquals(await res.text(), "Invalid JSON");
 });
 
+Deno.test("enqueue of malformed UTF-8 returns 'Invalid JSON' and queues nothing", async () => {
+    const encoder = new TextEncoder();
+    const bodies = [
+        // Latin-1 "é" inside a JSON string
+        [encoder.encode('{"payload":"caf'), [0xe9], encoder.encode('"}')],
+        // Stray continuation byte and a truncated 3-byte sequence
+        [encoder.encode('{"payload":"a'), [0x80], encoder.encode("b"), [0xe2, 0x82], encoder.encode('"}')],
+    ];
+    for (const parts of bodies) {
+        const handler = makeHandler();
+        const res = await handler(new Request("http://localhost/enqueue/q", {
+            method: "POST",
+            body: new Uint8Array(parts.flatMap((part) => [...part])),
+            headers: auth,
+        }));
+        assertEquals(res.status, 400);
+        assertEquals(await res.text(), "Invalid JSON");
+        const dequeued = await handler(new Request("http://localhost/dequeue/q", { headers: auth }));
+        assertEquals(dequeued.status, 204);
+    }
+});
+
+Deno.test("enqueue of well-formed multibyte UTF-8 round-trips unchanged", async () => {
+    const handler = makeHandler();
+    const res = await handler(new Request("http://localhost/enqueue/q", {
+        method: "POST",
+        body: new TextEncoder().encode('{"payload":"café €𝄞"}'),
+        headers: auth,
+    }));
+    assertEquals(res.status, 200);
+    const dequeued = await handler(new Request("http://localhost/dequeue/q", { headers: auth }));
+    assertEquals(await dequeued.json(), "café €𝄞");
+});
+
 Deno.test("enqueue of a JSON primitive returns 400 instead of throwing", async () => {
     const handler = makeHandler();
     const res = await handler(new Request("http://localhost/enqueue/q", {

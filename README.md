@@ -65,7 +65,7 @@ To get the next payload from the `foo` queue, send a get request to `/dequeue/:q
 curl -X GET -H "Authorization: Bearer replace-with-a-secret-token" http://127.0.0.1:1991/dequeue/foo
 ```
 
-This returns the oldest added payload on queue `foo` as JSON and removes it, guaranteeing both the order and that each payload will only be read once. Strings, numbers, booleans, arrays, and objects all use `application/json` so a string `"0"` is distinct from the number `0`. Numeric values that JavaScript cannot represent without loss are rejected with a `400` response.
+This returns the oldest added payload on queue `foo` as JSON and removes it, guaranteeing both the order and that each payload will only be read once. Strings, numbers, booleans, arrays, and objects all use `application/json` so a string `"0"` is distinct from the number `0`. Numeric values that JavaScript cannot represent without loss are rejected with a `400` response. Request bodies must be well-formed UTF-8; a body containing invalid byte sequences is rejected with `400 Invalid JSON` rather than stored with replacement characters.
 
 That's all you need to get started! 😎
 

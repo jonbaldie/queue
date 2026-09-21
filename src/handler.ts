@@ -101,7 +101,12 @@ async function readRequestBody(request: Request): Promise<string | Response> {
         body.set(chunk, offset);
         offset += chunk.byteLength;
     }
-    return await new Response(body).text();
+    try {
+        // Fatal decoding rejects malformed UTF-8 instead of silently storing U+FFFD.
+        return new TextDecoder("utf-8", { fatal: true }).decode(body);
+    } catch {
+        return new Response("Invalid JSON", { status: 400 });
+    }
 }
 
 function extractQueueName(match: Parameters<RouteHandler>[1]): { name: string } | { error: Response } {
