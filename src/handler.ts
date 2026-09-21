@@ -40,21 +40,90 @@ function isUnsupportedNumber(value: number, source: string): boolean {
     return canonicalJsonNumber(source) !== canonicalJsonNumber(serializedValue);
 }
 
-function parseJsonBody(body: string) {
-    return JSON.parse(body, function (key: string, value: unknown) {
-        void key;
-        if (typeof value !== "number") {
-            return value;
-        }
+// Every integer with at most 15 digits is below Number.MAX_SAFE_INTEGER, so
+// it round-trips exactly without the canonical comparison.
+const MAX_EXACT_INTEGER_DIGITS = 15;
+const QUOTE = 0x22;
+const BACKSLASH = 0x5c;
+const MINUS = 0x2d;
 
-        // V8 supplies context.source at runtime; Deno's JSON.parse type still
-        // only declares the legacy two-argument reviver signature.
-        const context = arguments[2] as { source: string };
-        if (isUnsupportedNumber(value, context.source)) {
+function isDigit(code: number): boolean {
+    return code >= 0x30 && code <= 0x39;
+}
+
+function isNumberStart(code: number): boolean {
+    return code === MINUS || isDigit(code);
+}
+
+function isNumberPart(code: number): boolean {
+    // Digits plus . e E + -
+    return isDigit(code) || code === 0x2e || code === 0x65 || code === 0x45 || code === 0x2b || code === MINUS;
+}
+
+function jsonStringEnd(body: string, openingQuote: number): number {
+    let closingQuote = body.indexOf('"', openingQuote + 1);
+    while (isEscaped(body, closingQuote)) {
+        closingQuote = body.indexOf('"', closingQuote + 1);
+    }
+    return closingQuote + 1;
+}
+
+function isEscaped(body: string, index: number): boolean {
+    let backslashes = 0;
+    while (body.charCodeAt(index - backslashes - 1) === BACKSLASH) {
+        backslashes++;
+    }
+    return backslashes % 2 === 1;
+}
+
+function isExactIntegerSource(body: string, start: number, end: number): boolean {
+    const digitsStart = body.charCodeAt(start) === MINUS ? start + 1 : start;
+    if (end - digitsStart > MAX_EXACT_INTEGER_DIGITS) {
+        return false;
+    }
+    for (let index = digitsStart; index < end; index++) {
+        if (!isDigit(body.charCodeAt(index))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+function jsonNumberEnd(body: string, start: number): number {
+    let end = start + 1;
+    while (isNumberPart(body.charCodeAt(end))) {
+        end++;
+    }
+    if (!isExactIntegerSource(body, start, end)) {
+        const source = body.slice(start, end);
+        if (isUnsupportedNumber(Number(source), source)) {
             throw new UnsupportedNumberError();
         }
-        return value;
-    });
+    }
+    return end;
+}
+
+// Scans already-validated JSON text and checks every number lexeme outside
+// strings. A JSON.parse reviver would do the same per value, but invoking it
+// for every leaf costs orders of magnitude more CPU on number-dense bodies.
+function assertSupportedNumbers(body: string): void {
+    let index = 0;
+    while (index < body.length) {
+        const code = body.charCodeAt(index);
+        if (code === QUOTE) {
+            index = jsonStringEnd(body, index);
+        } else if (isNumberStart(code)) {
+            index = jsonNumberEnd(body, index);
+        } else {
+            index++;
+        }
+    }
+}
+
+function parseJsonBody(body: string) {
+    const json = JSON.parse(body);
+    assertSupportedNumbers(body);
+    return json;
 }
 
 async function readRequestBody(request: Request): Promise<string | Response> {
