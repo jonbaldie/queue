@@ -12,6 +12,8 @@ class UnsupportedNumberError extends Error {
     }
 }
 
+class JsonNestingTooDeepError extends Error {}
+
 function canonicalJsonNumber(source: string): string {
     const match = /^(-?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(source);
     if (match === null) {
@@ -41,20 +43,31 @@ function isUnsupportedNumber(value: number, source: string): boolean {
 }
 
 function parseJsonBody(body: string) {
-    return JSON.parse(body, function (key: string, value: unknown) {
-        void key;
-        if (typeof value !== "number") {
-            return value;
+    try {
+        return JSON.parse(body, rejectUnsupportedNumbers);
+    } catch (error) {
+        // V8 applies the reviver recursively, so deeply nested JSON overflows
+        // the stack; treat it as unparseable input rather than a server fault.
+        if (error instanceof RangeError) {
+            throw new JsonNestingTooDeepError();
         }
+        throw error;
+    }
+}
 
-        // V8 supplies context.source at runtime; Deno's JSON.parse type still
-        // only declares the legacy two-argument reviver signature.
-        const context = arguments[2] as { source: string };
-        if (isUnsupportedNumber(value, context.source)) {
-            throw new UnsupportedNumberError();
-        }
+function rejectUnsupportedNumbers(key: string, value: unknown) {
+    void key;
+    if (typeof value !== "number") {
         return value;
-    });
+    }
+
+    // V8 supplies context.source at runtime; Deno's JSON.parse type still
+    // only declares the legacy two-argument reviver signature.
+    const context = arguments[2] as { source: string };
+    if (isUnsupportedNumber(value, context.source)) {
+        throw new UnsupportedNumberError();
+    }
+    return value;
 }
 
 async function readRequestBody(request: Request): Promise<string | Response> {
@@ -153,7 +166,7 @@ function enqueueHandler(mgr: QueueManager<string>): RouteHandler {
 }
 
 function enqueueErrorResponse(error: unknown): Response {
-    if (error instanceof SyntaxError) {
+    if (error instanceof SyntaxError || error instanceof JsonNestingTooDeepError) {
         return new Response("Invalid JSON", { status: 400 });
     }
     if (error instanceof UnsupportedNumberError) {

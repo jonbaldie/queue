@@ -404,6 +404,85 @@ Deno.test("FileStore.loadState does not read persist.dat.tmp", () => {
     Deno.removeSync(tmpDir, { recursive: true });
 });
 
+// ── FileStore.replace() failure and truncation semantics ─────────────────────
+
+Deno.test("FileStore.replace fully truncates a stale temp file longer than the snapshot", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    // Stale temp content much longer than the new snapshot: without a real
+    // truncate, the overwritten prefix leaves stale line fragments behind.
+    const staleLine = '{"queue":"q","payload":"' + "A".repeat(300) + '","enqueue":true,"dequeue":false}\n';
+    Deno.writeTextFileSync(tmpDir + "/persist.dat.tmp", staleLine + staleLine);
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir + "/");
+    persist.replace([{ queue: "q", payload: "fresh", enqueue: true, dequeue: false }]);
+    persist.close();
+    assertEquals(persist.loadState().map((event) => event.payload), ["fresh"]);
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("FileStore.replace rethrows errors when the temp file path is unusable", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    // A directory at persist.dat.tmp makes openSync fail after the store
+    // directory was created successfully.
+    Deno.mkdirSync(tmpDir + "/persist.dat.tmp");
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir + "/");
+    assertThrows(
+        () => persist.replace([{ queue: "q", payload: "x", enqueue: true, dequeue: false }]),
+        Deno.errors.IsADirectory,
+    );
+    persist.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("FileStore.replace removes the temp file when the rename fails", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    // A directory at persist.dat makes renameSync fail after the temp file
+    // has been written and closed.
+    Deno.mkdirSync(tmpDir + "/persist.dat");
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir + "/");
+    assertThrows(
+        () => persist.replace([{ queue: "q", payload: "x", enqueue: true, dequeue: false }]),
+        Deno.errors.IsADirectory,
+    );
+    let tempExists = false;
+    try {
+        Deno.statSync(tmpDir + "/persist.dat.tmp");
+        tempExists = true;
+    } catch { /* expected */ }
+    assertEquals(tempExists, false);
+    persist.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("FileStore.loadState reassembles multi-byte characters split across 4096-byte chunks", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    // The stream decoder must hold partial multi-byte sequences between reads.
+    // The 2-byte "é" sits 10 bytes into the second line (after '{"queue":"'),
+    // so pad the first line to 4085 bytes: the é then starts at byte 4095 and
+    // straddles the 4096-byte read boundary.
+    const enc = new TextEncoder();
+    const encodedLength = (payload: string, pad: number) =>
+        enc.encode(JSON.stringify({ queue: "q", payload: payload.padEnd(pad, "A"), enqueue: true, dequeue: false }) + "\n").length;
+    let pad = 0;
+    while (encodedLength("x", pad) < 4085) pad++;
+    const first = JSON.stringify({ queue: "q", payload: "x".padEnd(pad, "A"), enqueue: true, dequeue: false }) + "\n";
+    assertEquals(enc.encode(first).length, 4085);
+    // The é's first byte is the last byte of the first 4096-byte chunk.
+    const second = JSON.stringify({ queue: "éq", payload: "b", enqueue: true, dequeue: false }) + "\n";
+    Deno.writeFileSync(tmpDir + "/persist.dat", enc.encode(first + second));
+
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir + "/");
+    const events = persist.loadState();
+    assertEquals(events.length, 2);
+    assertEquals(events[0].payload, "x".padEnd(pad, "A"));
+    assertEquals(events[1].queue, "éq");
+    persist.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
 Deno.test("persist MemoryStore.replace() replaces existing events", () => {
     const p = new Persistency.MemoryStore();
     p.saveEvent("q", "old", true);
