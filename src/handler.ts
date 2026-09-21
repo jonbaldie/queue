@@ -101,7 +101,14 @@ async function readRequestBody(request: Request): Promise<string | Response> {
         body.set(chunk, offset);
         offset += chunk.byteLength;
     }
-    return await new Response(body).text();
+    try {
+        return new TextDecoder("utf-8", { fatal: true }).decode(body);
+    } catch (error) {
+        if (error instanceof TypeError) {
+            return new Response("Invalid JSON", { status: 400 });
+        }
+        throw error;
+    }
 }
 
 function extractQueueName(match: Parameters<RouteHandler>[1]): { name: string } | { error: Response } {

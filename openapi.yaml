@@ -84,7 +84,7 @@ paths:
               schema:
                 type: string
         '400':
-          description: Bad Request - Invalid JSON, unsupported number, or Queue name too long
+          description: Bad Request - Invalid JSON, invalid UTF-8, unsupported number, or Queue name too long
         '401':
           description: Unauthorized
         '413':
