@@ -101,13 +101,18 @@ async function readRequestBody(request: Request): Promise<string | Response> {
         body.set(chunk, offset);
         offset += chunk.byteLength;
     }
+    return decodeUtf8Body(body);
+}
+
+function decodeUtf8Body(body: Uint8Array): string | Response {
+    const encoded = Array.from(
+        body,
+        (byte) => `%${byte.toString(16).padStart(2, "0")}`,
+    ).join("");
     try {
-        return new TextDecoder("utf-8", { fatal: true }).decode(body);
-    } catch (error) {
-        if (error instanceof TypeError) {
-            return new Response("Invalid JSON", { status: 400 });
-        }
-        throw error;
+        return decodeURIComponent(encoded);
+    } catch {
+        return new Response("Invalid JSON", { status: 400 });
     }
 }
 
