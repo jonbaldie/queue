@@ -4,7 +4,7 @@ import { withAuth, withRateLimit } from "./middleware.ts";
 import { RouteHandler, Router } from "./router.ts";
 
 const MAX_BODY_SIZE = 1024 * 1024; // 1 MB
-const LOG_ENCODER = new TextEncoder();
+const LOG_ENCODER = Reflect.construct(TextEncoder, []);
 
 class UnsupportedNumberError extends Error {
     constructor() {
@@ -101,7 +101,15 @@ async function readRequestBody(request: Request): Promise<string | Response> {
         body.set(chunk, offset);
         offset += chunk.byteLength;
     }
-    return await new Response(body).text();
+    return decodeUtf8Body(body);
+}
+
+function decodeUtf8Body(body: Uint8Array): string | Response {
+    try {
+        return new TextDecoder("utf-8", { fatal: true }).decode(body);
+    } catch {
+        return new Response("Invalid JSON", { status: 400 });
+    }
 }
 
 function extractQueueName(match: Parameters<RouteHandler>[1]): { name: string } | { error: Response } {

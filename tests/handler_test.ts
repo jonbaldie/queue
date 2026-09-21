@@ -1173,6 +1173,75 @@ Deno.test("API: rejects rounded decimal payloads instead of changing their preci
     assertEquals(dequeueResponse.status, 204);
 });
 
+Deno.test("API: rejects invalid UTF-8 in JSON string payloads instead of replacing them", async () => {
+    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const handler = createHandler(mgr, API_TOKEN);
+    const latin1Body = Uint8Array.of(
+        ...new TextEncoder().encode('{"payload":"caf'),
+        0xe9,
+        ...new TextEncoder().encode('"}'),
+    );
+
+    const enqueueResponse = await handler(new Request("http://localhost:3000/enqueue/latin1", {
+        method: "POST",
+        body: latin1Body,
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+    }));
+
+    assertEquals(enqueueResponse.status, 400);
+    assertEquals(await enqueueResponse.text(), "Invalid JSON");
+
+    const dequeueResponse = await handler(new Request("http://localhost:3000/dequeue/latin1", {
+        headers: authHeaders,
+    }));
+    assertEquals(dequeueResponse.status, 204);
+});
+
+Deno.test("API: rejects truncated UTF-8 sequences in JSON string payloads", async () => {
+    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const handler = createHandler(mgr, API_TOKEN);
+    const truncatedBody = Uint8Array.of(
+        ...new TextEncoder().encode('{"payload":"a'),
+        0x80,
+        ...new TextEncoder().encode("b"),
+        0xe2,
+        0x82,
+        ...new TextEncoder().encode('"}'),
+    );
+
+    const enqueueResponse = await handler(new Request("http://localhost:3000/enqueue/truncated", {
+        method: "POST",
+        body: truncatedBody,
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+    }));
+
+    assertEquals(enqueueResponse.status, 400);
+    assertEquals(await enqueueResponse.text(), "Invalid JSON");
+
+    const dequeueResponse = await handler(new Request("http://localhost:3000/dequeue/truncated", {
+        headers: authHeaders,
+    }));
+    assertEquals(dequeueResponse.status, 204);
+});
+
+Deno.test("API: round-trips valid UTF-8 JSON string payloads", async () => {
+    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const handler = createHandler(mgr, API_TOKEN);
+
+    const enqueueResponse = await handler(new Request("http://localhost:3000/enqueue/cafe", {
+        method: "POST",
+        body: '{"payload":"café"}',
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+    }));
+    assertEquals(enqueueResponse.status, 200);
+
+    const dequeueResponse = await handler(new Request("http://localhost:3000/dequeue/cafe", {
+        headers: authHeaders,
+    }));
+    assertEquals(dequeueResponse.status, 200);
+    assertEquals(await dequeueResponse.json(), "café");
+});
+
 Deno.test("dequeue returns application/json for boolean payload", async () => {
     const mgr = new QueueManager(new Persistency.MemoryStore);
     const handler = createHandler(mgr, API_TOKEN);
