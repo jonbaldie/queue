@@ -1208,6 +1208,48 @@ Deno.test("API: rejects rounded decimal payloads instead of changing their preci
     assertEquals(dequeueResponse.status, 204);
 });
 
+Deno.test("API: rejects invalid UTF-8 in JSON string payloads without enqueueing", async () => {
+    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const handler = createHandler(mgr, API_TOKEN);
+    const invalidUtf8Body = Uint8Array.of(
+        ...new TextEncoder().encode('{"payload":"caf'),
+        0xe9,
+        ...new TextEncoder().encode('"}'),
+    );
+
+    const enqueueResponse = await handler(new Request("http://localhost:3000/enqueue/invalid-utf8", {
+        method: "POST",
+        body: invalidUtf8Body,
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+    }));
+
+    assertEquals(enqueueResponse.status, 400);
+    assertEquals(await enqueueResponse.text(), "Invalid JSON");
+
+    const dequeueResponse = await handler(new Request("http://localhost:3000/dequeue/invalid-utf8", {
+        headers: authHeaders,
+    }));
+    assertEquals(dequeueResponse.status, 204);
+});
+
+Deno.test("API: round-trips valid UTF-8 in JSON string payloads", async () => {
+    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const handler = createHandler(mgr, API_TOKEN);
+    const enqueueResponse = await handler(new Request("http://localhost:3000/enqueue/valid-utf8", {
+        method: "POST",
+        body: JSON.stringify({ payload: "café €𝄞" }),
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+    }));
+
+    assertEquals(enqueueResponse.status, 200);
+
+    const dequeueResponse = await handler(new Request("http://localhost:3000/dequeue/valid-utf8", {
+        headers: authHeaders,
+    }));
+    assertEquals(dequeueResponse.status, 200);
+    assertEquals(await dequeueResponse.json(), "café €𝄞");
+});
+
 Deno.test("dequeue returns application/json for boolean payload", async () => {
     const mgr = new QueueManager(new Persistency.MemoryStore);
     const handler = createHandler(mgr, API_TOKEN);
