@@ -84,16 +84,37 @@ export class RateLimiter {
         // Get or create timestamp list for this IP
         let timestamps = this.requestTimestamps.get(ip) || [];
 
-        // Remove timestamps older than the window
-        timestamps = timestamps.filter(ts => ts > cutoff);
+        // Timestamps are sorted ascending, so stale entries always form a
+        // prefix. Fast path: the newest timestamp is fresh → nothing stale,
+        // O(1). Otherwise binary search the first fresh timestamp — O(log n)
+        // — and count the window without filtering or copying it.
+        let firstFresh = 0;
+        if (timestamps.length > 0 && timestamps[0] <= cutoff) {
+            let lo = 0, hi = timestamps.length;
+            while (lo < hi) {
+                const mid = (lo + hi) >>> 1;
+                if (timestamps[mid] > cutoff) {
+                    hi = mid;
+                } else {
+                    lo = mid + 1;
+                }
+            }
+            firstFresh = lo;
+        }
+        const freshCount = timestamps.length - firstFresh;
 
-        // If all timestamps are stale, remove this IP entry
-        if (timestamps.length === 0) {
+        if (freshCount === 0) {
+            // All timestamps are stale — remove this IP entry
             this.requestTimestamps.delete(ip);
+            timestamps = [];
+        } else if (firstFresh > 0 && firstFresh * 2 >= timestamps.length) {
+            // Drop the stale prefix only once it dominates the array, so the
+            // copy stays amortized O(1) per recorded request
+            timestamps = timestamps.slice(firstFresh);
         }
 
         // Check if we've exceeded the limit
-        if (timestamps.length >= this.requestsPerMinute) {
+        if (freshCount >= this.requestsPerMinute) {
             return false;
         }
 

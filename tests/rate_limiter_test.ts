@@ -480,3 +480,97 @@ Deno.test("rate limiter: eviction sort orders by max timestamp regardless of ins
     assertEquals(internal.requestTimestamps.has("oldest.ip"), false);
     assertEquals(internal.requestTimestamps.has("newest.ip"), true);
 });
+
+// ── High-window behavior (#125): per-request work independent of window ──────
+
+Deno.test("rate limiter: full 10,000-entry window denies at limit", () => {
+    const LIMIT = 10_000;
+    const limiter = new RateLimiter(LIMIT, 600_000, 100, 10000);
+
+    for (let i = 0; i < LIMIT; i++) {
+        assertEquals(limiter.isAllowed(req("bulk.ip")), true);
+    }
+    // Limit boundary: the next request is denied
+    assertEquals(limiter.isAllowed(req("bulk.ip")), false);
+});
+
+Deno.test("rate limiter: entirely stale high-volume entry recovers with a single fresh timestamp", () => {
+    const limiter = new RateLimiter(10_000, 60_000, 100, 10000);
+    const internal = limiter as unknown as { requestTimestamps: Map<string, number[]> };
+
+    // Plant 10,000 timestamps that are all far outside the window
+    const staleBase = Date.now() - 120_000;
+    internal.requestTimestamps.set("stale.bulk.ip", Array.from({ length: 10_000 }, (_, i) => staleBase + i));
+
+    assertEquals(limiter.isAllowed(req("stale.bulk.ip")), true);
+    // All stale entries are dropped; only the fresh one remains
+    assertEquals(internal.requestTimestamps.get("stale.bulk.ip")!.length, 1);
+});
+
+Deno.test("rate limiter: stale prefix does not count toward the limit", () => {
+    const limiter = new RateLimiter(5, 60_000, 100, 10000);
+    const internal = limiter as unknown as { requestTimestamps: Map<string, number[]> };
+
+    // 9,000 stale + 3 fresh (sorted ascending, as maintained by the limiter)
+    const staleBase = Date.now() - 120_000;
+    const freshBase = Date.now() - 10;
+    const planted = [
+        ...Array.from({ length: 9_000 }, (_, i) => staleBase + i),
+        freshBase,
+        freshBase + 1,
+        freshBase + 2,
+    ];
+    internal.requestTimestamps.set("mixed.bulk.ip", planted);
+
+    // Only the 3 fresh timestamps count against the limit of 5
+    assertEquals(limiter.isAllowed(req("mixed.bulk.ip")), true);
+    // The stale prefix dominating the array is dropped on allow, leaving only
+    // the 3 fresh timestamps plus the one just recorded
+    assertEquals(internal.requestTimestamps.get("mixed.bulk.ip")!.length, 4);
+    assertEquals(limiter.isAllowed(req("mixed.bulk.ip")), true);
+    assertEquals(limiter.isAllowed(req("mixed.bulk.ip")), false);
+});
+
+Deno.test("rate limiter: stale prefix is dropped exactly when it is half the array (>= not >)", () => {
+    const limiter = new RateLimiter(10, 60_000, 100, 10000);
+    const internal = limiter as unknown as { requestTimestamps: Map<string, number[]> };
+
+    // 2 stale + 2 fresh: firstFresh=2, length=4 → 2*2 >= 4 → trim fires
+    const staleBase = Date.now() - 120_000;
+    const freshBase = Date.now() - 10;
+    internal.requestTimestamps.set("half.ip", [
+        staleBase,
+        staleBase + 1,
+        freshBase,
+        freshBase + 1,
+    ]);
+
+    assertEquals(limiter.isAllowed(req("half.ip")), true);
+    // Trimmed to the 2 fresh timestamps plus the one just recorded
+    assertEquals(internal.requestTimestamps.get("half.ip")!.length, 3);
+});
+
+Deno.test("rate limiter: denied requests at a full 10,000-entry window are cheap (no per-request window scan)", () => {
+    const LIMIT = 10_000;
+    const limiter = new RateLimiter(LIMIT, 600_000, 100, 10000);
+
+    for (let i = 0; i < LIMIT; i++) {
+        limiter.isAllowed(req("perf.ip"));
+    }
+
+    // Perf canary: pre-fix each denied request filtered the whole window
+    // (~0.1-0.25ms/req at 10,000 entries → 2,000 requests ≈ 200-500ms).
+    // Post-fix it is an O(1) check (~1-3ms total). The 80ms budget is chosen
+    // to sit far above fixed-case noise and far below the pre-fix cost.
+    // Requests are built up-front and results recorded, so only isAllowed
+    // work is timed.
+    const deniedReqs = Array.from({ length: 2_000 }, () => req("perf.ip"));
+    const results: boolean[] = [];
+    const start = performance.now();
+    for (const deniedReq of deniedReqs) {
+        results.push(limiter.isAllowed(deniedReq));
+    }
+    const elapsedMs = performance.now() - start;
+    assertEquals(results.every(r => r === false), true, "all requests at limit should be denied");
+    assertEquals(elapsedMs < 80, true, `2,000 denied requests took ${elapsedMs.toFixed(1)}ms`);
+});
