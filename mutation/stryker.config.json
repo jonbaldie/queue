@@ -11,7 +11,7 @@
   },
   "coverageAnalysis": "off",
   "timeoutMS": 30000,
-  "concurrency": 2,
+  "concurrency": 4,
   "thresholds": {
     "high": 80,
     "low": 70,

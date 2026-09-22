@@ -66,6 +66,7 @@ curl -X GET -H "Authorization: Bearer replace-with-a-secret-token" http://127.0.
 ```
 
 This returns the oldest added payload on queue `foo` as JSON and removes it, guaranteeing both the order and that each payload will only be read once. Strings, numbers, booleans, arrays, and objects all use `application/json` so a string `"0"` is distinct from the number `0`. Numeric values that JavaScript cannot represent without loss and request bodies that are not well-formed UTF-8 are rejected with a `400` response.
+JSON request bodies nested more than 3,000 container levels are also rejected with a `400` response.
 
 That's all you need to get started! 😎
 

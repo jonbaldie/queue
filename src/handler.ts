@@ -42,32 +42,52 @@ function isUnsupportedNumber(value: number, source: string): boolean {
     return canonicalJsonNumber(source) !== canonicalJsonNumber(serializedValue);
 }
 
+// Matches strings, containers, and number literals in valid JSON. Scanning
+// the source avoids invoking a JSON.parse reviver once per JSON value.
+const JSON_TOKEN = /"[^"\\]*(?:\\.[^"\\]*)*"|[[{]|[\]}]|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g;
+const EXACT_INTEGER = /^-?\d{1,15}$/;
+const MAX_JSON_DEPTH = 3000;
+
+function rejectUnsupportedNumber(source: string): void {
+    // Every integer with at most 15 digits is below Number.MAX_SAFE_INTEGER.
+    if (EXACT_INTEGER.test(source)) {
+        return;
+    }
+    if (isUnsupportedNumber(Number(source), source)) {
+        throw new UnsupportedNumberError();
+    }
+}
+
+function validateJsonSource(source: string): void {
+    let depth = 0;
+    for (const match of source.matchAll(JSON_TOKEN)) {
+        const token = match[0];
+        if (token === "[" || token === "{") {
+            depth++;
+            if (depth > MAX_JSON_DEPTH) {
+                throw new JsonNestingTooDeepError();
+            }
+        } else if (token === "]" || token === "}") {
+            depth--;
+        } else if (token[0] !== '"') {
+            rejectUnsupportedNumber(token);
+        }
+    }
+}
+
 function parseJsonBody(body: string) {
     try {
-        return JSON.parse(body, rejectUnsupportedNumbers);
+        const json = JSON.parse(body);
+        validateJsonSource(body);
+        return json;
     } catch (error) {
-        // V8 applies the reviver recursively, so deeply nested JSON overflows
-        // the stack; treat it as unparseable input rather than a server fault.
+        // Deeply nested JSON can overflow the native parser's stack; treat it
+        // as unparseable input rather than a server fault.
         if (error instanceof RangeError) {
             throw new JsonNestingTooDeepError();
         }
         throw error;
     }
-}
-
-function rejectUnsupportedNumbers(key: string, value: unknown) {
-    void key;
-    if (typeof value !== "number") {
-        return value;
-    }
-
-    // V8 supplies context.source at runtime; Deno's JSON.parse type still
-    // only declares the legacy two-argument reviver signature.
-    const context = arguments[2] as { source: string };
-    if (isUnsupportedNumber(value, context.source)) {
-        throw new UnsupportedNumberError();
-    }
-    return value;
 }
 
 async function readRequestBody(request: Request): Promise<string | Response> {
