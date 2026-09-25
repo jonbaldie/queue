@@ -42,6 +42,7 @@ const mutasaurus = new Mutasaurus({
     "./tests/e2e_test.ts",
     "./tests/handler_test.ts",
     "./tests/manager_test.ts",
+    "./tests/payload_test.ts",
     "./tests/persist_test.ts",
     "./tests/rate_limiter_test.ts",
     "./tests/router_test.ts",
