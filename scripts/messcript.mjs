@@ -18,6 +18,7 @@ const productionUnits = new Map([
   ["rate-limiter", ["src/rate_limiter.ts"]],
   ["queue-manager", ["src/manager.ts"]],
   ["persist-engine", ["src/persist.ts"]],
+  ["payload", ["src/payload.ts"]],
   ["http-handler", ["src/handler.ts"]],
   ["entrypoint", ["main.ts"]],
 ]);
