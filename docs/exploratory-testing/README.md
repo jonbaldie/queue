@@ -11,3 +11,4 @@ evidence. Replay scripts run from the repository root.
 | 2026-09-15 | [2026-09-15-report.md](./2026-09-15-queue/2026-09-15-report.md) | Non-ASCII token lockout (#112) |
 | 2026-09-18 | [2026-09-18-report.md](./2026-09-18-queue/2026-09-18-report.md) | None |
 | 2026-09-19 | [2026-09-19-report.md](./2026-09-19-queue/2026-09-19-report.md) | Docker `--persist` path (#114), snapshot-rewrite data loss (#115), invalid UTF-8 accepted (#116) |
+| 2026-09-26 | [2026-09-26-report.md](./2026-09-26-queue/2026-09-26-report.md) | None |
