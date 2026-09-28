@@ -2,6 +2,7 @@ import * as Persistency from "./src/persist.ts";
 import QueueManager from "./src/manager.ts";
 import { createHandler } from "./src/handler.ts";
 import { parseConfig } from "./src/config.ts";
+import type { Payload } from "./src/payload.ts";
 
 const LOG_ENCODER = new TextEncoder();
 
@@ -35,13 +36,13 @@ const CONFIG = parseConfig(readEnv(), Deno.args);
 
 // Set up our persistency manager
 const PERSIST_ENGINE = CONFIG.persistEnabled
-    ? new Persistency.FileStore
-    : new Persistency.MemoryStore;
+    ? new Persistency.FileStore<Payload>()
+    : new Persistency.MemoryStore<Payload>();
 
 PERSIST_ENGINE.dir(CONFIG.persistDir);
 
 // Set up the manager, which will handle our queues for us
-const MANAGER = new QueueManager(PERSIST_ENGINE, CONFIG.queueDepthLimit, CONFIG.queueCountLimit, CONFIG.persistEnabled);
+const MANAGER = new QueueManager<Payload>(PERSIST_ENGINE, CONFIG.queueDepthLimit, CONFIG.queueCountLimit, CONFIG.persistEnabled);
 
 // Load up any existing queue data, if we're persisting
 if (PERSIST_ENGINE instanceof Persistency.FileStore) {

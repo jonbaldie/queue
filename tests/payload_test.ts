@@ -11,7 +11,7 @@ import {
 } from "../src/payload.ts";
 
 Deno.test("payload: parses valid payload from JSON string", () => {
-    const result = parsePayloadBody<string>('{"payload":"hello world"}');
+    const result = parsePayloadBody('{"payload":"hello world"}');
     assertEquals(result, "hello world");
 });
 
@@ -53,7 +53,7 @@ Deno.test("payload: rejects malformed JSON string", () => {
 
 Deno.test("payload: parses valid UTF-8 Uint8Array payload", () => {
     const bytes = new TextEncoder().encode('{"payload":"héllo 🌍"}');
-    const result = parsePayloadBody<string>(bytes);
+    const result = parsePayloadBody(bytes);
     assertEquals(result, "héllo 🌍");
 });
 
@@ -161,7 +161,7 @@ Deno.test("readAndValidatePayload: reads and parses stream within size limit", a
             controller.close();
         },
     });
-    const result = await readAndValidatePayload<string>(stream);
+    const result = await readAndValidatePayload(stream);
     assertEquals(result, "streamed-data");
 });
 
@@ -177,7 +177,7 @@ Deno.test("readAndValidatePayload: reassembles payload split across multiple chu
             controller.close();
         },
     });
-    const result = await readAndValidatePayload<string>(stream);
+    const result = await readAndValidatePayload(stream);
     assertEquals(result, "multi-chunk");
 });
 
@@ -238,8 +238,10 @@ Deno.test("readAndValidatePayload: accepts exactly 1 MiB payload", async () => {
             controller.close();
         },
     });
-    const result = await readAndValidatePayload<string>(stream);
-    assertEquals(typeof result, "string");
+    const result = await readAndValidatePayload(stream);
+    if (typeof result !== "string") {
+        throw new Error("Expected string payload");
+    }
     assertEquals(result.length, DEFAULT_MAX_PAYLOAD_SIZE - emptyPayloadBody.length);
 });
 
@@ -261,7 +263,5 @@ Deno.test("readAndValidatePayload: rejects exactly 1 MiB + 1 byte", async () => 
         "Payload too large",
     );
 });
-
-
 
 

@@ -1,3 +1,13 @@
+export type JsonValue =
+    | string
+    | number
+    | boolean
+    | null
+    | JsonValue[]
+    | { [key: string]: JsonValue };
+
+export type Payload = Exclude<JsonValue, null>;
+
 export class InvalidPayloadError extends Error {
     constructor(message: string = "Invalid JSON") {
         super(message);
@@ -101,11 +111,12 @@ function decodePayloadBody(body: string | Uint8Array): string {
     }
 }
 
-function parseAndValidateJson(text: string): unknown {
+function parseAndValidateJson(text: string): JsonValue {
     try {
-        const json = JSON.parse(text);
+        const json: unknown = JSON.parse(text);
         validateJsonSource(text);
-        return json;
+        // JSON.parse only creates JSON values; source validation also rules out non-finite numbers.
+        return json as JsonValue;
     } catch (error) {
         if (error instanceof RangeError || error instanceof JsonNestingTooDeepError) {
             throw new JsonNestingTooDeepError();
@@ -117,32 +128,36 @@ function parseAndValidateJson(text: string): unknown {
     }
 }
 
-function extractPayloadValue<T>(json: unknown): T {
-    if (json === null || typeof json !== "object") {
+function isJsonObject(value: JsonValue): value is { [key: string]: JsonValue } {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function extractPayloadValue(json: JsonValue): Payload {
+    if (!isJsonObject(json)) {
         throw new InvalidPayloadError("Missing payload key");
     }
     if (!("payload" in json)) {
         throw new InvalidPayloadError("Missing payload key");
     }
-    const payload = (json as Record<string, unknown>).payload;
+    const payload = json.payload;
     if (payload === null) {
         throw new InvalidPayloadError("Null payload not allowed");
     }
-    return payload as T;
+    return payload;
 }
 
-export function parsePayloadBody<T = unknown>(body: string | Uint8Array): T {
+export function parsePayloadBody(body: string | Uint8Array): Payload {
     const text = decodePayloadBody(body);
     const json = parseAndValidateJson(text);
-    return extractPayloadValue<T>(json);
+    return extractPayloadValue(json);
 }
 
-export async function readAndValidatePayload<T = unknown>(
+export async function readAndValidatePayload(
     stream: ReadableStream<Uint8Array> | null,
     maxBytes: number = DEFAULT_MAX_PAYLOAD_SIZE,
-): Promise<T> {
+): Promise<Payload> {
     if (stream === null) {
-        return parsePayloadBody<T>("");
+        return parsePayloadBody("");
     }
 
     const reader = stream.getReader();
@@ -182,6 +197,5 @@ export async function readAndValidatePayload<T = unknown>(
         body.set(chunk, offset);
         offset += chunk.byteLength;
     }
-    return parsePayloadBody<T>(body);
+    return parsePayloadBody(body);
 }
-

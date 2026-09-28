@@ -4,13 +4,14 @@ import { createHandler } from "../src/handler.ts";
 import * as Persistency from "../src/persist.ts";
 import { RateLimiter } from "../src/rate_limiter.ts";
 import { parseConfig, ConfigError } from "../src/config.ts";
+import type { Payload } from "../src/payload.ts";
 
 // Shared helpers
 const API_TOKEN = "test-token";
 const authHeaders = { "Authorization": `Bearer ${API_TOKEN}` };
 
 function makeHandler(queueDepthLimit?: number, queueCountLimit?: number, rateLimitRequests = 100, token = API_TOKEN) {
-    const mgr = new QueueManager(new Persistency.MemoryStore(), queueDepthLimit, queueCountLimit);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>(), queueDepthLimit, queueCountLimit);
     return createHandler(mgr, token, rateLimitRequests);
 }
 const handler = makeHandler();
@@ -778,7 +779,7 @@ Deno.test("POST to length returns 405", async () => {
 // /queues endpoint: GET returns list of queue names
 
 Deno.test("GET /queues returns empty array when no queues", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN);
     const request = new Request("http://localhost:3000/queues", {
         method: "GET",
@@ -791,7 +792,7 @@ Deno.test("GET /queues returns empty array when no queues", async () => {
 });
 
 Deno.test("GET /queues returns queue names", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     mgr.enqueue("queue1", "item1");
     mgr.enqueue("queue2", "item2");
     const handler = createHandler(mgr, API_TOKEN);
@@ -806,7 +807,7 @@ Deno.test("GET /queues returns queue names", async () => {
 });
 
 Deno.test("POST /queues returns 405", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN);
     const request = new Request("http://localhost:3000/queues", {
         method: "POST",
@@ -818,7 +819,7 @@ Deno.test("POST /queues returns 405", async () => {
 });
 
 Deno.test("GET /queues requires bearer token", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN);
     const request = new Request("http://localhost:3000/queues", {
         method: "GET",
@@ -828,7 +829,7 @@ Deno.test("GET /queues requires bearer token", async () => {
 });
 
 Deno.test("GET /queues returns sorted queue names", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     mgr.enqueue("zebra", "item1");
     mgr.enqueue("alpha", "item2");
     mgr.enqueue("mango", "item3");
@@ -844,7 +845,7 @@ Deno.test("GET /queues returns sorted queue names", async () => {
 });
 
 Deno.test("GET /queues does not include cleaned-up empty queues", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     mgr.enqueue("persistent", "item1");
     mgr.enqueue("transient", "item2");
     mgr.dequeue("transient"); // queue becomes empty and gets cleaned up
@@ -1019,7 +1020,7 @@ Deno.test("GET peek returns 204 when queue is empty", async () => {
 });
 
 Deno.test("dequeue returns application/json for object payload", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN);
 
     const enqueueReq = new Request("http://localhost:3000/enqueue/jsonqueue", {
@@ -1041,7 +1042,7 @@ Deno.test("dequeue returns application/json for object payload", async () => {
 });
 
 Deno.test("dequeue returns application/json for array payload", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN);
 
     const enqueueReq = new Request("http://localhost:3000/enqueue/jsonqueue", {
@@ -1062,8 +1063,29 @@ Deno.test("dequeue returns application/json for array payload", async () => {
     assertEquals(body, [1, 2, 3]);
 });
 
+Deno.test("dequeue preserves null nested inside JSON payloads", async () => {
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>());
+    const handler = createHandler(mgr, API_TOKEN);
+    const payload = { object: null, array: [null] };
+
+    const enqueueResponse = await handler(new Request("http://localhost:3000/enqueue/jsonqueue", {
+        method: "POST",
+        body: JSON.stringify({ payload }),
+        headers: authHeaders,
+    }));
+    assertEquals(enqueueResponse.status, 200);
+
+    const response = await handler(new Request("http://localhost:3000/dequeue/jsonqueue", {
+        method: "GET",
+        headers: authHeaders,
+    }));
+    assertEquals(response.status, 200);
+    assertEquals(response.headers.get("content-type"), "application/json");
+    assertEquals(await response.json(), payload);
+});
+
 Deno.test("dequeue returns application/json for number payload", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN);
 
     const enqueueReq = new Request("http://localhost:3000/enqueue/jsonqueue", {
@@ -1084,7 +1106,7 @@ Deno.test("dequeue returns application/json for number payload", async () => {
 });
 
 Deno.test("API: rejects non-finite numeric payloads instead of corrupting them", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN);
 
     const enqueueResponse = await handler(new Request("http://localhost:3000/enqueue/numeric-queue", {
@@ -1103,7 +1125,7 @@ Deno.test("API: rejects non-finite numeric payloads instead of corrupting them",
 });
 
 Deno.test("API: rejects unsafe integer payloads instead of rounding them", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN);
 
     const enqueueResponse = await handler(new Request("http://localhost:3000/enqueue/unsafe-integer-queue", {
@@ -1122,7 +1144,7 @@ Deno.test("API: rejects unsafe integer payloads instead of rounding them", async
 });
 
 Deno.test("API: accepts exactly representable large integer payloads", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN);
 
     const enqueueResponse = await handler(new Request("http://localhost:3000/enqueue/exact-large-integer-queue", {
@@ -1150,7 +1172,7 @@ Deno.test("API: preserves equivalent JSON numeric spellings", async () => {
         { name: "negative-exponent", source: "-1.2300e+2", value: -123 },
         { name: "zero-exponent", source: "0e400", value: 0 },
     ];
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN);
 
     for (const testCase of cases) {
@@ -1171,7 +1193,7 @@ Deno.test("API: preserves equivalent JSON numeric spellings", async () => {
 });
 
 Deno.test("API: rejects underflowing numeric payloads instead of changing them to zero", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN);
 
     const enqueueResponse = await handler(new Request("http://localhost:3000/enqueue/underflow-queue", {
@@ -1190,7 +1212,7 @@ Deno.test("API: rejects underflowing numeric payloads instead of changing them t
 });
 
 Deno.test("API: rejects rounded decimal payloads instead of changing their precision", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN);
 
     const enqueueResponse = await handler(new Request("http://localhost:3000/enqueue/decimal-precision-queue", {
@@ -1209,7 +1231,7 @@ Deno.test("API: rejects rounded decimal payloads instead of changing their preci
 });
 
 Deno.test("API: rejects invalid UTF-8 in JSON string payloads without enqueueing", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN);
     const invalidUtf8Body = Uint8Array.of(
         ...new TextEncoder().encode('{"payload":"caf'),
@@ -1233,7 +1255,7 @@ Deno.test("API: rejects invalid UTF-8 in JSON string payloads without enqueueing
 });
 
 Deno.test("API: round-trips valid UTF-8 in JSON string payloads", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN);
     const enqueueResponse = await handler(new Request("http://localhost:3000/enqueue/valid-utf8", {
         method: "POST",
@@ -1251,7 +1273,7 @@ Deno.test("API: round-trips valid UTF-8 in JSON string payloads", async () => {
 });
 
 Deno.test("dequeue returns application/json for boolean payload", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN);
 
     const enqueueReq = new Request("http://localhost:3000/enqueue/jsonqueue", {
@@ -1274,7 +1296,7 @@ Deno.test("dequeue returns application/json for boolean payload", async () => {
 // queue-nyc: Missing payload key returns 400
 
 Deno.test("missing payload key returns 400", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN);
     const request = new Request("http://localhost:3000/enqueue/testqueue", {
         method: "POST",
@@ -1288,7 +1310,7 @@ Deno.test("missing payload key returns 400", async () => {
 // queue-w37: Null payload is rejected with 400
 
 Deno.test("null payload returns 400", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN);
     const request = new Request("http://localhost:3000/enqueue/testqueue", {
         method: "POST",
@@ -1302,7 +1324,7 @@ Deno.test("null payload returns 400", async () => {
 // queue-nyc: Valid payload returns 200
 
 Deno.test("valid payload key returns 200", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN);
     const request = new Request("http://localhost:3000/enqueue/testqueue", {
         method: "POST",
@@ -1316,7 +1338,7 @@ Deno.test("valid payload key returns 200", async () => {
 // queue-o3b: Health check works even when rate limit is exhausted
 
 Deno.test("health check exempt from rate limiting", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN, 1); // 1 request per minute
 
     // Exhaust rate limit with a non-health request
@@ -1337,7 +1359,7 @@ Deno.test("health check exempt from rate limiting", async () => {
 // queue-zla: Body within limit is accepted
 
 Deno.test("body within limit is accepted", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN);
     const request = new Request("http://localhost:3000/enqueue/testqueue", {
         method: "POST",
@@ -1351,7 +1373,7 @@ Deno.test("body within limit is accepted", async () => {
 // queue-zla: Body exceeding limit is rejected without Content-Length header
 
 Deno.test("body exceeding limit rejected without Content-Length", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN);
     const bigBody = '{"payload": "' + "x".repeat(1024 * 1024) + '"}';
     const request = new Request("http://localhost:3000/enqueue/testqueue", {
@@ -1366,7 +1388,7 @@ Deno.test("body exceeding limit rejected without Content-Length", async () => {
 // queue-zla: Body exceeding limit rejected with fake Content-Length
 
 Deno.test("body exceeding limit rejected with fake Content-Length", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN);
     const bigBody = '{"payload": "' + "x".repeat(1024 * 1024) + '"}';
     const request = new Request("http://localhost:3000/enqueue/testqueue", {
@@ -1383,7 +1405,7 @@ Deno.test("body exceeding limit rejected with fake Content-Length", async () => 
 // The byte limit must be measured in bytes, not in JS string code units.
 
 Deno.test("oversized multi-byte UTF-8 body without content-length returns 413", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN);
     // U+4E00 is one UTF-16 code unit but three UTF-8 bytes.
     // 400000 chars -> ~1.2 MiB of wire bytes, < 1 MiB of code units.
@@ -1410,7 +1432,7 @@ Deno.test("oversized multi-byte UTF-8 body without content-length returns 413", 
 // queue-02t: Body read error returns 413 not 400
 
 Deno.test("body read error returns 413 not 400", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN);
     const bodyStream = new ReadableStream({
         start(controller) {
@@ -1427,7 +1449,7 @@ Deno.test("body read error returns 413 not 400", async () => {
 });
 
 Deno.test("dequeue returns application/json for string payload", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN);
 
     const enqueueReq = new Request("http://localhost:3000/enqueue/jsonqueue", {
@@ -1469,7 +1491,7 @@ Deno.test("Manager: enqueue followed by multiple dequeues (catches state corrupt
 const TEST_TOKEN = "test-token-12345";
 
 function makeTestHandler() {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     return createHandler(mgr, TEST_TOKEN);
 }
 
@@ -1873,7 +1895,7 @@ Deno.test("auth: valid token on length returns 200", async () => {
 });
 
 Deno.test("dequeue distinguishes string zero from number zero", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN);
 
     await handler(new Request("http://localhost:3000/enqueue/q", {
@@ -1903,7 +1925,7 @@ Deno.test("dequeue distinguishes string zero from number zero", async () => {
 });
 
 Deno.test("peek returns JSON for a string payload", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore);
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN);
 
     await handler(new Request("http://localhost:3000/enqueue/q", {
@@ -1981,7 +2003,7 @@ Deno.test("HEAD /peek/:queue on empty queue returns 204 with empty body", async 
 });
 
 Deno.test("HEAD /peek/:queue on non-empty queue returns 200 with headers and empty body", async () => {
-    const mgr = new QueueManager(new Persistency.MemoryStore());
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>());
     mgr.enqueue("test-queue", "payload-1");
     const handler = createHandler(mgr, API_TOKEN);
 
