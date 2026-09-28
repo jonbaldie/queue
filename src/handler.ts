@@ -1,12 +1,16 @@
 import QueueManager, { QueueNameTooLongError } from "./manager.ts";
 import { RateLimiter } from "./rate_limiter.ts";
 import { withAuth, withRateLimit } from "./middleware.ts";
-import { RouteHandler, Router } from "./router.ts";
+import { Router } from "./router.ts";
 import * as Payload from "./payload.ts";
+
+type JsonPayload = Payload.Payload;
+type RouteHandler = Parameters<Router["get"]>[1];
+type RouteMatch = Parameters<RouteHandler>[1];
 
 const LOG_ENCODER = Reflect.construct(TextEncoder, []);
 
-function extractQueueName(match: Parameters<RouteHandler>[1]): { name: string } | { error: Response } {
+function extractQueueName(match: RouteMatch): { name: string } | { error: Response } {
     const raw = match.pathname.groups.queue;
     if (raw === undefined) {
         return { error: new Response("Invalid queue name", { status: 400 }) };
@@ -21,7 +25,7 @@ function extractQueueName(match: Parameters<RouteHandler>[1]): { name: string } 
     }
 }
 
-function enqueueHandler(mgr: QueueManager<string>): RouteHandler {
+function enqueueHandler(mgr: QueueManager<JsonPayload>): RouteHandler {
     return async (request, match) => {
         const queueResult = extractQueueName(match);
         if ("error" in queueResult) {
@@ -33,7 +37,7 @@ function enqueueHandler(mgr: QueueManager<string>): RouteHandler {
             if (contentLength && parseInt(contentLength) > Payload.DEFAULT_MAX_PAYLOAD_SIZE) {
                 return new Response("Payload too large", { status: 413 });
             }
-            const payload = await Payload.readAndValidatePayload<string>(
+            const payload = await Payload.readAndValidatePayload(
                 request.body,
                 Payload.DEFAULT_MAX_PAYLOAD_SIZE,
             );
@@ -71,7 +75,7 @@ function queueNameErrorResponse(error: unknown): Response {
     throw error;
 }
 
-function itemResponse(item: unknown): Response {
+function itemResponse(item: JsonPayload | undefined): Response {
     if (item === undefined) {
         return new Response(null, { status: 204 });
     }
@@ -80,7 +84,7 @@ function itemResponse(item: unknown): Response {
     });
 }
 
-function dequeueHandler(mgr: QueueManager<string>): RouteHandler {
+function dequeueHandler(mgr: QueueManager<JsonPayload>): RouteHandler {
     return (request, match) => {
         void request;
         const queueResult = extractQueueName(match);
@@ -98,7 +102,7 @@ function dequeueHandler(mgr: QueueManager<string>): RouteHandler {
     };
 }
 
-function peekHandler(mgr: QueueManager<string>): RouteHandler {
+function peekHandler(mgr: QueueManager<JsonPayload>): RouteHandler {
     return (request, match) => {
         void request;
         const queueResult = extractQueueName(match);
@@ -113,7 +117,7 @@ function peekHandler(mgr: QueueManager<string>): RouteHandler {
     };
 }
 
-function lengthHandler(mgr: QueueManager<string>): RouteHandler {
+function lengthHandler(mgr: QueueManager<JsonPayload>): RouteHandler {
     return (request, match) => {
         void request;
         const queueResult = extractQueueName(match);
@@ -129,7 +133,7 @@ function lengthHandler(mgr: QueueManager<string>): RouteHandler {
     };
 }
 
-function registerRoutes(router: Router, mgr: QueueManager<string>): void {
+function registerRoutes(router: Router, mgr: QueueManager<JsonPayload>): void {
     router.get("/health{/}?", () => {
         return new Response(JSON.stringify({ status: "ok" }), {
             status: 200,
@@ -153,7 +157,7 @@ function writeLog(destination: { writeSync(data: Uint8Array): number }, message:
 }
 
 export function createHandler(
-    mgr: QueueManager<string>,
+    mgr: QueueManager<JsonPayload>,
     apiToken: string,
     rateLimitRequests?: number,
 ) {

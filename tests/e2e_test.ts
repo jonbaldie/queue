@@ -4,13 +4,14 @@ import { createHandler } from "../src/handler.ts";
 import * as Persistency from "../src/persist.ts";
 import { RateLimiter } from "../src/rate_limiter.ts";
 import { parseConfig, ConfigError } from "../src/config.ts";
+import type { Payload } from "../src/payload.ts";
 
 // Shared helpers
 const API_TOKEN = "test-token";
 const authHeaders = { "Authorization": `Bearer ${API_TOKEN}` };
 
 function makeHandler(token = API_TOKEN, rateLimit = 100) {
-    const mgr = new QueueManager(new Persistency.MemoryStore());
+    const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>());
     return createHandler(mgr, token, rateLimit);
 }
 
