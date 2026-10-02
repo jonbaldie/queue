@@ -2238,24 +2238,35 @@ Deno.test("malformed percent-encoded queue names return 400 and do not create qu
             body: JSON.stringify({ payload: "item" }),
         }));
         assertEquals(enqRes.status, 400, `enqueue with ${bad} should return 400`);
+        assertEquals(await enqRes.text(), "Invalid queue name");
 
         // dequeue
         const deqRes = await handler(new Request(`http://localhost/dequeue/${bad}`, {
             headers: authHeaders,
         }));
         assertEquals(deqRes.status, 400, `dequeue with ${bad} should return 400`);
+        assertEquals(await deqRes.text(), "Invalid queue name");
 
         // peek
         const peekRes = await handler(new Request(`http://localhost/peek/${bad}`, {
             headers: authHeaders,
         }));
         assertEquals(peekRes.status, 400, `peek with ${bad} should return 400`);
+        assertEquals(await peekRes.text(), "Invalid queue name");
 
         // length
         const lenRes = await handler(new Request(`http://localhost/length/${bad}`, {
             headers: authHeaders,
         }));
         assertEquals(lenRes.status, 400, `length with ${bad} should return 400`);
+        assertEquals(await lenRes.text(), "Invalid queue name");
+
+        // HEAD dequeue
+        const headRes = await handler(new Request(`http://localhost/dequeue/${bad}`, {
+            method: "HEAD",
+            headers: authHeaders,
+        }));
+        assertEquals(headRes.status, 400, `HEAD dequeue with ${bad} should return 400`);
     }
 
     // Ensure no queues were created

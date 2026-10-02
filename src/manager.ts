@@ -1,12 +1,6 @@
 import { QueueEvent, QueueStore } from "./persist.ts"
-export const MAX_QUEUE_NAME_LENGTH = 128;
-
-export class QueueNameTooLongError extends Error {
-    constructor() {
-        super("Queue name too long");
-        this.name = "QueueNameTooLongError";
-    }
-}
+import { validateQueueName } from "./queue_name.ts";
+export { InvalidQueueNameError, MAX_QUEUE_NAME_LENGTH, QueueNameTooLongError } from "./queue_name.ts";
 
 /**
  * FIFO queue with O(1) amortized enqueue and dequeue.
@@ -77,18 +71,12 @@ export default class Manager<T = string> {
         return this;
     }
 
-    private validateName(name: string): void {
-        if (Array.from(name).length > MAX_QUEUE_NAME_LENGTH) {
-            throw new QueueNameTooLongError();
-        }
-    }
-
     public canCreateQueue(): boolean {
         return this.queues.size < this.queueCountLimit;
     }
 
     public canEnqueue(name: string): boolean {
-        this.validateName(name);
+        validateQueueName(name);
         const queue = this.find(name);
         if (!queue) {
             return this.canCreateQueue() && 0 < this.queueDepthLimit;
@@ -101,7 +89,7 @@ export default class Manager<T = string> {
     }
 
     public enqueue(name: string, payload: T): Manager<T> {
-        this.validateName(name);
+        validateQueueName(name);
         const existing = this.find(name);
         if (!existing && !this.canCreateQueue()) {
             throw new Error("Queue count limit reached");
@@ -123,7 +111,7 @@ export default class Manager<T = string> {
     }
 
     public dequeue(name: string): T | undefined {
-        this.validateName(name);
+        validateQueueName(name);
         const queue = this.find(name);
         if (!queue) {
             return undefined;
@@ -144,7 +132,7 @@ export default class Manager<T = string> {
     }
 
     public peek(name: string): T | undefined {
-        this.validateName(name);
+        validateQueueName(name);
         const queue = this.find(name);
 
         if (queue === undefined) {
@@ -155,7 +143,7 @@ export default class Manager<T = string> {
     }
 
     public length(name: string): number {
-        this.validateName(name);
+        validateQueueName(name);
         const queue = this.find(name);
         return queue ? queue.length : 0;
     }
