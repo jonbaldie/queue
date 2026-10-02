@@ -2238,24 +2238,35 @@ Deno.test("malformed percent-encoded queue names return 400 and do not create qu
             body: JSON.stringify({ payload: "item" }),
         }));
         assertEquals(enqRes.status, 400, `enqueue with ${bad} should return 400`);
+        assertEquals(await enqRes.text(), "Invalid queue name");
 
         // dequeue
         const deqRes = await handler(new Request(`http://localhost/dequeue/${bad}`, {
             headers: authHeaders,
         }));
         assertEquals(deqRes.status, 400, `dequeue with ${bad} should return 400`);
+        assertEquals(await deqRes.text(), "Invalid queue name");
 
         // peek
         const peekRes = await handler(new Request(`http://localhost/peek/${bad}`, {
             headers: authHeaders,
         }));
         assertEquals(peekRes.status, 400, `peek with ${bad} should return 400`);
+        assertEquals(await peekRes.text(), "Invalid queue name");
 
         // length
         const lenRes = await handler(new Request(`http://localhost/length/${bad}`, {
             headers: authHeaders,
         }));
         assertEquals(lenRes.status, 400, `length with ${bad} should return 400`);
+        assertEquals(await lenRes.text(), "Invalid queue name");
+
+        // HEAD dequeue
+        const headRes = await handler(new Request(`http://localhost/dequeue/${bad}`, {
+            method: "HEAD",
+            headers: authHeaders,
+        }));
+        assertEquals(headRes.status, 400, `HEAD dequeue with ${bad} should return 400`);
     }
 
     // Ensure no queues were created
@@ -2323,4 +2334,36 @@ Deno.test("queue name length counts Unicode code points", async () => {
     }));
     assertEquals(rejected.status, 400);
     assertEquals(await rejected.text(), "Queue name too long");
+});
+
+Deno.test("enqueue: payload errors take precedence over an over-length queue name (#148)", async () => {
+    const handler = makeHandler();
+    const longName = "a".repeat(129);
+
+    const tooLarge = await handler(new Request(`http://localhost/enqueue/${longName}`, {
+        method: "POST",
+        headers: { ...authHeaders, "Content-Type": "application/json", "Content-Length": "99999999" },
+        body: "{}",
+    }));
+    assertEquals(tooLarge.status, 413);
+    assertEquals(await tooLarge.text(), "Payload too large");
+
+    const badJson = await handler(new Request(`http://localhost/enqueue/${longName}`, {
+        method: "POST",
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: "{",
+    }));
+    assertEquals(badJson.status, 400);
+    assertEquals(await badJson.text(), "Invalid JSON");
+});
+
+Deno.test("enqueue: malformed queue name encoding takes precedence over payload errors (#148)", async () => {
+    const handler = makeHandler();
+    const res = await handler(new Request("http://localhost/enqueue/%E0%A4%A", {
+        method: "POST",
+        headers: { ...authHeaders, "Content-Type": "application/json", "Content-Length": "99999999" },
+        body: "{",
+    }));
+    assertEquals(res.status, 400);
+    assertEquals(await res.text(), "Invalid queue name");
 });

@@ -19,6 +19,7 @@ const productionUnits = new Map([
   ["queue-manager", ["src/manager.ts"]],
   ["persist-engine", ["src/persist.ts"]],
   ["payload", ["src/payload.ts"]],
+  ["queue-name", ["src/queue_name.ts"]],
   ["http-handler", ["src/handler.ts"]],
   ["entrypoint", ["main.ts"]],
 ]);
