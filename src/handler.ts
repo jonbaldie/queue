@@ -21,10 +21,13 @@ function queueNameErrorResponse(error: unknown): Response {
     throw error;
 }
 
-function queueRoute(handle: QueueRouteHandler): RouteHandler {
+function queueRoute(
+    handle: QueueRouteHandler,
+    parseName: (raw: string | undefined) => string = QueueName.parseQueueName,
+): RouteHandler {
     return async (request, match) => {
         try {
-            return await handle(QueueName.parseQueueName(match.pathname.groups.queue), request);
+            return await handle(parseName(match.pathname.groups.queue), request);
         } catch (error) {
             return queueNameErrorResponse(error);
         }
@@ -48,12 +51,12 @@ function enqueueHandler(mgr: QueueManager<JsonPayload>): QueueRouteHandler {
             mgr.enqueue(queueName, payload);
             return new Response(`Payload successfully queued onto ${queueName}.`);
         } catch (error) {
-            return payloadErrorResponse(error);
+            return enqueueErrorResponse(error);
         }
     };
 }
 
-function payloadErrorResponse(error: unknown): Response {
+function enqueueErrorResponse(error: unknown): Response {
     if (error instanceof Payload.PayloadTooLargeError) {
         return new Response(error.message, { status: 413 });
     }
@@ -106,7 +109,9 @@ function registerRoutes(router: Router, mgr: QueueManager<JsonPayload>): void {
             headers: { "Content-Type": "application/json" },
         });
     });
-    router.post("/enqueue/:queue", queueRoute(enqueueHandler(mgr)));
+    // Enqueue only decodes here; QueueManager applies the length rule after the
+    // payload is validated, so payload errors keep precedence over it.
+    router.post("/enqueue/:queue", queueRoute(enqueueHandler(mgr), QueueName.decodeQueueName));
     router.get("/dequeue/:queue", queueRoute(dequeueHandler(mgr)));
     router.get("/peek/:queue", queueRoute(peekHandler(mgr)));
     router.get("/length/:queue", queueRoute(lengthHandler(mgr)));

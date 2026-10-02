@@ -1,5 +1,5 @@
 import { assertEquals, assertNotEquals, assertThrows, assertRejects } from "jsr:@std/assert@1.0";
-import QueueManager, { QueueNameTooLongError } from "../src/manager.ts";
+import QueueManager, { MAX_QUEUE_NAME_LENGTH, QueueNameTooLongError } from "../src/manager.ts";
 import * as QueueName from "../src/queue_name.ts";
 import { createHandler } from "../src/handler.ts";
 import * as Persistency from "../src/persist.ts";
@@ -596,8 +596,9 @@ Deno.test("manager canEnqueue validates queue name", () => {
     assertThrows(() => mgr.canEnqueue("x".repeat(129)), QueueNameTooLongError);
 });
 
-Deno.test("manager re-exports the QueueName domain errors and limit", () => {
+Deno.test("manager re-exports QueueNameTooLongError and MAX_QUEUE_NAME_LENGTH", () => {
     assertEquals(QueueNameTooLongError, QueueName.QueueNameTooLongError);
+    assertEquals(MAX_QUEUE_NAME_LENGTH, QueueName.MAX_QUEUE_NAME_LENGTH);
 });
 
 Deno.test("manager applies QueueName rules to every operation without decoding", () => {

@@ -1,6 +1,6 @@
 import { QueueEvent, QueueStore } from "./persist.ts"
 import { validateQueueName } from "./queue_name.ts";
-export { InvalidQueueNameError, MAX_QUEUE_NAME_LENGTH, QueueNameTooLongError } from "./queue_name.ts";
+export { MAX_QUEUE_NAME_LENGTH, QueueNameTooLongError } from "./queue_name.ts";
 
 /**
  * FIFO queue with O(1) amortized enqueue and dequeue.

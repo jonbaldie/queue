@@ -1,5 +1,6 @@
 import { assertEquals, assertThrows } from "jsr:@std/assert@1.0";
 import {
+    decodeQueueName,
     InvalidQueueNameError,
     MAX_QUEUE_NAME_LENGTH,
     parseQueueName,
@@ -53,6 +54,22 @@ Deno.test("queue name: parse rejects malformed percent-encoding", () => {
 Deno.test("queue name: parse measures length after decoding", () => {
     assertEquals(parseQueueName("%61".repeat(128)), "a".repeat(128));
     assertThrows(() => parseQueueName("%61".repeat(129)), QueueNameTooLongError, "Queue name too long");
+});
+
+Deno.test("queue name: parse accepts 128 astral code points and rejects 129", () => {
+    const name128 = "😀".repeat(128);
+    assertEquals(parseQueueName(encodeURIComponent(name128)), name128);
+    assertThrows(() => parseQueueName(encodeURIComponent("😀".repeat(129))), QueueNameTooLongError);
+});
+
+Deno.test("queue name: decode percent-decodes without applying the length rule", () => {
+    assertEquals(decodeQueueName("a%20b"), "a b");
+    assertEquals(decodeQueueName("%61".repeat(129)), "a".repeat(129));
+});
+
+Deno.test("queue name: decode rejects missing and malformed names", () => {
+    assertThrows(() => decodeQueueName(undefined), InvalidQueueNameError, "Invalid queue name");
+    assertThrows(() => decodeQueueName("%E0%A4%A"), InvalidQueueNameError, "Invalid queue name");
 });
 
 Deno.test("queue name: validate accepts exactly MAX_QUEUE_NAME_LENGTH code points", () => {

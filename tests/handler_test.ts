@@ -2335,3 +2335,35 @@ Deno.test("queue name length counts Unicode code points", async () => {
     assertEquals(rejected.status, 400);
     assertEquals(await rejected.text(), "Queue name too long");
 });
+
+Deno.test("enqueue: payload errors take precedence over an over-length queue name (#148)", async () => {
+    const handler = makeHandler();
+    const longName = "a".repeat(129);
+
+    const tooLarge = await handler(new Request(`http://localhost/enqueue/${longName}`, {
+        method: "POST",
+        headers: { ...authHeaders, "Content-Type": "application/json", "Content-Length": "99999999" },
+        body: "{}",
+    }));
+    assertEquals(tooLarge.status, 413);
+    assertEquals(await tooLarge.text(), "Payload too large");
+
+    const badJson = await handler(new Request(`http://localhost/enqueue/${longName}`, {
+        method: "POST",
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: "{",
+    }));
+    assertEquals(badJson.status, 400);
+    assertEquals(await badJson.text(), "Invalid JSON");
+});
+
+Deno.test("enqueue: malformed queue name encoding takes precedence over payload errors (#148)", async () => {
+    const handler = makeHandler();
+    const res = await handler(new Request("http://localhost/enqueue/%E0%A4%A", {
+        method: "POST",
+        headers: { ...authHeaders, "Content-Type": "application/json", "Content-Length": "99999999" },
+        body: "{",
+    }));
+    assertEquals(res.status, 400);
+    assertEquals(await res.text(), "Invalid queue name");
+});

@@ -28,7 +28,14 @@ export function validateQueueName(name: string): string {
     return name;
 }
 
-function decodeQueueName(raw: string): string {
+/**
+ * Percent-decodes a raw Queue name without applying the length rule.
+ * Callers that decode with this must validate the name before use.
+ */
+export function decodeQueueName(raw: string | undefined): string {
+    if (raw === undefined) {
+        throw new InvalidQueueNameError();
+    }
     try {
         return decodeURIComponent(raw);
     } catch (error) {
@@ -44,8 +51,5 @@ function decodeQueueName(raw: string): string {
  * validated Queue name.
  */
 export function parseQueueName(raw: string | undefined): string {
-    if (raw === undefined) {
-        throw new InvalidQueueNameError();
-    }
     return validateQueueName(decodeQueueName(raw));
 }
