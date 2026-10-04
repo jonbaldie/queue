@@ -1,5 +1,6 @@
 import { assertEquals, assertNotEquals, assertThrows, assertRejects } from "jsr:@std/assert@1.0";
-import QueueManager, { QueueNameTooLongError } from "../src/manager.ts";
+import QueueManager, { MAX_QUEUE_NAME_LENGTH, QueueNameTooLongError } from "../src/manager.ts";
+import * as QueueName from "../src/queue_name.ts";
 import { createHandler } from "../src/handler.ts";
 import * as Persistency from "../src/persist.ts";
 import { RateLimiter } from "../src/rate_limiter.ts";
@@ -593,6 +594,28 @@ Deno.test("QueueNameTooLongError has correct message and name", () => {
 Deno.test("manager canEnqueue validates queue name", () => {
     const mgr = new QueueManager(new Persistency.MemoryStore());
     assertThrows(() => mgr.canEnqueue("x".repeat(129)), QueueNameTooLongError);
+});
+
+Deno.test("manager re-exports QueueNameTooLongError and MAX_QUEUE_NAME_LENGTH", () => {
+    assertEquals(QueueNameTooLongError, QueueName.QueueNameTooLongError);
+    assertEquals(MAX_QUEUE_NAME_LENGTH, QueueName.MAX_QUEUE_NAME_LENGTH);
+});
+
+Deno.test("manager applies QueueName rules to every operation without decoding", () => {
+    const mgr = new QueueManager(new Persistency.MemoryStore());
+    for (const operation of [
+        (name: string) => mgr.canEnqueue(name),
+        (name: string) => mgr.enqueue(name, "item"),
+        (name: string) => mgr.dequeue(name),
+        (name: string) => mgr.peek(name),
+        (name: string) => mgr.length(name),
+    ]) {
+        assertThrows(() => operation(""), QueueName.InvalidQueueNameError);
+        assertThrows(() => operation("x".repeat(129)), QueueName.QueueNameTooLongError);
+    }
+    mgr.enqueue("%41", "raw");
+    assertEquals(mgr.listQueues(), ["%41"]);
+    assertEquals(mgr.length("A"), 0);
 });
 
 Deno.test("manager enqueue throws when queue depth limit reached", () => {
