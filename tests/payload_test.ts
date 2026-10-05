@@ -192,7 +192,7 @@ Deno.test("readAndValidatePayload: respects custom maxBytes limit", async () => 
     });
     // Stream size is 19 bytes. Set maxBytes to 10.
     await assertRejects(
-        () => readAndValidatePayload(stream, 10),
+        () => readAndValidatePayload(stream, { maxBytes: 10 }),
         PayloadTooLargeError,
         "Payload too large",
     );
@@ -206,7 +206,7 @@ Deno.test("readAndValidatePayload: rejects stream when size limit is exceeded", 
         },
     });
     await assertRejects(
-        () => readAndValidatePayload(stream, 40),
+        () => readAndValidatePayload(stream, { maxBytes: 40 }),
         PayloadTooLargeError,
         "Payload too large",
     );
@@ -265,3 +265,55 @@ Deno.test("readAndValidatePayload: rejects exactly 1 MiB + 1 byte", async () => 
 });
 
 
+
+Deno.test("readAndValidatePayload: rejects an oversized declared content length before reading the body", async () => {
+    const bytes = new TextEncoder().encode('{"payload":"small"}');
+    const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+            controller.enqueue(bytes);
+            controller.close();
+        },
+    });
+    await assertRejects(
+        () => readAndValidatePayload(stream, { maxBytes: 100, contentLength: "101" }),
+        PayloadTooLargeError,
+        "Payload too large",
+    );
+
+    assertEquals(stream.locked, false);
+    const { value } = await stream.getReader().read();
+    assertEquals(value, bytes);
+});
+
+Deno.test("readAndValidatePayload: accepts a declared content length exactly at the limit", async () => {
+    const bytes = new TextEncoder().encode('{"payload":"12345"}');
+    const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+            controller.enqueue(bytes);
+            controller.close();
+        },
+    });
+    const result = await readAndValidatePayload(stream, { maxBytes: 19, contentLength: "19" });
+    assertEquals(result, "12345");
+});
+
+for (const contentLength of ["5", "not-a-number", "", null]) {
+    Deno.test(`readAndValidatePayload: enforces streamed limit when content length is ${JSON.stringify(contentLength)}`, async () => {
+        let cancelObserved = false;
+        const stream = new ReadableStream<Uint8Array>({
+            start(controller) {
+                controller.enqueue(new Uint8Array(50));
+                controller.enqueue(new Uint8Array(50));
+            },
+            cancel() {
+                cancelObserved = true;
+            },
+        });
+        await assertRejects(
+            () => readAndValidatePayload(stream, { maxBytes: 40, contentLength }),
+            PayloadTooLargeError,
+            "Payload too large",
+        );
+        assertEquals(cancelObserved, true);
+    });
+}

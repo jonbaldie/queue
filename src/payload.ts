@@ -152,10 +152,26 @@ export function parsePayloadBody(body: string | Uint8Array): Payload {
     return extractPayloadValue(json);
 }
 
+export interface ReadPayloadOptions {
+    maxBytes?: number;
+    // Declared body length, e.g. a Content-Length header. Only used to reject
+    // early; the streamed byte count is always enforced.
+    contentLength?: string | null;
+}
+
+function declaresTooManyBytes(contentLength: string | null | undefined, maxBytes: number): boolean {
+    return contentLength !== undefined && contentLength !== null &&
+        parseInt(contentLength) > maxBytes;
+}
+
 export async function readAndValidatePayload(
     stream: ReadableStream<Uint8Array> | null,
-    maxBytes: number = DEFAULT_MAX_PAYLOAD_SIZE,
+    options: ReadPayloadOptions = {},
 ): Promise<Payload> {
+    const { maxBytes = DEFAULT_MAX_PAYLOAD_SIZE, contentLength } = options;
+    if (declaresTooManyBytes(contentLength, maxBytes)) {
+        throw new PayloadTooLargeError();
+    }
     if (stream === null) {
         return parsePayloadBody("");
     }
