@@ -33,14 +33,10 @@ function enqueueHandler(mgr: QueueManager<JsonPayload>): RouteHandler {
         }
         const queueName = queueResult.name;
         try {
-            const contentLength = request.headers.get("content-length");
-            if (contentLength && parseInt(contentLength) > Payload.DEFAULT_MAX_PAYLOAD_SIZE) {
-                return new Response("Payload too large", { status: 413 });
-            }
-            const payload = await Payload.readAndValidatePayload(
-                request.body,
-                Payload.DEFAULT_MAX_PAYLOAD_SIZE,
-            );
+            const payload = await Payload.readAndValidatePayload(request.body, {
+                maxBytes: Payload.DEFAULT_MAX_PAYLOAD_SIZE,
+                contentLength: request.headers.get("content-length"),
+            });
             if (!mgr.canEnqueue(queueName)) {
                 return new Response("Queue full or too many queues", { status: 507 });
             }
