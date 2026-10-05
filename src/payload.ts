@@ -160,8 +160,7 @@ export interface ReadPayloadOptions {
 }
 
 function declaresTooManyBytes(contentLength: string | null | undefined, maxBytes: number): boolean {
-    return contentLength !== undefined && contentLength !== null &&
-        parseInt(contentLength) > maxBytes;
+    return contentLength != null && parseInt(contentLength) > maxBytes;
 }
 
 export async function readAndValidatePayload(

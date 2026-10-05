@@ -546,6 +546,20 @@ Deno.test("response body: exactly 1 MiB is accepted", async () => {
     assertEquals(await lengthResponse.text(), "1");
 });
 
+Deno.test("response body: Content-Length exactly at 1 MiB is accepted", async () => {
+    const handler = makeHandler();
+    const maxBodySize = 1024 * 1024;
+    const emptyPayloadBody = '{"payload":""}';
+    const body = `{"payload":"${"x".repeat(maxBodySize - emptyPayloadBody.length)}"}`;
+
+    const response = await handler(new Request("http://localhost/enqueue/exact-length", {
+        method: "POST",
+        body,
+        headers: { ...auth, "content-length": String(maxBodySize) },
+    }));
+    assertEquals(response.status, 200);
+});
+
 Deno.test("response body: streaming overflow ignores a small Content-Length", async () => {
     const handler = makeHandler();
     const body = new ReadableStream<Uint8Array>({

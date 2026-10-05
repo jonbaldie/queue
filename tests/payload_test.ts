@@ -264,8 +264,6 @@ Deno.test("readAndValidatePayload: rejects exactly 1 MiB + 1 byte", async () => 
     );
 });
 
-
-
 Deno.test("readAndValidatePayload: rejects an oversized declared content length before reading the body", async () => {
     const bytes = new TextEncoder().encode('{"payload":"small"}');
     const stream = new ReadableStream<Uint8Array>({
