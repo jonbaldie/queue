@@ -1,3 +1,5 @@
+import type { JsonValue } from "./payload.ts";
+
 export interface QueueEvent<T> {
     queue: string;
     payload: T;
@@ -39,7 +41,8 @@ export interface QueueStore<T = string> {
     close(): void;
 }
 
-export class FileStore<T = string> implements QueueStore<T> {
+/** Persists payloads as JSON; T must be JSON-compatible. */
+export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
     private directory: string = '';
     private writeHandle: Deno.FsFile | null = null;
     private encoder = new TextEncoder();

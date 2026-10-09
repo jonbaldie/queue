@@ -6,6 +6,9 @@ import { RateLimiter } from "../src/rate_limiter.ts";
 import { parseConfig, ConfigError } from "../src/config.ts";
 import type { Payload } from "../src/payload.ts";
 
+// @ts-expect-error FileStore can only persist JSON-compatible payloads.
+new Persistency.FileStore<Date>();
+
 // Shared helpers
 const API_TOKEN = "test-token";
 const authHeaders = { "Authorization": `Bearer ${API_TOKEN}` };
@@ -180,6 +183,26 @@ Deno.test("persist FileStore.saveEvent() waits for an existing file lock", async
     Deno.removeSync(tmpDir, { recursive: true });
 });
 
+Deno.test("FileStore preserves the existing JSON-lines format", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const store = new Persistency.FileStore<Payload>();
+    store.dir(tmpDir);
+    try {
+        store.saveEvent("q", "hello", true);
+        store.saveEvent("q", { nested: [1, true, "x"] }, true);
+        store.close();
+
+        assertEquals(
+            Deno.readTextFileSync(tmpDir + "/persist.dat"),
+            '{"queue":"q","payload":"hello","enqueue":true,"dequeue":false}\n' +
+                '{"queue":"q","payload":{"nested":[1,true,"x"]},"enqueue":true,"dequeue":false}\n',
+        );
+    } finally {
+        store.close();
+        Deno.removeSync(tmpDir, { recursive: true });
+    }
+});
+
 // ── FileStore.clear() creates file if absent ─────────────────────────────────
 
 Deno.test("persist FileStore.clear() creates file when it does not exist", () => {
@@ -208,7 +231,7 @@ Deno.test("persist FileStore.clear() truncates existing content", () => {
 
 Deno.test("persist FileStore.loadState() reads large file correctly", () => {
     const tmpDir = Deno.makeTempDirSync();
-    const p = new Persistency.FileStore<any>();
+    const p = new Persistency.FileStore<{ payload: string; i: number }>();
     p.dir(tmpDir + "/");
     p.clear();
     for (let i = 0; i < 100; i++) {
