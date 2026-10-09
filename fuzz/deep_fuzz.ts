@@ -192,7 +192,7 @@ console.log("\n--- Testing Persistence Invariants ---");
         mgr.enqueue("q1", { a: [1, 2, { b: "hello" }], c: true });
         mgr.enqueue("q1", "second");
         mgr.enqueue("q2", 42);
-        mgr.enqueue("q2", null as any); // if enqueued directly in manager
+        mgr.enqueue("q2", null); // if enqueued directly in manager
         mgr.enqueue("q3", "");
         mgr.dequeue("q1"); // dequeue "first"
 
