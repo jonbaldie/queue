@@ -3,6 +3,7 @@ import * as Persistency from "../src/persist.ts";
 import { createHandler } from "../src/handler.ts";
 import { RateLimiter } from "../src/rate_limiter.ts";
 import { parseConfig, ConfigError } from "../src/config.ts";
+import type { JsonValue } from "../src/payload.ts";
 
 console.log("=== STARTING DEEP PROPERTY & INVARIANT FUZZING ===");
 
@@ -183,7 +184,7 @@ console.log("\n--- Testing Persistence Invariants ---");
 {
     const tempDir = await Deno.makeTempDir();
     try {
-        const store = new Persistency.FileStore<unknown>();
+        const store = new Persistency.FileStore<JsonValue>();
         store.dir(tempDir);
         const mgr = new QueueManager(store, 100, 50, true);
 
@@ -198,7 +199,7 @@ console.log("\n--- Testing Persistence Invariants ---");
         mgr.save();
 
         // Create fresh manager from same store
-        const store2 = new Persistency.FileStore<unknown>();
+        const store2 = new Persistency.FileStore<JsonValue>();
         store2.dir(tempDir);
         const mgr2 = new QueueManager(store2, 100, 50, true);
         mgr2.load();

@@ -676,6 +676,35 @@ Deno.test("load snapshots remaining items so a second load restores them", () =>
     assertEquals(loaded2.dequeue("jobs"), "keep-me");
 });
 
+Deno.test("FileStore reloads nested JSON payloads through QueueManager", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    try {
+        const expected: Payload = {
+            name: "job",
+            metadata: {
+                retries: 3,
+                active: true,
+                tags: ["urgent", "batch"],
+                lastError: null,
+            },
+        };
+        const firstStore = new Persistency.FileStore<Payload>();
+        firstStore.dir(tmpDir);
+        const firstManager = new QueueManager<Payload>(firstStore);
+        firstManager.enqueue("jobs", expected);
+        firstStore.close();
+
+        const reopenedStore = new Persistency.FileStore<Payload>();
+        reopenedStore.dir(tmpDir);
+        const reopenedManager = new QueueManager<Payload>(reopenedStore);
+        reopenedManager.load();
+        assertEquals(reopenedManager.peek("jobs"), expected);
+        reopenedStore.close();
+    } finally {
+        Deno.removeSync(tmpDir, { recursive: true });
+    }
+});
+
 Deno.test("FileStore load snapshots remaining items onto disk", () => {
     const tmp = Deno.makeTempDirSync();
     try {
