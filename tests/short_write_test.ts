@@ -145,3 +145,94 @@ Deno.test("e2e: a snapshot that cannot be fully written keeps the complete persi
         await Deno.remove(tempDir, { recursive: true }).catch(() => {});
     }
 });
+
+async function dequeue(port: number, queue: string): Promise<{ status: number; body: string }> {
+    const res = await fetch(`http://127.0.0.1:${port}/dequeue/${queue}`, { headers: AUTH });
+    return { status: res.status, body: await res.text() };
+}
+
+// Byte cap of `ulimit -f` on this host. The unit is 512 bytes on Linux and
+// 1024 on macOS, so measure it instead of assuming.
+async function fileSizeCap(dir: string): Promise<number> {
+    const probeFile = `${dir}/cap-probe.ts`;
+    const probeData = `${dir}/cap-probe.dat`;
+    await Deno.writeTextFile(
+        probeFile,
+        `
+const path = Deno.args[0];
+let lo = 0;
+let hi = 2_000_000;
+while (lo < hi) {
+  const mid = Math.ceil((lo + hi) / 2);
+  try {
+    Deno.writeFileSync(path, new Uint8Array(mid));
+    lo = mid;
+  } catch {
+    hi = mid - 1;
+  }
+}
+console.log(lo);
+`,
+    );
+    const child = new Deno.Command("sh", {
+        args: [
+            "-c",
+            `trap '' XFSZ; ulimit -f ${FILE_SIZE_LIMIT_BLOCKS}; exec "$0" run --allow-write "$1" "$2"`,
+            Deno.execPath(),
+            probeFile,
+            probeData,
+        ],
+        stdout: "piped",
+        stderr: "piped",
+    }).spawn();
+    try {
+        const stdout = await new Response(child.stdout).text();
+        const stderr = await new Response(child.stderr).text();
+        const status = await child.status;
+        if (!status.success) {
+            throw new Error(stderr);
+        }
+        return Number(stdout.trim());
+    } finally {
+        await child.stdout.cancel().catch(() => {});
+        await child.stderr.cancel().catch(() => {});
+    }
+}
+
+Deno.test("e2e: a failed persist write leaves the queue unchanged (#161)", async () => {
+    const tempDir = await Deno.makeTempDir();
+    const cap = await fileSizeCap(tempDir);
+    const overhead = logLine("q", "").length;
+    const payload = "x".repeat(cap - overhead);
+    // The accepted item fills persist.dat to the cap, so the dequeue event
+    // (the same number of bytes) cannot be written. That is the minimised
+    // full-volume failure: the log write throws, the client sees 500.
+    assertEquals(logLine("q", payload).length, cap);
+
+    let limited: Deno.ChildProcess | undefined;
+    let recovered: Deno.ChildProcess | undefined;
+    try {
+        const started = await startServer(tempDir, true);
+        limited = started.child;
+        assertEquals(await enqueue(started.port, "q", payload), 200);
+        assertEquals(await length(started.port, "q"), "1");
+
+        const failedDequeue = await dequeue(started.port, "q");
+        assertEquals(failedDequeue.status, 500);
+        assertEquals(await length(started.port, "q"), "1");
+
+        assertEquals(await enqueue(started.port, "q", "during-full"), 500);
+        assertEquals(await length(started.port, "q"), "1");
+
+        limited.kill("SIGKILL");
+        await limited.status;
+
+        const restarted = await startServer(tempDir, false);
+        recovered = restarted.child;
+        assertEquals(await drain(restarted.port, "q"), [payload]);
+    } finally {
+        if (limited) await stopServer(limited);
+        if (recovered) await stopServer(recovered);
+        await Deno.remove(tempDir, { recursive: true }).catch(() => {});
+    }
+});
