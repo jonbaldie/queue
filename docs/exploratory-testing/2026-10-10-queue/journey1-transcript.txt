@@ -1,0 +1,17 @@
+## journey1 default rate limit
+{"rateLimit":"default","statuses":{"200":99,"204":1,"429":94},"sent":120,"received":41,"unique":41,"duplicates":0,"perProducerOrdered":true,"finalLength":"Too many requests"}
+## journey1 RATE_LIMIT_REQUESTS=100000
+{"rateLimit":"100000","statuses":{"200":240,"204":34},"sent":120,"received":120,"unique":120,"duplicates":0,"perProducerOrdered":true,"finalLength":"0"}
+## 429 response headers (RATE_LIMIT_REQUESTS=2)
+req 1 -> 200
+req 2 -> 200
+req 3 -> 429
+HTTP/1.1 429 Too Many Requests
+content-type: text/plain;charset=UTF-8
+vary: Accept-Encoding
+content-length: 17
+date: Sat, 10 Oct 2026 00:40:46 GMT
+
+Too many requests
+## unauthenticated requests consume the same budget
+wrong token -> 429

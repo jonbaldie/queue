@@ -13,3 +13,4 @@ evidence. Replay scripts run from the repository root.
 | 2026-09-19 | [2026-09-19-report.md](./2026-09-19-queue/2026-09-19-report.md) | Docker `--persist` path (#114), snapshot-rewrite data loss (#115), invalid UTF-8 accepted (#116) |
 | 2026-09-26 | [2026-09-26-report.md](./2026-09-26-queue/2026-09-26-report.md) | None |
 | 2026-10-03 | [2026-10-03-report.md](./2026-10-03-queue/2026-10-03-report.md) | None |
+| 2026-10-10 | [2026-10-10-report.md](./2026-10-10-queue/2026-10-10-report.md) | Full-disk short writes corrupt `persist.dat` (#160), failed persist writes still mutate queues (#161) |
