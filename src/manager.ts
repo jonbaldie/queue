@@ -110,14 +110,16 @@ export default class Manager<T = string> {
         if (queue.length >= this.queueDepthLimit) {
             throw new Error("Queue depth limit reached");
         }
+        // Log before mutating, so an item that cannot be persisted is
+        // rejected rather than held only in memory.
+        if (this.persistEnabled) {
+            this.store.saveEvent(name, payload, true);
+        }
+
         if (!existing) {
             this.register(name, queue);
         }
         queue.push(payload);
-
-        if (this.persistEnabled) {
-            this.store.saveEvent(name, payload, true);
-        }
 
         return this;
     }
@@ -129,15 +131,18 @@ export default class Manager<T = string> {
             return undefined;
         }
 
-        const wasNonEmpty = queue.length > 0;
-        const payload = queue.shift();
-
-        if (wasNonEmpty && queue.length === 0) {
-            this.queues.delete(name);
+        const payload = queue.peek();
+        if (payload === undefined) {
+            return undefined;
         }
 
-        if (payload !== undefined && this.persistEnabled) {
+        if (this.persistEnabled) {
             this.store.saveEvent(name, payload, false);
+        }
+
+        queue.shift();
+        if (queue.length === 0) {
+            this.queues.delete(name);
         }
 
         return payload;

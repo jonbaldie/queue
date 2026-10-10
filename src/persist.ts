@@ -108,30 +108,52 @@ export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
     }
 
     public saveEvent(queueName: string, payload: T, isEnqueue: boolean): void {
-        this.ensureOpen();
-        this.writeHandle!.lockSync(true);
-        try {
-            this.writeHandle!.writeSync(this.serialize({
-                queue: queueName,
-                payload: payload,
-                enqueue: isEnqueue,
-                dequeue: !isEnqueue,
-            }));
-        } finally {
-            this.writeHandle!.unlockSync();
-        }
+        this.append([{
+            queue: queueName,
+            payload: payload,
+            enqueue: isEnqueue,
+            dequeue: !isEnqueue,
+        }]);
     }
 
     public saveBatch(events: Array<QueueEvent<T>>): void {
         if (events.length === 0) return;
+        this.append(events);
+    }
+
+    // writeSync() may write fewer bytes than requested (e.g. on a full
+    // volume) without throwing, so keep writing until every byte is down
+    // or the OS reports the error.
+    private writeAll(file: Deno.FsFile, bytes: Uint8Array): void {
+        let offset = 0;
+        while (offset < bytes.length) {
+            const written = file.writeSync(bytes.subarray(offset));
+            if (written === 0) {
+                throw new Error("Failed to write to " + this.path + ": wrote 0 bytes");
+            }
+            offset += written;
+        }
+    }
+
+    // A failed append is rolled back to the previous end of the log, so a
+    // partial line can never be glued onto the next appended event.
+    private append(events: Array<QueueEvent<T>>): void {
         this.ensureOpen();
-        this.writeHandle!.lockSync(true);
+        const handle = this.writeHandle!;
+        handle.lockSync(true);
         try {
-            for (const event of events) {
-                this.writeHandle!.writeSync(this.serialize(event));
+            const end = handle.statSync().size;
+            try {
+                for (const event of events) {
+                    this.writeAll(handle, this.serialize(event));
+                }
+            } catch (error) {
+                handle.truncateSync(end);
+                handle.seekSync(end, Deno.SeekMode.Start);
+                throw error;
             }
         } finally {
-            this.writeHandle!.unlockSync();
+            handle.unlockSync();
         }
     }
 
@@ -144,7 +166,7 @@ export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
             temp.lockSync(true);
             try {
                 for (const event of events) {
-                    temp.writeSync(this.serialize(event));
+                    this.writeAll(temp, this.serialize(event));
                 }
                 temp.syncSync();
             } finally {

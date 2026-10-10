@@ -69,7 +69,14 @@ async function shutdown(signal: string): Promise<void> {
     // If we're using file persistency, save all current state to persistant storage
     if (PERSIST_ENGINE instanceof Persistency.FileStore) {
         writeLog("Flushing data to persist.dat...\n");
-        MANAGER.save();
+        try {
+            MANAGER.save();
+        } catch (error) {
+            // The previous persist.dat is left in place; it still holds every logged item.
+            writeLog(`Failed to flush data to persist.dat: ${error instanceof Error ? error.message : error}`);
+            PERSIST_ENGINE.close();
+            Deno.exit(1);
+        }
     }
 
     PERSIST_ENGINE.close();
