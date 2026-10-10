@@ -1,0 +1,215 @@
+## run 1: SIGKILL crash after disk-full episode
+enqueue q -> 200
+free KiB after filler: 0
+enqueue q -> 200
+length q -> 2
+persist.dat bytes:     4096
+filler removed; free KiB: 1896
+enqueue q -> 200
+length q -> 3
+persist.dat lines:        2  bytes:     4171
+last 120 bytes of persist.dat:
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA{"queue":"q","payload":"after-space-freed","enqueue":true,"dequeue":false}
+
+--- stopping server with SIGKILL
+--- after restart
+length q -> 1
+dequeue q -> 200 "before-full"
+dequeue q -> 204 
+dequeue q -> 204 
+dequeue q -> 204 
+
+## run 2: replay, SIGKILL crash
+enqueue q -> 200
+free KiB after filler: 0
+enqueue q -> 200
+length q -> 2
+persist.dat bytes:     4096
+filler removed; free KiB: 1896
+enqueue q -> 200
+length q -> 3
+persist.dat lines:        2  bytes:     4171
+last 120 bytes of persist.dat:
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA{"queue":"q","payload":"after-space-freed","enqueue":true,"dequeue":false}
+
+--- stopping server with SIGKILL
+--- after restart
+length q -> 1
+dequeue q -> 200 "before-full"
+dequeue q -> 204 
+dequeue q -> 204 
+dequeue q -> 204 
+
+## run 3: variation, graceful SIGTERM
+enqueue q -> 200
+free KiB after filler: 0
+enqueue q -> 200
+length q -> 2
+persist.dat bytes:     4096
+filler removed; free KiB: 1896
+enqueue q -> 200
+length q -> 3
+persist.dat lines:        2  bytes:     4171
+last 120 bytes of persist.dat:
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA{"queue":"q","payload":"after-space-freed","enqueue":true,"dequeue":false}
+
+--- stopping server with SIGTERM
+--- after restart
+length q -> 3
+dequeue q -> 200 "before-full"
+dequeue q -> 200 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+dequeue q -> 200 "after-space-freed"
+dequeue q -> 204 
+
+## snapshot near-full run 1
+enqueue q -> 200
+enqueue q -> 200
+length q -> 2
+persist.dat bytes before shutdown:   200123
+free KiB before shutdown: 100
+server exit status: 0
+Flushing data to persist.dat...
+
+Goodbye!
+persist.dat bytes after shutdown:     4096
+--- after restart (space freed)
+length q -> 1
+dequeue q -> 200 "small-1"
+dequeue q -> 204 
+dequeue q -> 204 
+
+## snapshot near-full run 2
+enqueue q -> 200
+enqueue q -> 200
+length q -> 2
+persist.dat bytes before shutdown:   200123
+free KiB before shutdown: 100
+server exit status: 0
+Flushing data to persist.dat...
+
+Goodbye!
+persist.dat bytes after shutdown:     4096
+--- after restart (space freed)
+length q -> 1
+dequeue q -> 200 "small-1"
+dequeue q -> 204 
+dequeue q -> 204 
+
+## NOTE: runs 1-2 below wrote the server log onto the full volume. The final
+## 'length q -> Internal Server Error' is a harness artifact (log write failed),
+## not a product failure. Runs 3-4 keep the log off-volume.
+## ENOSPC enqueue/dequeue run 1
+enqueue q "first" -> 200
+free KiB: 0
+enqueue q "pad-1-<pad>" -> 200
+enqueue q "pad-2-<pad>" -> 500
+enqueue q "pad-3-<pad>" -> 500
+enqueue q "during-full" -> 500
+length q -> 5
+dequeue q -> 500 
+length q -> Internal Server Error
+server log tail:
+    at writeSync (ext:deno_io/12_io.js:53:15)
+    at FsFile.writeSync (ext:deno_fs/30_fs.js:609:12)
+    at FileStore.saveEvent (file:///Users/jonathanbaldie/.fleet/events/scratch/1b63e1b956f0b51cb469524917d2565b246146118f585930ba0103e453bee461/deno-compile-que
+    at Manager.dequeue (file:///Users/jonathanbaldie/.fleet/events/scratch/1b63e1b956f0b51cb469524917d2565b246146118f585930ba0103e453bee461/deno-compile-queue/s
+    at Object.handler (file:///Users/jonathanbaldie/.fleet/events/scratch/1b63e1b956f0b51cb469524917d2565b246146118f585930ba0103e453bee461/deno-compile-queue/sr
+    at handle (file:///Users/jonathanbaldie/.fleet/events/scratch/1b63e1b956f0b51cb469524917d2565b2461461
+## ENOSPC enqueue/dequeue run 2
+enqueue q "first" -> 200
+free KiB: 0
+enqueue q "pad-1-<pad>" -> 200
+enqueue q "pad-2-<pad>" -> 500
+enqueue q "pad-3-<pad>" -> 500
+enqueue q "during-full" -> 500
+length q -> 5
+dequeue q -> 500 
+length q -> Internal Server Error
+server log tail:
+    at writeSync (ext:deno_io/12_io.js:53:15)
+    at FsFile.writeSync (ext:deno_fs/30_fs.js:609:12)
+    at FileStore.saveEvent (file:///Users/jonathanbaldie/.fleet/events/scratch/1b63e1b956f0b51cb469524917d2565b246146118f585930ba0103e453bee461/deno-compile-que
+    at Manager.dequeue (file:///Users/jonathanbaldie/.fleet/events/scratch/1b63e1b956f0b51cb469524917d2565b246146118f585930ba0103e453bee461/deno-compile-queue/s
+    at Object.handler (file:///Users/jonathanbaldie/.fleet/events/scratch/1b63e1b956f0b51cb469524917d2565b246146118f585930ba0103e453bee461/deno-compile-queue/sr
+    at handle (file:///Users/jonathanbaldie/.fleet/events/scratch/1b63e1b956f0b51cb469524917d2565b2461461
+## ENOSPC enqueue/dequeue run 3 (server log off-volume)
+enqueue q "first" -> 200
+free KiB: 0
+enqueue q "pad-1-<pad>" -> 200
+enqueue q "pad-2-<pad>" -> 500
+enqueue q "pad-3-<pad>" -> 500
+enqueue q "during-full" -> 500
+length q -> 5
+dequeue q -> 500 Internal Server Error
+length q -> 4
+dequeue q -> 500 Internal Server Error
+length q -> 3
+filler removed (space available again)
+dequeue q -> 200 "pad-2-<pad>
+dequeue q -> 200 "pad-3-<pad>
+dequeue q -> 200 "during-full"
+dequeue q -> 204 
+dequeue q -> 204 
+server log (no stack frames):
+GET http://127.0.0.1:39603/health 200 1.74ms
+POST http://127.0.0.1:39603/enqueue/q 200 3.90ms
+POST http://127.0.0.1:39603/enqueue/q 200 0.64ms
+POST http://127.0.0.1:39603/enqueue/q 500 0.55ms
+Error: No space left on device (os error 28)
+POST http://127.0.0.1:39603/enqueue/q 500 0.57ms
+Error: No space left on device (os error 28)
+POST http://127.0.0.1:39603/enqueue/q 500 0.23ms
+Error: No space left on device (os error 28)
+GET http://127.0.0.1:39603/length/q 200 0.18ms
+GET http://127.0.0.1:39603/dequeue/q 500 0.33ms
+Error: No space left on device (os error 28)
+GET http://127.0.0.1:39603/length/q 200 0.11ms
+GET http://127.0.0.1:39603/dequeue/q 500 0.13ms
+Error: No space left on device (os error 28)
+GET http://127.0.0.1:39603/length/q 200 0.08ms
+GET http://127.0.0.1:39603/dequeue/q 200 0.15ms
+GET http://127.0.0.1:39603/dequeue/q 200 0.11ms
+GET http://127.0.0.1:39603/dequeue/q 200 0.07ms
+GET http://127.0.0.1:39603/dequeue/q 204 0.04ms
+GET http://127.0.0.1:39603/dequeue/q 204 0.03ms
+
+## ENOSPC enqueue/dequeue run 4 (server log off-volume)
+enqueue q "first" -> 200
+free KiB: 0
+enqueue q "pad-1-<pad>" -> 200
+enqueue q "pad-2-<pad>" -> 500
+enqueue q "pad-3-<pad>" -> 500
+enqueue q "during-full" -> 500
+length q -> 5
+dequeue q -> 500 Internal Server Error
+length q -> 4
+dequeue q -> 500 Internal Server Error
+length q -> 3
+filler removed (space available again)
+dequeue q -> 200 "pad-2-<pad>
+dequeue q -> 200 "pad-3-<pad>
+dequeue q -> 200 "during-full"
+dequeue q -> 204 
+dequeue q -> 204 
+server log (no stack frames):
+GET http://127.0.0.1:39604/health 200 1.24ms
+POST http://127.0.0.1:39604/enqueue/q 200 2.32ms
+POST http://127.0.0.1:39604/enqueue/q 200 0.55ms
+POST http://127.0.0.1:39604/enqueue/q 500 0.54ms
+Error: No space left on device (os error 28)
+POST http://127.0.0.1:39604/enqueue/q 500 0.44ms
+Error: No space left on device (os error 28)
+POST http://127.0.0.1:39604/enqueue/q 500 0.25ms
+Error: No space left on device (os error 28)
+GET http://127.0.0.1:39604/length/q 200 0.20ms
+GET http://127.0.0.1:39604/dequeue/q 500 0.29ms
+Error: No space left on device (os error 28)
+GET http://127.0.0.1:39604/length/q 200 0.13ms
+GET http://127.0.0.1:39604/dequeue/q 500 0.13ms
+Error: No space left on device (os error 28)
+GET http://127.0.0.1:39604/length/q 200 0.07ms
+GET http://127.0.0.1:39604/dequeue/q 200 0.17ms
+GET http://127.0.0.1:39604/dequeue/q 200 0.10ms
+GET http://127.0.0.1:39604/dequeue/q 200 0.11ms
+GET http://127.0.0.1:39604/dequeue/q 204 0.06ms
+GET http://127.0.0.1:39604/dequeue/q 204 0.05ms

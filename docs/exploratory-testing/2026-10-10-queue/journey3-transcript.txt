@@ -1,0 +1,27 @@
+### 3a: named volume survives container recreation (README Persistency section)
+enqueue jobs -> 200
+enqueue jobs -> 200
+dequeue jobs -> 200 {"id":1}
+container force-removed (no graceful shutdown)
+length jobs -> 1
+dequeue jobs -> 200 {"id":2}
+dequeue jobs -> 204 
+### 3b: README volume advice without --persist (default CMD)
+enqueue nopersist -> 200
+length nopersist after restart -> 0
+### 3c: graceful stop with a nearly full 2 MiB tmpfs volume (Linux)
+enqueue q -> 200
+enqueue q -> 200
+length q -> 2
+persist.dat bytes before stop: 200123
+tmpfs               2048  1948       100  96% /data
+Flushing data to persist.dat...
+
+Goodbye!
+queue container: exit=0
+persist.dat bytes after stop: 102400
+--- after restart (space freed)
+length q -> 1
+dequeue q -> 200 "small-1"
+dequeue q -> 204 
+dequeue q -> 204 
