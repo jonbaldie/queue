@@ -37,12 +37,7 @@ Do NOT use these in code that must support Deno 1.x.
 
 ## persist.ts Quirk
 
-The `clear()` method creates the file if absent:
-```ts
-Deno.writeFileSync(this.directory + "persist.dat", new Uint8Array());
-```
-
-This prevents "file not found" errors in tests.
+`FileStore` creates `persist.dat` lazily on first write, and `loadState()` returns an empty array if the file is absent. Tests isolate storage using per-test temporary directories (`Deno.makeTempDirSync()`).
 
 ## PR Dependencies
 

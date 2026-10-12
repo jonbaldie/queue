@@ -33,10 +33,8 @@ function parseLine<T>(line: string): QueueEvent<T> | undefined {
 
 export interface QueueStore<T = string> {
     saveEvent(queueName: string, payload: T, isEnqueue: boolean): void;
-    saveBatch(events: Array<QueueEvent<T>>): void;
     replace(events: Array<QueueEvent<T>>): void;
     loadState(): Array<QueueEvent<T>>;
-    clear(): void;
     dir(dir: string): void;
     close(): void;
 }
@@ -116,11 +114,6 @@ export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
         }]);
     }
 
-    public saveBatch(events: Array<QueueEvent<T>>): void {
-        if (events.length === 0) return;
-        this.append(events);
-    }
-
     // writeSync() may write fewer bytes than requested (e.g. on a full
     // volume) without throwing, so keep writing until every byte is down
     // or the OS reports the error.
@@ -190,16 +183,6 @@ export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
                 this.removeTempFile();
             }
             throw error;
-        }
-    }
-
-    public clear(): void {
-        this.ensureOpen();
-        this.writeHandle!.lockSync(true);
-        try {
-            this.writeHandle!.truncateSync(0);
-        } finally {
-            this.writeHandle!.unlockSync();
         }
     }
 
@@ -275,18 +258,8 @@ export class MemoryStore<T = string> implements QueueStore<T> {
         });
     }
 
-    public saveBatch(events: Array<QueueEvent<T>>): void {
-        for (const event of events) {
-            this.events.push(event);
-        }
-    }
-
     public replace(events: Array<QueueEvent<T>>): void {
         this.events = [...events];
-    }
-
-    public clear(): void {
-        this.events = [];
     }
 
     public loadState(): Array<QueueEvent<T>> {
