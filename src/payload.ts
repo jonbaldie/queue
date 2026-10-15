@@ -132,6 +132,11 @@ function isJsonObject(value: JsonValue): value is { [key: string]: JsonValue } {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** The top-level Payload domain rule, shared by requests and log replay. */
+export function isNonNullPayload<T>(value: T): value is Exclude<T, null> {
+    return value !== null;
+}
+
 function extractPayloadValue(json: JsonValue): Payload {
     if (!isJsonObject(json)) {
         throw new InvalidPayloadError("Missing payload key");
@@ -140,7 +145,7 @@ function extractPayloadValue(json: JsonValue): Payload {
         throw new InvalidPayloadError("Missing payload key");
     }
     const payload = json.payload;
-    if (payload === null) {
+    if (!isNonNullPayload(payload)) {
         throw new InvalidPayloadError("Null payload not allowed");
     }
     return payload;
