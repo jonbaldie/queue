@@ -1,4 +1,5 @@
 import { QueueEvent, QueueStore } from "./persist.ts"
+import { InvalidPayloadError, isNonNullPayload } from "./payload.ts";
 export const MAX_QUEUE_NAME_LENGTH = 128;
 
 export class QueueNameTooLongError extends Error {
@@ -31,6 +32,11 @@ class FIFOQueue<T> {
             this.head = 0;
         }
         return item;
+    }
+
+    retain(predicate: (item: T) => boolean): void {
+        this.items = Array.from(this).filter(predicate);
+        this.head = 0;
     }
 
     peek(): T | undefined {
@@ -101,19 +107,20 @@ export default class Manager<T = string> {
     }
 
     public enqueue(name: string, payload: T): Manager<T> {
+        return this.applyEnqueue(name, payload, "live");
+    }
+
+    private applyEnqueue(name: string, payload: T, mode: "live" | "replay"): Manager<T> {
         this.validateName(name);
         const existing = this.find(name);
-        if (!existing && !this.canCreateQueue()) {
-            throw new Error("Queue count limit reached");
-        }
         const queue = existing || new FIFOQueue<T>();
-        if (queue.length >= this.queueDepthLimit) {
-            throw new Error("Queue depth limit reached");
-        }
-        // Log before mutating, so an item that cannot be persisted is
-        // rejected rather than held only in memory.
-        if (this.persistEnabled) {
-            this.store.saveEvent(name, payload, true);
+        if (mode === "live") {
+            this.validateLiveEnqueue(payload, existing);
+            // Log before mutating, so persistence failures cannot leave
+            // an item held only in memory. Replay never appends events.
+            if (this.persistEnabled) {
+                this.store.saveEvent(name, payload, true);
+            }
         }
 
         if (!existing) {
@@ -124,7 +131,23 @@ export default class Manager<T = string> {
         return this;
     }
 
+    private validateLiveEnqueue(payload: T, existing: FIFOQueue<T> | undefined): void {
+        if (!isNonNullPayload(payload)) {
+            throw new InvalidPayloadError("Null payload not allowed");
+        }
+        if (!existing && !this.canCreateQueue()) {
+            throw new Error("Queue count limit reached");
+        }
+        if ((existing?.length ?? 0) >= this.queueDepthLimit) {
+            throw new Error("Queue depth limit reached");
+        }
+    }
+
     public dequeue(name: string): T | undefined {
+        return this.applyDequeue(name, "live");
+    }
+
+    private applyDequeue(name: string, mode: "live" | "replay"): T | undefined {
         this.validateName(name);
         const queue = this.find(name);
         if (!queue) {
@@ -136,16 +159,20 @@ export default class Manager<T = string> {
             return undefined;
         }
 
-        if (this.persistEnabled) {
+        if (mode === "live" && this.persistEnabled) {
             this.store.saveEvent(name, payload, false);
         }
 
         queue.shift();
+        this.deleteIfEmpty(name, queue);
+
+        return payload;
+    }
+
+    private deleteIfEmpty(name: string, queue: FIFOQueue<T>): void {
         if (queue.length === 0) {
             this.queues.delete(name);
         }
-
-        return payload;
     }
 
     public peek(name: string): T | undefined {
@@ -183,37 +210,28 @@ export default class Manager<T = string> {
         for (const event of this.store.loadState()) {
             this.applyLoadedEvent(event);
         }
+        // Rejected payloads occupy FIFO slots until all dequeue events have
+        // consumed their original positions. Only then discard survivors.
+        // Filtering during enqueue would incorrectly consume valid items.
+        for (const [name, queue] of this.queues) {
+            queue.retain(isNonNullPayload);
+            this.deleteIfEmpty(name, queue);
+        }
         this.save();
     }
 
     private applyLoadedEvent(event: QueueEvent<T>): void {
-        if (event.enqueue) {
-            this.applyLoadedEnqueue(event);
-            return;
-        }
-        if (event.dequeue) {
-            this.applyLoadedDequeue(event);
-        }
-    }
-
-    private applyLoadedEnqueue(event: QueueEvent<T>): void {
-        const existing = this.find(event.queue);
-        const queue = existing || new FIFOQueue<T>();
-        if (!existing) {
-            this.register(event.queue, queue);
-        }
-        queue.push(event.payload);
-    }
-
-    private applyLoadedDequeue(event: QueueEvent<T>): void {
-        const queue = this.find(event.queue);
-        if (!queue) {
-            return;
-        }
-        const wasNonEmpty = queue.length > 0;
-        queue.shift();
-        if (wasNonEmpty && queue.length === 0) {
-            this.queues.delete(event.queue);
+        try {
+            if (event.enqueue) {
+                this.applyEnqueue(event.queue, event.payload, "replay");
+            } else if (event.dequeue) {
+                this.applyDequeue(event.queue, "replay");
+            }
+        } catch (error) {
+            // Match the persist log's silent-skip policy for invalid lines.
+            if (!(error instanceof QueueNameTooLongError)) {
+                throw error;
+            }
         }
     }
 }
