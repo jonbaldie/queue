@@ -212,7 +212,7 @@ Deno.test("readAndValidatePayload: rejects stream when size limit is exceeded", 
     );
 });
 
-Deno.test("readAndValidatePayload: throws PayloadTooLargeError when stream errors", async () => {
+Deno.test("readAndValidatePayload: throws InvalidPayloadError when stream errors", async () => {
     const stream = new ReadableStream<Uint8Array>({
         start(controller) {
             controller.enqueue(new Uint8Array(10));
@@ -221,8 +221,8 @@ Deno.test("readAndValidatePayload: throws PayloadTooLargeError when stream error
     });
     await assertRejects(
         () => readAndValidatePayload(stream),
-        PayloadTooLargeError,
-        "Payload too large",
+        InvalidPayloadError,
+        "Invalid JSON",
     );
 });
 

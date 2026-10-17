@@ -1443,9 +1443,9 @@ Deno.test("oversized multi-byte UTF-8 body without content-length returns 413", 
     assertEquals(response.status, 413);
 });
 
-// queue-02t: Body read error returns 413 not 400
+// An unreadable upload is invalid input, not evidence of an oversized body.
 
-Deno.test("body read error returns 413 not 400", async () => {
+Deno.test("body read error returns 400 not 413", async () => {
     const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN);
     const bodyStream = new ReadableStream({
@@ -1459,7 +1459,8 @@ Deno.test("body read error returns 413 not 400", async () => {
         headers: authHeaders,
     });
     const response = await handler(request);
-    assertEquals(response.status, 413);
+    assertEquals(response.status, 400);
+    assertEquals(await response.text(), "Invalid JSON");
 });
 
 Deno.test("dequeue returns application/json for string payload", async () => {
