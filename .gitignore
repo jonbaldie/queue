@@ -1,5 +1,6 @@
 /persist.dat
 /persist.dat.tmp
+/persist.lock
 /queue
 /target/
 /node_modules/
