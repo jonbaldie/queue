@@ -41,10 +41,18 @@ export interface QueueStore<T = string> {
     close(): void;
 }
 
+export class PersistDirectoryInUseError extends Error {
+    constructor(directory: string) {
+        super(`PERSIST directory ${directory} is already in use by another queue process`);
+        this.name = "PersistDirectoryInUseError";
+    }
+}
+
 /** Persists payloads as JSON; T must be JSON-compatible. */
 export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
     private directory: string = '';
     private writeHandle: Deno.FsFile | null = null;
+    private ownerHandle: Deno.FsFile | null = null;
     private encoder = new TextEncoder();
 
     private get path(): string {
@@ -86,6 +94,32 @@ export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
             this.writeHandle.close();
             this.writeHandle = null;
         }
+    }
+
+    private releaseOwnership(): void {
+        if (this.ownerHandle !== null) {
+            this.ownerHandle.close();
+            this.ownerHandle = null;
+        }
+    }
+
+    // Two processes serving one directory each keep their own in-memory
+    // queues, so both deliver the same item and each shutdown snapshot
+    // erases the other's items. Hold an exclusive lock on a separate file
+    // (persist.dat is replaced by rename, so its lock would not carry over)
+    // for as long as this store owns the directory. The OS drops the lock
+    // when the process exits, including on SIGKILL.
+    public claimDirectory(): void {
+        if (this.ownerHandle !== null) {
+            return;
+        }
+        this.ensureDirectory();
+        const handle = Deno.openSync(this.directory + "persist.lock", { write: true, create: true });
+        if (!handle.tryLockSync(true)) {
+            handle.close();
+            throw new PersistDirectoryInUseError(this.directory === "" ? "." : this.directory);
+        }
+        this.ownerHandle = handle;
     }
 
     private removeTempFile(): void {
@@ -255,11 +289,13 @@ export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
 
     public dir(dir: string): void {
         this.closeWriteHandle();
+        this.releaseOwnership();
         this.directory = dir.replace(/\/$/, '') + "/";
     }
 
     public close(): void {
         this.closeWriteHandle();
+        this.releaseOwnership();
     }
 }
 

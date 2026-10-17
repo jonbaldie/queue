@@ -747,3 +747,49 @@ Deno.test("FileStore.loadState skips non-event JSON records", () => {
     persist.close();
     Deno.removeSync(tmpDir, { recursive: true });
 });
+
+// ── FileStore.claimDirectory() gives one store exclusive use of a directory ──
+
+Deno.test("persist FileStore.claimDirectory() rejects a second claim until the owner closes", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const owner = new Persistency.FileStore();
+    const contender = new Persistency.FileStore();
+    owner.dir(tmpDir);
+    contender.dir(tmpDir);
+    try {
+        owner.claimDirectory();
+        owner.claimDirectory();
+        const error = assertThrows(() => contender.claimDirectory(), Persistency.PersistDirectoryInUseError);
+        assertEquals(error.message, `PERSIST directory ${tmpDir}/ is already in use by another queue process`);
+
+        owner.close();
+        contender.claimDirectory();
+        assertThrows(() => owner.claimDirectory(), Persistency.PersistDirectoryInUseError);
+    } finally {
+        owner.close();
+        contender.close();
+        Deno.removeSync(tmpDir, { recursive: true });
+    }
+});
+
+Deno.test("persist FileStore.dir() releases the claim on the previous directory", () => {
+    const dir1 = Deno.makeTempDirSync();
+    const dir2 = Deno.makeTempDirSync();
+    const mover = new Persistency.FileStore();
+    const other = new Persistency.FileStore();
+    try {
+        mover.dir(dir1);
+        mover.claimDirectory();
+        mover.dir(dir2);
+        mover.claimDirectory();
+        other.dir(dir1);
+        other.claimDirectory();
+        other.dir(dir2);
+        assertThrows(() => other.claimDirectory(), Persistency.PersistDirectoryInUseError);
+    } finally {
+        mover.close();
+        other.close();
+        Deno.removeSync(dir1, { recursive: true });
+        Deno.removeSync(dir2, { recursive: true });
+    }
+});
