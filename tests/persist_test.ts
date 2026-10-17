@@ -793,3 +793,21 @@ Deno.test("persist FileStore.dir() releases the claim on the previous directory"
         Deno.removeSync(dir2, { recursive: true });
     }
 });
+
+Deno.test("persist FileStore.claimDirectory() creates a missing PERSIST directory", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const persistDir = tmpDir + "/not/yet/created";
+    const owner = new Persistency.FileStore();
+    const contender = new Persistency.FileStore();
+    owner.dir(persistDir);
+    contender.dir(persistDir);
+    try {
+        owner.claimDirectory();
+        assertEquals(Deno.statSync(persistDir + "/persist.lock").isFile, true);
+        assertThrows(() => contender.claimDirectory(), Persistency.PersistDirectoryInUseError);
+    } finally {
+        owner.close();
+        contender.close();
+        Deno.removeSync(tmpDir, { recursive: true });
+    }
+});
