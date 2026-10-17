@@ -206,7 +206,8 @@ export async function readAndValidatePayload(
             // The stream may already be closed or errored.
             void cancelError;
         }
-        throw new PayloadTooLargeError();
+        // An interrupted upload is invalid input, not evidence of a size violation.
+        throw new InvalidPayloadError("Invalid JSON");
     } finally {
         reader.releaseLock();
     }
