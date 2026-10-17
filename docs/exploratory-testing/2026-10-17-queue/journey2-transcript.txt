@@ -1,0 +1,244 @@
+=== ordinary: enqueue, consume one, graceful stop, restart ===
+started graceful-1 pid=60476
+Loading in data from persist.dat...
+
+Listening on 127.0.0.1:18772
+HTTP/1.1 200 OK
+content-type: text/plain;charset=UTF-8
+vary: Accept-Encoding
+content-length: 39
+date: Sat, 17 Oct 2026 00:51:58 GMT
+
+BODY Payload successfully queued onto email.
+HTTP/1.1 200 OK
+content-type: text/plain;charset=UTF-8
+vary: Accept-Encoding
+content-length: 39
+date: Sat, 17 Oct 2026 00:51:58 GMT
+
+BODY Payload successfully queued onto email.
+HTTP/1.1 200 OK
+content-type: text/plain;charset=UTF-8
+vary: Accept-Encoding
+content-length: 41
+date: Sat, 17 Oct 2026 00:51:58 GMT
+
+BODY Payload successfully queued onto billing.
+HTTP/1.1 200 OK
+content-type: text/plain;charset=UTF-8
+vary: Accept-Encoding
+content-length: 41
+date: Sat, 17 Oct 2026 00:51:58 GMT
+
+BODY Payload successfully queued onto billing.
+HTTP/1.1 200 OK
+content-type: text/plain;charset=UTF-8
+vary: Accept-Encoding
+content-length: 41
+date: Sat, 17 Oct 2026 00:51:58 GMT
+
+BODY Payload successfully queued onto billing.
+HTTP/1.1 200 OK
+content-type: text/plain;charset=UTF-8
+vary: Accept-Encoding
+content-length: 39
+date: Sat, 17 Oct 2026 00:51:58 GMT
+
+BODY Payload successfully queued onto notes.
+HTTP/1.1 200 OK
+content-type: application/json
+vary: Accept-Encoding
+content-length: 39
+date: Sat, 17 Oct 2026 00:51:58 GMT
+
+BODY {"id":"email-1","to":"ada@example.com"}
+HTTP/1.1 200 OK
+content-type: text/plain;charset=UTF-8
+vary: Accept-Encoding
+content-length: 1
+date: Sat, 17 Oct 2026 00:51:58 GMT
+
+BODY 1
+HTTP/1.1 200 OK
+content-type: application/json
+vary: Accept-Encoding
+content-length: 27
+date: Sat, 17 Oct 2026 00:51:58 GMT
+
+BODY ["email","billing","notes"]
+--- persist.dat before stop ---
+     570 docs/exploratory-testing/2026-10-17-queue/persist-data/persist.dat
+exit after SIGTERM, persist bytes=     372
+--- server log tail ---
+Loading in data from persist.dat...
+
+Listening on 127.0.0.1:18772
+POST http://127.0.0.1:18772/enqueue/email 200 2.59ms
+POST http://127.0.0.1:18772/enqueue/email 200 0.49ms
+POST http://127.0.0.1:18772/enqueue/billing 200 0.43ms
+POST http://127.0.0.1:18772/enqueue/billing 200 0.40ms
+POST http://127.0.0.1:18772/enqueue/billing 200 0.33ms
+POST http://127.0.0.1:18772/enqueue/notes 200 0.42ms
+GET http://127.0.0.1:18772/dequeue/email 200 0.30ms
+GET http://127.0.0.1:18772/length/email 200 0.19ms
+GET http://127.0.0.1:18772/queues 200 0.14ms
+Received SIGTERM, shutting down gracefully...
+Flushing data to persist.dat...
+
+Goodbye!
+started graceful-2 pid=60545
+Loading in data from persist.dat...
+
+Listening on 127.0.0.1:18772
+HTTP/1.1 200 OK
+content-type: application/json
+vary: Accept-Encoding
+content-length: 27
+date: Sat, 17 Oct 2026 00:51:58 GMT
+
+BODY ["email","billing","notes"]
+HTTP/1.1 200 OK
+content-type: text/plain;charset=UTF-8
+vary: Accept-Encoding
+content-length: 1
+date: Sat, 17 Oct 2026 00:51:58 GMT
+
+BODY 1
+HTTP/1.1 200 OK
+content-type: application/json
+vary: Accept-Encoding
+content-length: 41
+date: Sat, 17 Oct 2026 00:51:58 GMT
+
+BODY {"id":"email-2","to":"grace@example.com"}
+HTTP/1.1 204 No Content
+date: Sat, 17 Oct 2026 00:51:58 GMT
+
+BODY 
+HTTP/1.1 200 OK
+content-type: text/plain;charset=UTF-8
+vary: Accept-Encoding
+content-length: 1
+date: Sat, 17 Oct 2026 00:51:58 GMT
+
+BODY 3
+HTTP/1.1 200 OK
+content-type: application/json
+vary: Accept-Encoding
+content-length: 5
+date: Sat, 17 Oct 2026 00:51:58 GMT
+
+BODY false
+HTTP/1.1 200 OK
+content-type: application/json
+vary: Accept-Encoding
+content-length: 1
+date: Sat, 17 Oct 2026 00:51:58 GMT
+
+BODY 0
+HTTP/1.1 200 OK
+content-type: application/json
+vary: Accept-Encoding
+content-length: 2
+date: Sat, 17 Oct 2026 00:51:58 GMT
+
+BODY ""
+HTTP/1.1 204 No Content
+date: Sat, 17 Oct 2026 00:51:58 GMT
+
+BODY 
+HTTP/1.1 200 OK
+content-type: application/json
+vary: Accept-Encoding
+content-length: 17
+date: Sat, 17 Oct 2026 00:51:58 GMT
+
+BODY "こんにちは"
+HTTP/1.1 204 No Content
+date: Sat, 17 Oct 2026 00:51:58 GMT
+
+BODY 
+HTTP/1.1 200 OK
+content-type: application/json
+vary: Accept-Encoding
+content-length: 2
+date: Sat, 17 Oct 2026 00:51:58 GMT
+
+BODY []
+=== variation: SIGKILL after acknowledged enqueue and dequeue ===
+started kill-1 pid=60621
+Loading in data from persist.dat...
+
+Listening on 127.0.0.1:18772
+HTTP/1.1 200 OK
+content-type: text/plain;charset=UTF-8
+vary: Accept-Encoding
+content-length: 38
+date: Sat, 17 Oct 2026 00:51:59 GMT
+
+BODY Payload successfully queued onto jobs.
+HTTP/1.1 200 OK
+content-type: text/plain;charset=UTF-8
+vary: Accept-Encoding
+content-length: 38
+date: Sat, 17 Oct 2026 00:51:59 GMT
+
+BODY Payload successfully queued onto jobs.
+HTTP/1.1 200 OK
+content-type: text/plain;charset=UTF-8
+vary: Accept-Encoding
+content-length: 38
+date: Sat, 17 Oct 2026 00:51:59 GMT
+
+BODY Payload successfully queued onto jobs.
+HTTP/1.1 200 OK
+content-type: application/json
+vary: Accept-Encoding
+content-length: 7
+date: Sat, 17 Oct 2026 00:51:59 GMT
+
+BODY {"n":1}
+killing -9
+persist bytes after kill=     264
+--- persist.dat ---
+{"queue":"jobs","payload":{"n":1},"enqueue":true,"dequeue":false}
+{"queue":"jobs","payload":{"n":2},"enqueue":true,"dequeue":false}
+{"queue":"jobs","payload":{"n":3},"enqueue":true,"dequeue":false}
+{"queue":"jobs","payload":{"n":1},"enqueue":false,"dequeue":true}
+started kill-2 pid=60664
+Loading in data from persist.dat...
+
+Listening on 127.0.0.1:18772
+HTTP/1.1 200 OK
+content-type: text/plain;charset=UTF-8
+vary: Accept-Encoding
+content-length: 1
+date: Sat, 17 Oct 2026 00:52:00 GMT
+
+BODY 2
+HTTP/1.1 200 OK
+content-type: application/json
+vary: Accept-Encoding
+content-length: 7
+date: Sat, 17 Oct 2026 00:52:00 GMT
+
+BODY {"n":2}
+HTTP/1.1 200 OK
+content-type: application/json
+vary: Accept-Encoding
+content-length: 7
+date: Sat, 17 Oct 2026 00:52:00 GMT
+
+BODY {"n":3}
+HTTP/1.1 204 No Content
+date: Sat, 17 Oct 2026 00:52:00 GMT
+
+BODY 
+HTTP/1.1 200 OK
+content-type: application/json
+vary: Accept-Encoding
+content-length: 2
+date: Sat, 17 Oct 2026 00:52:00 GMT
+
+BODY []
+DONE

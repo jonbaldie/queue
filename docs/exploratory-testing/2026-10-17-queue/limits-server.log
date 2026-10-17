@@ -1,0 +1,25 @@
+Listening on 127.0.0.1:18776
+POST http://127.0.0.1:18776/enqueue/q 200 1.84ms
+POST http://127.0.0.1:18776/enqueue/q 200 0.55ms
+POST http://127.0.0.1:18776/enqueue/q 507 0.24ms
+GET http://127.0.0.1:18776/length/q 200 0.23ms
+GET http://127.0.0.1:18776/dequeue/q 200 0.23ms
+POST http://127.0.0.1:18776/enqueue/q 200 0.22ms
+POST http://127.0.0.1:18776/enqueue/other 200 0.21ms
+POST http://127.0.0.1:18776/enqueue/third 507 0.16ms
+GET http://127.0.0.1:18776/queues 200 0.14ms
+GET http://127.0.0.1:18776/dequeue/q 200 0.10ms
+GET http://127.0.0.1:18776/dequeue/q 200 0.05ms
+GET http://127.0.0.1:18776/dequeue/q 204 0.04ms
+GET http://127.0.0.1:18776/dequeue/other 200 0.07ms
+POST http://127.0.0.1:18776/enqueue/q 200 0.49ms
+POST http://127.0.0.1:18776/enqueue/q 200 0.27ms
+POST http://127.0.0.1:18776/enqueue/q 507 0.21ms
+POST http://127.0.0.1:18776/enqueue/q 507 0.15ms
+POST http://127.0.0.1:18776/enqueue/q 507 0.21ms
+POST http://127.0.0.1:18776/enqueue/q 507 0.19ms
+POST http://127.0.0.1:18776/enqueue/q 507 0.17ms
+POST http://127.0.0.1:18776/enqueue/q 507 0.15ms
+GET http://127.0.0.1:18776/length/q 200 0.11ms
+Received SIGTERM, shutting down gracefully...
+Goodbye!

@@ -1,0 +1,38 @@
+2026-10-17T00:39:04Z
+e798df0e20cad8594d1c8ba965ab6b73dd7c03f2
+deno 2.7.6 (stable, release, aarch64-apple-darwin)
+v8 14.6.202.9-rusty
+typescript 5.9.2
+29.8.2 linux/arm64
+DENO_DIR=/Users/jonathanbaldie/Code-2/github.com/jonbaldie/queue/target/deno
+[0m[32mDownload[0m https://jsr.io/@std/cli/meta.json
+[0m[32mDownload[0m https://jsr.io/@std/cli/1.0.29_meta.json
+[0m[32mDownload[0m https://jsr.io/@std/cli/1.0.29/parse_args.ts
+[0m[38;5;245mInstalled[0m 1 [0m[38;5;245mpackage[0m [0m[38;5;245min[0m 633ms
+[0m[38;5;245mReused[0m 0 [0m[38;5;245mpackages from cache[0m
+[0m[38;5;245mDownloaded[0m 1 [0m[38;5;245mpackage from JSR[0m
+[0m[32m+[0m
+[0m[38;5;245mDownloaded[0m 0 [0m[38;5;245mpackages from npm[0m
+
+[0m[36mDependencies:[0m
+[0m[32m+[0m [0m[38;5;245mjsr:[0m@std/cli [0m[38;5;245m1.0.29[0m
+
+[0m[32mCheck[0m main.ts
+[0m[32mCompile[0m main.ts to target/queue
+[0m[32mDownload[0m https://dl.deno.land/release/v2.7.6/denort-aarch64-apple-darwin.zip
+
+[0m[1mEmbedded Files[0m
+
+[0m[3mqueue[0m
+[0m[38;5;245m├──[0m main.ts (6.87KB)
+[0m[38;5;245m├──[0m node_modules/* (73.51MB[0m[38;5;245m - 70.86MB unique[0m)
+[0m[38;5;245m├──[0m package.json (227B)
+[0m[38;5;245m└──[0m src/* (94.32KB)
+
+[0m[1mFiles:[0m 71.93MB
+[0m[1mMetadata:[0m 1.96KB
+[0m[1mRemote modules:[0m 45.43KB
+
+COMPILE_OK
+DOCKER_BUILD_PID:59333
+id=sha256:0877370e9764aff1f93a39d3a4fcf9cba2e83bf297affd77f8301058f8bc258c user=deno cmd=["/usr/bin/queue"] env=["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin","DENO_USE_CGROUPS=1","DENO_DIR=/deno-dir/","DENO_INSTALL_ROOT=/usr/local","DENO_VERSION=2.7.6","PERSIST=/data/"]

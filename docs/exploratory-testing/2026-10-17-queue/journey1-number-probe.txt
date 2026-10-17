@@ -1,0 +1,45 @@
+=== raw unsafe integer ===
+HTTP/1.1 400 Bad Request
+content-type: text/plain;charset=UTF-8
+vary: Accept-Encoding
+content-length: 38
+date: Sat, 17 Oct 2026 00:50:27 GMT
+
+
+body=Payload contains an unsupported number
+=== length after unsafe ===
+HTTP/1.1 200 OK
+content-type: text/plain;charset=UTF-8
+vary: Accept-Encoding
+content-length: 1
+date: Sat, 17 Oct 2026 00:50:27 GMT
+
+0
+=== raw safe integer boundary ===
+HTTP/1.1 200 OK
+content-type: text/plain;charset=UTF-8
+vary: Accept-Encoding
+content-length: 41
+date: Sat, 17 Oct 2026 00:50:27 GMT
+
+
+body=Payload successfully queued onto numbers.
+=== 1.0 and 1e2 ===
+Payload successfully queued onto numbers.
+HTTP 200
+Payload successfully queued onto numbers.
+HTTP 200
+=== dequeue numbers ===
+200 9007199254740991
+200 1
+200 100
+204 
+=== BOM body ===
+Payload successfully queued onto numbers.
+HTTP 200
+=== localhost vs 127.0.0.1 health ===
+{"status":"ok"}
+HTTP 200
+
+HTTP 000
+ipv6 failed: 7

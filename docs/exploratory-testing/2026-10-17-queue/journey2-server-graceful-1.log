@@ -1,0 +1,16 @@
+Loading in data from persist.dat...
+
+Listening on 127.0.0.1:18772
+POST http://127.0.0.1:18772/enqueue/email 200 2.59ms
+POST http://127.0.0.1:18772/enqueue/email 200 0.49ms
+POST http://127.0.0.1:18772/enqueue/billing 200 0.43ms
+POST http://127.0.0.1:18772/enqueue/billing 200 0.40ms
+POST http://127.0.0.1:18772/enqueue/billing 200 0.33ms
+POST http://127.0.0.1:18772/enqueue/notes 200 0.42ms
+GET http://127.0.0.1:18772/dequeue/email 200 0.30ms
+GET http://127.0.0.1:18772/length/email 200 0.19ms
+GET http://127.0.0.1:18772/queues 200 0.14ms
+Received SIGTERM, shutting down gracefully...
+Flushing data to persist.dat...
+
+Goodbye!

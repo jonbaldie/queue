@@ -1,0 +1,11 @@
+Loading in data from persist.dat...
+
+Listening on 127.0.0.1:18780
+POST http://127.0.0.1:18780/enqueue/drop 413 2.71ms
+GET http://127.0.0.1:18780/length/drop 200 0.53ms
+POST http://127.0.0.1:18780/enqueue/drop 200 2.23ms
+GET http://127.0.0.1:18780/dequeue/drop 200 0.66ms
+Received SIGTERM, shutting down gracefully...
+Flushing data to persist.dat...
+
+Goodbye!

@@ -1,0 +1,10 @@
+Loading in data from persist.dat...
+
+Listening on 127.0.0.1:18775
+POST http://127.0.0.1:18775/enqueue/jobs 200 2.49ms
+GET http://127.0.0.1:18775/length/jobs 200 0.28ms
+GET http://127.0.0.1:18775/dequeue/jobs 200 0.36ms
+Received SIGTERM, shutting down gracefully...
+Flushing data to persist.dat...
+
+Failed to flush data to persist.dat: No such file or directory (os error 2): rename 'docs/exploratory-testing/2026-10-17-queue/persist-two/persist.dat.tmp' -> 'docs/exploratory-testing/2026-10-17-queue/persist-two/persist.dat'

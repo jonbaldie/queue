@@ -1,0 +1,66 @@
+#0 building with "orbstack" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 538B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/denoland/deno:2.7.6
+#2 ...
+
+#3 [auth] denoland/deno:pull token for registry-1.docker.io
+#3 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/denoland/deno:2.7.6
+#2 DONE 1.3s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 109B done
+#4 DONE 0.0s
+
+#5 [1/5] FROM docker.io/denoland/deno:2.7.6@sha256:09f1c182557637a459a169735701ad4b99b1db2e99598bc3a5686ab08481e0f0
+#5 DONE 0.0s
+
+#6 [internal] load build context
+#6 transferring context: 843.73kB 0.0s done
+#6 DONE 0.1s
+
+#5 [1/5] FROM docker.io/denoland/deno:2.7.6@sha256:09f1c182557637a459a169735701ad4b99b1db2e99598bc3a5686ab08481e0f0
+#5 CACHED
+
+#7 [2/5] COPY . /queue
+#7 DONE 0.1s
+
+#8 [3/5] WORKDIR /queue
+#8 DONE 0.0s
+
+#9 [4/5] RUN deno compile --allow-read --allow-write --allow-net --allow-env=HOST,PORT,PERSIST,QUEUE_API_TOKEN,QUEUE_DEPTH_LIMIT,QUEUE_COUNT_LIMIT,RATE_LIMIT_REQUESTS --allow-sys main.ts && cp ./queue /usr/bin/
+#9 0.285 [0m[32mDownload[0m https://jsr.io/@std/cli/meta.json
+#9 0.590 [0m[32mDownload[0m https://jsr.io/@std/cli/1.0.29_meta.json
+#9 0.628 [0m[32mDownload[0m https://jsr.io/@std/cli/1.0.29/parse_args.ts
+#9 0.709 [0m[32mCheck[0m main.ts
+#9 1.219 [0m[32mCompile[0m main.ts to queue
+#9 1.219 [0m[32mDownload[0m https://dl.deno.land/release/v2.7.6/denort-aarch64-unknown-linux-gnu.zip
+#9 10.78 
+#9 10.78 [0m[1mEmbedded Files[0m
+#9 10.78 
+#9 10.78 [0m[3mqueue[0m
+#9 10.78 [0m[38;5;245m├──[0m main.ts (6.87KB)
+#9 10.78 [0m[38;5;245m├──[0m package.json (227B)
+#9 10.78 [0m[38;5;245m└──[0m src/* (94.32KB)
+#9 10.78 
+#9 10.78 [0m[1mFiles:[0m 104.41KB
+#9 10.78 [0m[1mMetadata:[0m 1.96KB
+#9 10.78 [0m[1mRemote modules:[0m 45.43KB
+#9 10.78 
+#9 DONE 11.0s
+
+#10 [5/5] RUN mkdir -p /data && chown -R deno:deno /queue /usr/bin/queue /data
+#10 DONE 0.2s
+
+#11 exporting to image
+#11 exporting layers
+#11 exporting layers 0.3s done
+#11 writing image sha256:0877370e9764aff1f93a39d3a4fcf9cba2e83bf297affd77f8301058f8bc258c
+#11 writing image sha256:0877370e9764aff1f93a39d3a4fcf9cba2e83bf297affd77f8301058f8bc258c done
+#11 naming to docker.io/library/qx20261017-queue:local done
+#11 DONE 0.3s
