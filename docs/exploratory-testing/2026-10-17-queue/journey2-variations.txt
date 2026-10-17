@@ -1,0 +1,47 @@
+double-signal before bytes=     154
+double-signal after bytes=     154
+--- persist.dat ---
+{"queue":"jobs","payload":{"id":"must-survive"},"enqueue":true,"dequeue":false}
+{"queue":"jobs","payload":{"id":"second"},"enqueue":true,"dequeue":false}
+--- server log ---
+Loading in data from persist.dat...
+
+Listening on 127.0.0.1:18773
+POST http://127.0.0.1:18773/enqueue/jobs 200 3.43ms
+POST http://127.0.0.1:18773/enqueue/jobs 200 0.66ms
+Received SIGINT, shutting down gracefully...
+POST http://127.0.0.1/enqueue/jobs 413 5151.41ms
+Flushing data to persist.dat...
+
+Goodbye!
+restart log:
+Loading in data from persist.dat...
+
+Listening on 127.0.0.1:18773
+length=2
+item1={"id":"must-survive"}
+item2={"id":"second"}
+item3= status:204
+=== two writers ===
+A alive=yes B alive=yes
+--- B log ---
+Loading in data from persist.dat...
+
+Listening on 127.0.0.1:18775
+Payload successfully queued onto jobs.
+HTTP 200
+A length=1
+B length=2
+A dequeue="from-a" status:200
+B dequeue="from-a" status:200
+--- persist after both stopped ---
+{"queue":"jobs","payload":"from-b","enqueue":true,"dequeue":false}
+--- restart log ---
+Loading in data from persist.dat...
+
+Listening on 127.0.0.1:18774
+recovered length=1
+recovered1="from-b" status:200
+recovered2= status:204
+recovered3= status:204
+DONE variations

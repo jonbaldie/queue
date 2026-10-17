@@ -1,0 +1,22 @@
+=== docker stop/start ===
+Payload successfully queued onto jobs.
+HTTP 200
+qx20261017-data
+qx20261017-data
+
+Listening on 0.0.0.0:1991
+GET http://127.0.0.1:18792/length/jobs 200 2.50ms
+GET http://127.0.0.1:18792/dequeue/jobs 200 1.65ms
+GET http://127.0.0.1:18792/dequeue/jobs 204 0.43ms
+GET http://127.0.0.1:18792/queues 401 0.41ms
+GET http://127.0.0.1:18792/health 200 0.49ms
+POST http://127.0.0.1:18792/enqueue/jobs 200 4.59ms
+Received SIGTERM, shutting down gracefully...
+Flushing data to persist.dat...
+
+Goodbye!
+Loading in data from persist.dat...
+
+Listening on 0.0.0.0:1991
+{"id":"after-stop"}
+HTTP 200

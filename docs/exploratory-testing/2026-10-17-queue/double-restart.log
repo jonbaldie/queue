@@ -1,0 +1,11 @@
+Loading in data from persist.dat...
+
+Listening on 127.0.0.1:18773
+GET http://127.0.0.1:18773/length/jobs 200 1.07ms
+GET http://127.0.0.1:18773/dequeue/jobs 200 0.90ms
+GET http://127.0.0.1:18773/dequeue/jobs 200 0.23ms
+GET http://127.0.0.1:18773/dequeue/jobs 204 0.12ms
+Received SIGTERM, shutting down gracefully...
+Flushing data to persist.dat...
+
+Goodbye!

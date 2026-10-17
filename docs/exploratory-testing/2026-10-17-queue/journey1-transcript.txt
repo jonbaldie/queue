@@ -1,0 +1,40 @@
+base=http://127.0.0.1:18771
+GET /health -> 200 "{\"status\":\"ok\"}" headers={"content-length":"15","content-type":"application/json","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+GET /queues -> 200 "[]" headers={"content-length":"2","content-type":"application/json","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+GET /length/email -> 200 "0" headers={"content-length":"1","content-type":"text/plain;charset=UTF-8","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+GET /dequeue/email -> 204 "" headers={"date":"Sat, 17 Oct 2026 00:45:22 GMT"}
+POST /enqueue/email -> 400 "Invalid JSON" headers={"content-length":"12","content-type":"text/plain;charset=UTF-8","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+POST /enqueue/email -> 400 "Missing payload key" headers={"content-length":"19","content-type":"text/plain;charset=UTF-8","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+POST /enqueue/email -> 200 "Payload successfully queued onto email." headers={"content-length":"39","content-type":"text/plain;charset=UTF-8","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+POST /enqueue/email -> 200 "Payload successfully queued onto email." headers={"content-length":"39","content-type":"text/plain;charset=UTF-8","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+POST /enqueue/billing -> 200 "Payload successfully queued onto billing." headers={"content-length":"41","content-type":"text/plain;charset=UTF-8","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+POST /enqueue/billing -> 200 "Payload successfully queued onto billing." headers={"content-length":"41","content-type":"text/plain;charset=UTF-8","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+POST /enqueue/flags -> 200 "Payload successfully queued onto flags." headers={"content-length":"39","content-type":"text/plain;charset=UTF-8","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+POST /enqueue/flags -> 200 "Payload successfully queued onto flags." headers={"content-length":"39","content-type":"text/plain;charset=UTF-8","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+POST /enqueue/flags -> 200 "Payload successfully queued onto flags." headers={"content-length":"39","content-type":"text/plain;charset=UTF-8","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+POST /enqueue/flags -> 200 "Payload successfully queued onto flags." headers={"content-length":"39","content-type":"text/plain;charset=UTF-8","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+POST /enqueue/flags -> 200 "Payload successfully queued onto flags." headers={"content-length":"39","content-type":"text/plain;charset=UTF-8","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+GET /queues -> 200 "[\"email\",\"billing\",\"flags\"]" headers={"content-length":"27","content-type":"application/json","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+GET /length/email -> 200 "2" headers={"content-length":"1","content-type":"text/plain;charset=UTF-8","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+GET /peek/email -> 200 "{\"id\":\"email-1\",\"kind\":\"email\",\"to\":\"ada@example.com\"}" headers={"content-length":"54","content-type":"application/json","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+GET /length/email -> 200 "2" headers={"content-length":"1","content-type":"text/plain;charset=UTF-8","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+GET /peek/email -> 200 "{\"id\":\"email-1\",\"kind\":\"email\",\"to\":\"ada@example.com\"}" headers={"content-length":"54","content-type":"application/json","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+GET /dequeue/email -> 401 "Unauthorized" headers={"content-length":"12","content-type":"text/plain;charset=UTF-8","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding","www-authenticate":"Bearer"}
+GET /dequeue/email -> 200 "{\"id\":\"email-1\",\"kind\":\"email\",\"to\":\"ada@example.com\"}" headers={"content-length":"54","content-type":"application/json","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+GET /dequeue/email -> 200 "{\"id\":\"email-2\",\"kind\":\"email\",\"to\":\"grace@example.com\"}" headers={"content-length":"56","content-type":"application/json","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+GET /dequeue/email -> 204 "" headers={"date":"Sat, 17 Oct 2026 00:45:22 GMT"}
+GET /length/email -> 200 "0" headers={"content-length":"1","content-type":"text/plain;charset=UTF-8","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+GET /queues -> 200 "[\"billing\",\"flags\"]" headers={"content-length":"19","content-type":"application/json","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+GET /peek/billing -> 200 "{\"id\":\"bill-1\",\"kind\":\"invoice\",\"amount\":0}" headers={"content-length":"43","content-type":"application/json","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+GET /length/billing -> 200 "2" headers={"content-length":"1","content-type":"text/plain;charset=UTF-8","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+GET /dequeue/billing -> 200 "{\"id\":\"bill-1\",\"kind\":\"invoice\",\"amount\":0}" headers={"content-length":"43","content-type":"application/json","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+GET /dequeue/billing -> 200 "{\"id\":\"bill-2\",\"kind\":\"invoice\",\"amount\":12.5,\"paid\":false}" headers={"content-length":"59","content-type":"application/json","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+GET /dequeue/billing -> 204 "" headers={"date":"Sat, 17 Oct 2026 00:45:22 GMT"}
+GET /dequeue/flags -> 200 "false" headers={"content-length":"5","content-type":"application/json","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+GET /dequeue/flags -> 200 "0" headers={"content-length":"1","content-type":"application/json","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+GET /dequeue/flags -> 200 "\"0\"" headers={"content-length":"3","content-type":"application/json","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+GET /dequeue/flags -> 200 "\"\"" headers={"content-length":"2","content-type":"application/json","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+GET /dequeue/flags -> 200 "[]" headers={"content-length":"2","content-type":"application/json","date":"Sat, 17 Oct 2026 00:45:22 GMT","vary":"Accept-Encoding"}
+GET /dequeue/flags -> 204 "" headers={"date":"Sat, 17 Oct 2026 00:45:22 GMT"}
+flags=["200:false","200:0","200:\"0\"","200:\"\"","200:[]","204:"]
+first_two={"id":"email-1","kind":"email","to":"ada@example.com"} then {"id":"email-2","kind":"email","to":"grace@example.com"}

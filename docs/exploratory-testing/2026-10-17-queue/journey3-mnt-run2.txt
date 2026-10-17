@@ -1,0 +1,12 @@
+=== mnt replay 2 ===
+Exited (1) 1 second ago
+Loading in data from persist.dat...
+
+[0m[1m[31merror[0m: Uncaught (in promise) PermissionDenied: Permission denied (os error 13): open '/mnt/persist.dat.tmp'
+            temp = Deno.openSync(this.tempPath, { write: true, create: true, truncate: true });
+[0m[31m                        ^[0m
+    [0m[2m[38;5;245mat [0m[0m[2m[38;5;245mObject.openSync[0m[0m[2m[38;5;245m ([0m[0m[2m[38;5;245mext:deno_fs/30_fs.js[0m[0m[2m[38;5;245m:[0m[0m[2m[38;5;245m545[0m[0m[2m[38;5;245m:[0m[0m[2m[38;5;245m15[0m[0m[2m[38;5;245m)[0m
+    at [0m[1m[3mFileStore.replace[0m ([0m[36mfile:///tmp/deno-compile-queue/src/persist.ts[0m:[0m[33m165[0m:[0m[33m25[0m)
+    at [0m[1m[3mManager.save[0m ([0m[36mfile:///tmp/deno-compile-queue/src/manager.ts[0m:[0m[33m206[0m:[0m[33m20[0m)
+    at [0m[1m[3mManager.load[0m ([0m[36mfile:///tmp/deno-compile-queue/src/manager.ts[0m:[0m[33m220[0m:[0m[33m14[0m)
+    at [0m[36mfile:///tmp/deno-compile-queue/main.ts[0m:[0m[33m51[0m:[0m[33m13[0m

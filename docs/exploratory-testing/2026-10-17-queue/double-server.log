@@ -1,0 +1,10 @@
+Loading in data from persist.dat...
+
+Listening on 127.0.0.1:18773
+POST http://127.0.0.1:18773/enqueue/jobs 200 3.43ms
+POST http://127.0.0.1:18773/enqueue/jobs 200 0.66ms
+Received SIGINT, shutting down gracefully...
+POST http://127.0.0.1/enqueue/jobs 413 5151.41ms
+Flushing data to persist.dat...
+
+Goodbye!
