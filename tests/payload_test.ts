@@ -1,6 +1,7 @@
 import { assertEquals, assertRejects, assertThrows } from "jsr:@std/assert@1.0";
 import {
     DEFAULT_MAX_PAYLOAD_SIZE,
+    IncompleteBodyError,
     InvalidPayloadError,
     JsonNestingTooDeepError,
     MAX_JSON_DEPTH,
@@ -212,7 +213,7 @@ Deno.test("readAndValidatePayload: rejects stream when size limit is exceeded", 
     );
 });
 
-Deno.test("readAndValidatePayload: throws PayloadTooLargeError when stream errors", async () => {
+Deno.test("readAndValidatePayload: throws IncompleteBodyError, not PayloadTooLargeError, when stream errors (#172)", async () => {
     const stream = new ReadableStream<Uint8Array>({
         start(controller) {
             controller.enqueue(new Uint8Array(10));
@@ -221,8 +222,8 @@ Deno.test("readAndValidatePayload: throws PayloadTooLargeError when stream error
     });
     await assertRejects(
         () => readAndValidatePayload(stream),
-        PayloadTooLargeError,
-        "Payload too large",
+        IncompleteBodyError,
+        "Incomplete request body",
     );
 });
 

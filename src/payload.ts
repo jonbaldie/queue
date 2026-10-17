@@ -22,6 +22,15 @@ export class PayloadTooLargeError extends Error {
     }
 }
 
+// The request body ended or failed before it was fully read, e.g. the client
+// closed the connection before sending its declared Content-Length.
+export class IncompleteBodyError extends Error {
+    constructor(message: string = "Incomplete request body") {
+        super(message);
+        this.name = "IncompleteBodyError";
+    }
+}
+
 export const DEFAULT_MAX_PAYLOAD_SIZE = 1024 * 1024; // 1 MB
 
 export class JsonNestingTooDeepError extends Error {
@@ -206,7 +215,7 @@ export async function readAndValidatePayload(
             // The stream may already be closed or errored.
             void cancelError;
         }
-        throw new PayloadTooLargeError();
+        throw new IncompleteBodyError();
     } finally {
         reader.releaseLock();
     }
