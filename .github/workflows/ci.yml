@@ -79,7 +79,8 @@ jobs:
     name: Mutation testing (Stryker)
     needs: mutation-mutasaurus
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Full-suite runs already took 38-45 minutes with ~1150 mutants.
+    timeout-minutes: 60
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
