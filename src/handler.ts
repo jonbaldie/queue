@@ -52,6 +52,9 @@ function enqueueErrorResponse(error: unknown): Response {
     if (error instanceof Payload.PayloadTooLargeError) {
         return new Response(error.message, { status: 413 });
     }
+    if (error instanceof Payload.IncompleteBodyError) {
+        return new Response(error.message, { status: 400 });
+    }
     if (error instanceof Payload.UnsupportedNumberError) {
         return new Response(error.message, { status: 400 });
     }

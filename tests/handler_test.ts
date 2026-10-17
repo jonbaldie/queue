@@ -1443,9 +1443,10 @@ Deno.test("oversized multi-byte UTF-8 body without content-length returns 413", 
     assertEquals(response.status, 413);
 });
 
-// queue-02t: Body read error returns 413 not 400
+// queue-02t: a body read error is not reported as Invalid JSON.
+// #172: nor as 413, since an aborted upload says nothing about its size.
 
-Deno.test("body read error returns 413 not 400", async () => {
+Deno.test("body read error returns 400 Incomplete request body, not 413 or Invalid JSON", async () => {
     const mgr = new QueueManager<Payload>(new Persistency.MemoryStore<Payload>);
     const handler = createHandler(mgr, API_TOKEN);
     const bodyStream = new ReadableStream({
@@ -1459,7 +1460,8 @@ Deno.test("body read error returns 413 not 400", async () => {
         headers: authHeaders,
     });
     const response = await handler(request);
-    assertEquals(response.status, 413);
+    assertEquals(response.status, 400);
+    assertEquals(await response.text(), "Incomplete request body");
 });
 
 Deno.test("dequeue returns application/json for string payload", async () => {
