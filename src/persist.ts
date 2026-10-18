@@ -45,6 +45,7 @@ export interface QueueStore<T = string> {
 export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
     private directory: string = '';
     private writeHandle: Deno.FsFile | null = null;
+    private ownerHandle: Deno.FsFile | null = null;
     private encoder = new TextEncoder();
 
     private get path(): string {
@@ -53,6 +54,10 @@ export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
 
     private get tempPath(): string {
         return this.path + ".tmp";
+    }
+
+    private get ownerLockPath(): string {
+        return this.directory + "persist.lock";
     }
 
     private ensureDirectory(): void {
@@ -253,6 +258,39 @@ export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
         }
     }
 
+    // Each server serves its queues from memory, so two servers sharing a
+    // directory would deliver the same item twice and overwrite each other's
+    // snapshots. Hold an exclusive lock on a separate file (persist.dat is
+    // replaced by rename, which would drop a lock on it) until close(); a
+    // second server waits here until the first exits. The OS releases the
+    // lock when the process dies, so a crash cannot leave it stale.
+    public async acquireOwnership(onWait: () => void, waitNoticeMs = 100): Promise<void> {
+        if (this.ownerHandle !== null) {
+            return;
+        }
+        this.ensureDirectory();
+        const handle = await Deno.open(this.ownerLockPath, { write: true, create: true });
+        try {
+            const locked = handle.lock(true);
+            let timeoutId: number | undefined;
+            const notice = new Promise<"waiting">((resolve) => {
+                timeoutId = setTimeout(() => resolve("waiting"), waitNoticeMs);
+            });
+            try {
+                if (await Promise.race([locked, notice]) === "waiting") {
+                    onWait();
+                    await locked;
+                }
+            } finally {
+                clearTimeout(timeoutId);
+            }
+        } catch (error) {
+            handle.close();
+            throw error;
+        }
+        this.ownerHandle = handle;
+    }
+
     public dir(dir: string): void {
         this.closeWriteHandle();
         this.directory = dir.replace(/\/$/, '') + "/";
@@ -260,6 +298,10 @@ export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
 
     public close(): void {
         this.closeWriteHandle();
+        if (this.ownerHandle !== null) {
+            this.ownerHandle.close();
+            this.ownerHandle = null;
+        }
     }
 }
 

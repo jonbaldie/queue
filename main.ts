@@ -46,6 +46,10 @@ const MANAGER = new QueueManager<Payload>(PERSIST_ENGINE, CONFIG.queueDepthLimit
 
 // Load up any existing queue data, if we're persisting
 if (PERSIST_ENGINE instanceof Persistency.FileStore) {
+    await PERSIST_ENGINE.acquireOwnership(() =>
+        writeLog(`Waiting for another server to release ${CONFIG.persistDir}...`)
+    );
+
     writeLog("Loading in data from persist.dat...\n");
 
     MANAGER.load();

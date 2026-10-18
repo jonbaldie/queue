@@ -141,6 +141,8 @@ If the server sees that the `persist.dat` file exists on startup, it will replay
 
 The Docker image runs as the non-root `deno` user and ships a `/data` directory owned by that user, declared as a volume and used as the default `PERSIST` path. Mount a named volume there to keep your binary log across container recreation, e.g. `-v queue-data:/data`. If you point `PERSIST` somewhere else, that directory must be writable by the `deno` user (uid 1993).
 
+Only one server can use a `PERSIST` directory at a time. A server holds an exclusive lock on `persist.lock` in that directory until it exits. A second server started on the same directory logs that it is waiting, and only loads `persist.dat` and starts listening after the first server has stopped. So for a rolling replace, start the new server, then stop the old one: the new server picks up the old one's final snapshot. The lock is released automatically if a server crashes.
+
 It should go without saying, but try not to edit `persist.dat`, because it might result in weird behaviour.
 
 Known persistence issues found during exploratory testing are recorded in [docs/exploratory-testing](docs/exploratory-testing/README.md).

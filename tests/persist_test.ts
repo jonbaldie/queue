@@ -747,3 +747,31 @@ Deno.test("FileStore.loadState skips non-event JSON records", () => {
     persist.close();
     Deno.removeSync(tmpDir, { recursive: true });
 });
+
+Deno.test("FileStore.acquireOwnership waits for the current owner to close (#173)", async () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const owner = new Persistency.FileStore();
+    const next = new Persistency.FileStore();
+    owner.dir(tmpDir);
+    next.dir(tmpDir);
+    try {
+        let ownerWaited = false;
+        await owner.acquireOwnership(() => ownerWaited = true);
+        assertEquals(ownerWaited, false);
+
+        let notifyWaiting: () => void;
+        const waiting = new Promise<void>((resolve) => notifyWaiting = resolve);
+        let acquired = false;
+        const takeover = next.acquireOwnership(() => notifyWaiting(), 10).then(() => acquired = true);
+        await waiting;
+        assertEquals(acquired, false);
+
+        owner.close();
+        await takeover;
+        assertEquals(acquired, true);
+    } finally {
+        owner.close();
+        next.close();
+        Deno.removeSync(tmpDir, { recursive: true });
+    }
+});
