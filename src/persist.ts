@@ -41,10 +41,18 @@ export interface QueueStore<T = string> {
     close(): void;
 }
 
+export class PersistDirectoryInUseError extends Error {
+    constructor(path: string) {
+        super(`PERSIST directory is already in use by another queue process (lock held on ${path})`);
+        this.name = "PersistDirectoryInUseError";
+    }
+}
+
 /** Persists payloads as JSON; T must be JSON-compatible. */
 export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
     private directory: string = '';
     private writeHandle: Deno.FsFile | null = null;
+    private claimHandle: Deno.FsFile | null = null;
     private encoder = new TextEncoder();
 
     private get path(): string {
@@ -53,6 +61,10 @@ export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
 
     private get tempPath(): string {
         return this.path + ".tmp";
+    }
+
+    private get lockPath(): string {
+        return this.directory + "persist.lock";
     }
 
     private ensureDirectory(): void {
@@ -85,6 +97,13 @@ export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
         if (this.writeHandle !== null) {
             this.writeHandle.close();
             this.writeHandle = null;
+        }
+    }
+
+    private releaseClaim(): void {
+        if (this.claimHandle !== null) {
+            this.claimHandle.close();
+            this.claimHandle = null;
         }
     }
 
@@ -253,13 +272,39 @@ export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
         }
     }
 
+    // Each process replays the log into its own memory, so two processes on
+    // one directory would deliver the same items and overwrite each other's
+    // snapshots. The claim is an exclusive lock held until close(); the OS
+    // drops it if the process dies, so a crash never blocks a restart.
+    public claim(): void {
+        if (this.claimHandle !== null) {
+            return;
+        }
+        this.ensureDirectory();
+        const handle = Deno.openSync(this.lockPath, { write: true, create: true });
+        let locked = false;
+        try {
+            locked = handle.tryLockSync(true);
+        } finally {
+            if (!locked) {
+                handle.close();
+            }
+        }
+        if (!locked) {
+            throw new PersistDirectoryInUseError(this.lockPath);
+        }
+        this.claimHandle = handle;
+    }
+
     public dir(dir: string): void {
         this.closeWriteHandle();
+        this.releaseClaim();
         this.directory = dir.replace(/\/$/, '') + "/";
     }
 
     public close(): void {
         this.closeWriteHandle();
+        this.releaseClaim();
     }
 }
 

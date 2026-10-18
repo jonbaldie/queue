@@ -747,3 +747,42 @@ Deno.test("FileStore.loadState skips non-event JSON records", () => {
     persist.close();
     Deno.removeSync(tmpDir, { recursive: true });
 });
+
+Deno.test("FileStore.claim() refuses a directory another store has claimed until it closes", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const owner = new Persistency.FileStore();
+    const contender = new Persistency.FileStore();
+    owner.dir(tmpDir);
+    contender.dir(tmpDir);
+    try {
+        owner.claim();
+        owner.claim();
+        assertThrows(() => contender.claim(), Persistency.PersistDirectoryInUseError, "already in use");
+        owner.close();
+        contender.claim();
+        assertThrows(() => owner.claim(), Persistency.PersistDirectoryInUseError);
+    } finally {
+        owner.close();
+        contender.close();
+        Deno.removeSync(tmpDir, { recursive: true });
+    }
+});
+
+Deno.test("FileStore.dir() releases the claim on the previous directory", () => {
+    const firstDir = Deno.makeTempDirSync();
+    const secondDir = Deno.makeTempDirSync();
+    const store = new Persistency.FileStore();
+    const contender = new Persistency.FileStore();
+    try {
+        store.dir(firstDir);
+        store.claim();
+        store.dir(secondDir);
+        contender.dir(firstDir);
+        contender.claim();
+    } finally {
+        store.close();
+        contender.close();
+        Deno.removeSync(firstDir, { recursive: true });
+        Deno.removeSync(secondDir, { recursive: true });
+    }
+});

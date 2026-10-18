@@ -46,6 +46,13 @@ const MANAGER = new QueueManager<Payload>(PERSIST_ENGINE, CONFIG.queueDepthLimit
 
 // Load up any existing queue data, if we're persisting
 if (PERSIST_ENGINE instanceof Persistency.FileStore) {
+    try {
+        PERSIST_ENGINE.claim();
+    } catch (error) {
+        writeLog(`Failed to start: ${error instanceof Error ? error.message : error}`);
+        Deno.exit(1);
+    }
+
     writeLog("Loading in data from persist.dat...\n");
 
     MANAGER.load();
