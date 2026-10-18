@@ -282,15 +282,8 @@ export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
         }
         this.ensureDirectory();
         const handle = Deno.openSync(this.lockPath, { write: true, create: true });
-        let locked = false;
-        try {
-            locked = handle.tryLockSync(true);
-        } finally {
-            if (!locked) {
-                handle.close();
-            }
-        }
-        if (!locked) {
+        if (!handle.tryLockSync(true)) {
+            handle.close();
             throw new PersistDirectoryInUseError(this.lockPath);
         }
         this.claimHandle = handle;

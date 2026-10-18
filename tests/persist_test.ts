@@ -757,7 +757,9 @@ Deno.test("FileStore.claim() refuses a directory another store has claimed until
     try {
         owner.claim();
         owner.claim();
-        assertThrows(() => contender.claim(), Persistency.PersistDirectoryInUseError, "already in use");
+        const error = assertThrows(() => contender.claim(), Persistency.PersistDirectoryInUseError, "already in use");
+        assertEquals(error.name, "PersistDirectoryInUseError");
+        assertEquals(error.message.includes(tmpDir + "/persist.lock"), true);
         owner.close();
         contender.claim();
         assertThrows(() => owner.claim(), Persistency.PersistDirectoryInUseError);
@@ -779,10 +781,26 @@ Deno.test("FileStore.dir() releases the claim on the previous directory", () => 
         store.dir(secondDir);
         contender.dir(firstDir);
         contender.claim();
+        // Claims on different directories never block each other.
+        store.claim();
     } finally {
         store.close();
         contender.close();
         Deno.removeSync(firstDir, { recursive: true });
         Deno.removeSync(secondDir, { recursive: true });
+    }
+});
+
+Deno.test("FileStore.claim() creates a missing PERSIST directory", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const persistDir = tmpDir + "/not/yet/created";
+    const store = new Persistency.FileStore();
+    store.dir(persistDir);
+    try {
+        store.claim();
+        assertEquals(Deno.statSync(persistDir + "/persist.lock").isFile, true);
+    } finally {
+        store.close();
+        Deno.removeSync(tmpDir, { recursive: true });
     }
 });
