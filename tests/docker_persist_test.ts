@@ -63,8 +63,16 @@ Deno.test({
 
     const documented = readmePersistCommand();
     assertStringIncludes(documented, "--persist");
+    assert(
+      !documented.includes("/mnt"),
+      "README persistence command must not reference /mnt (#174)",
+    );
     const persistDir = envValue(documented, "PERSIST").replace(/\/+$/, "");
-    assert(persistDir.length > 0, "README persistence command does not set PERSIST");
+    assertEquals(
+      persistDir,
+      "/data",
+      "README persistence command must configure PERSIST=/data/ (#174)",
+    );
 
     const name = `queue-persist-test-${Date.now()}`;
     const volume = `${name}-data`;
