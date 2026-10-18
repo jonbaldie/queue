@@ -46,3 +46,24 @@ Deno.test("README quick start documents authenticated, reachable commands", () =
     assertStringIncludes(command, "Authorization: Bearer");
   }
 });
+
+Deno.test(
+  "README persistence section documents writable Docker data path (#174)",
+  () => {
+    const persistSection =
+      README.match(/## Persistency([\s\S]*?)(\n## |$)/)?.[1] ?? "";
+    const persistBlocks = codeBlocks(persistSection);
+    const dockerPersist =
+      persistBlocks.find((block) => block.includes("docker run")) ?? "";
+    assert(
+      dockerPersist.length > 0,
+      "README Persistency section is missing a Docker run command",
+    );
+    assertStringIncludes(dockerPersist, "PERSIST=/data/");
+    assert(
+      !dockerPersist.includes("/mnt"),
+      "README persistence command must not reference /mnt (#174)",
+    );
+  },
+);
+
