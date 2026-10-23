@@ -41,20 +41,12 @@ Deno.test("persist MemoryStore replays events in append order", () => {
     );
 });
 
-Deno.test("persist MemoryStore.clear() clears events", () => {
-    const p = new Persistency.MemoryStore();
-    p.saveEvent("q", "anything", true);
-    p.clear();
-    assertEquals(p.loadState(), []);
-});
-
 // ── FileStore.dir() ──────────────────────────────────────────────────────────
 
 Deno.test("persist FileStore.dir() with trailing slash writes files in that directory", () => {
     const tmpDir = Deno.makeTempDirSync();
     const p = new Persistency.FileStore();
     p.dir(tmpDir + "/");
-    p.clear();
     p.saveEvent("q", "hello", true);
     assertEquals(p.loadState()[0].payload, "hello");
     p.close();
@@ -65,7 +57,6 @@ Deno.test("persist FileStore.dir() without trailing slash still works", () => {
     const tmpDir = Deno.makeTempDirSync();
     const p = new Persistency.FileStore();
     p.dir(tmpDir);
-    p.clear();
     p.saveEvent("q", "world", true);
     assertEquals(p.loadState()[0].payload, "world");
     p.close();
@@ -78,7 +69,6 @@ Deno.test("persist FileStore.dir() multi-segment path does not corrupt the file 
     Deno.mkdirSync(sub);
     const p = new Persistency.FileStore();
     p.dir(sub + "/");
-    p.clear();
     p.saveEvent("q", "nested", true);
     assertEquals(p.loadState()[0].payload, "nested");
     p.close();
@@ -91,7 +81,6 @@ Deno.test("persist FileStore.dir() second call replaces first", () => {
     const p = new Persistency.FileStore();
     p.dir(dir1 + "/");
     p.dir(dir2 + "/");
-    p.clear();
     p.saveEvent("q", "only-in-dir2", true);
     assertEquals(p.loadState()[0].payload, "only-in-dir2");
     
@@ -109,7 +98,6 @@ Deno.test("persist FileStore.saveEvent() does not overwrite existing content", (
     const tmpDir = Deno.makeTempDirSync();
     const p = new Persistency.FileStore();
     p.dir(tmpDir + "/");
-    p.clear();
     p.saveEvent("q", "line1", true);
     p.saveEvent("q", "line2", true);
     const events = p.loadState();
@@ -203,37 +191,12 @@ Deno.test("FileStore preserves the existing JSON-lines format", () => {
     }
 });
 
-// ── FileStore.clear() creates file if absent ─────────────────────────────────
-
-Deno.test("persist FileStore.clear() creates file when it does not exist", () => {
-    const tmpDir = Deno.makeTempDirSync();
-    const p = new Persistency.FileStore();
-    p.dir(tmpDir + "/");
-    p.clear();
-    assertEquals(p.loadState(), []);
-    p.close();
-    Deno.removeSync(tmpDir, { recursive: true });
-});
-
-Deno.test("persist FileStore.clear() truncates existing content", () => {
-    const tmpDir = Deno.makeTempDirSync();
-    const p = new Persistency.FileStore();
-    p.dir(tmpDir + "/");
-    p.clear();
-    p.saveEvent("q", "existing", true);
-    p.clear();
-    assertEquals(p.loadState(), []);
-    p.close();
-    Deno.removeSync(tmpDir, { recursive: true });
-});
-
 // ── FileStore.loadState() with large data ────────────────────────────────────
 
 Deno.test("persist FileStore.loadState() reads large file correctly", () => {
     const tmpDir = Deno.makeTempDirSync();
     const p = new Persistency.FileStore<{ payload: string; i: number }>();
     p.dir(tmpDir + "/");
-    p.clear();
     for (let i = 0; i < 100; i++) {
         p.saveEvent("q", { payload: "x".repeat(150), i }, true);
     }
@@ -262,12 +225,10 @@ Deno.test("manager save() writes enqueue:true dequeue:false for each item", () =
     const tmpDir = Deno.makeTempDirSync();
     const persist = new Persistency.FileStore();
     persist.dir(tmpDir + "/");
-    persist.clear();
 
     const mgr = new QueueManager(persist);
     mgr.enqueue("myq", "alpha");
     mgr.enqueue("myq", "beta");
-    persist.clear();
     mgr.save();
 
     const events = persist.loadState();
@@ -284,12 +245,10 @@ Deno.test("manager save() writes correct payloads in queue order", () => {
     const tmpDir = Deno.makeTempDirSync();
     const persist = new Persistency.FileStore();
     persist.dir(tmpDir + "/");
-    persist.clear();
 
     const mgr = new QueueManager(persist);
     mgr.enqueue("q", "first");
     mgr.enqueue("q", "second");
-    persist.clear();
     mgr.save();
 
     const events = persist.loadState();
@@ -303,7 +262,6 @@ Deno.test("manager save() on empty manager writes nothing", () => {
     const tmpDir = Deno.makeTempDirSync();
     const persist = new Persistency.FileStore();
     persist.dir(tmpDir + "/");
-    persist.clear();
 
     const mgr = new QueueManager(persist);
     mgr.save();
@@ -524,7 +482,6 @@ Deno.test("manager enqueue log: enqueue=true dequeue=false", () => {
     const tmpDir = Deno.makeTempDirSync();
     const persist = new Persistency.FileStore();
     persist.dir(tmpDir + "/");
-    persist.clear();
 
     const mgr = new QueueManager(persist);
     mgr.enqueue("q", "item");
@@ -540,16 +497,15 @@ Deno.test("manager dequeue log: enqueue=false dequeue=true", () => {
     const tmpDir = Deno.makeTempDirSync();
     const persist = new Persistency.FileStore();
     persist.dir(tmpDir + "/");
-    persist.clear();
 
     const mgr = new QueueManager(persist);
     mgr.enqueue("q", "item");
-    persist.clear();
     mgr.dequeue("q");
 
     const events = persist.loadState();
-    assertEquals(events[0].enqueue, false);
-    assertEquals(events[0].dequeue, true);
+    assertEquals(events.length, 2);
+    assertEquals(events[1].enqueue, false);
+    assertEquals(events[1].dequeue, true);
     persist.close();
     Deno.removeSync(tmpDir, { recursive: true });
 });
@@ -560,7 +516,6 @@ Deno.test("manager load() enqueue entry adds item to queue", () => {
     const tmpDir = Deno.makeTempDirSync();
     const persist = new Persistency.FileStore();
     persist.dir(tmpDir + "/");
-    persist.clear();
     persist.saveEvent("q", "x", true);
 
     const mgr = new QueueManager(persist);
@@ -574,7 +529,6 @@ Deno.test("manager load() dequeue entry removes item from queue", () => {
     const tmpDir = Deno.makeTempDirSync();
     const persist = new Persistency.FileStore();
     persist.dir(tmpDir + "/");
-    persist.clear();
     persist.saveEvent("q", "x", true);
     persist.saveEvent("q", "x", false);
 
@@ -582,41 +536,6 @@ Deno.test("manager load() dequeue entry removes item from queue", () => {
     mgr.load();
     assertEquals(mgr.length("q"), 0);
     persist.close();
-    Deno.removeSync(tmpDir, { recursive: true });
-});
-
-// ── saveBatch edge cases ────────────────────────────────────────────────────
-
-Deno.test("persist FileStore.saveBatch([]) does not create file", () => {
-    const tmpDir = Deno.makeTempDirSync();
-    const p = new Persistency.FileStore();
-    p.dir(tmpDir + "/");
-    p.saveBatch([]);
-    let fileExists = false;
-    try { Deno.statSync(tmpDir + "/persist.dat"); fileExists = true; } catch { /* expected */ }
-    assertEquals(fileExists, false);
-    p.close();
-    Deno.removeSync(tmpDir, { recursive: true });
-});
-
-Deno.test("persist FileStore.saveBatch() writes multiple events in one batch", () => {
-    const tmpDir = Deno.makeTempDirSync();
-    const p = new Persistency.FileStore();
-    p.dir(tmpDir + "/");
-    p.clear();
-    p.saveBatch([
-        { queue: "q", payload: "a", enqueue: true, dequeue: false },
-        { queue: "q", payload: "b", enqueue: false, dequeue: true },
-    ]);
-    const events = p.loadState();
-    assertEquals(events.length, 2);
-    assertEquals(events[0].payload, "a");
-    assertEquals(events[0].enqueue, true);
-    assertEquals(events[0].dequeue, false);
-    assertEquals(events[1].payload, "b");
-    assertEquals(events[1].enqueue, false);
-    assertEquals(events[1].dequeue, true);
-    p.close();
     Deno.removeSync(tmpDir, { recursive: true });
 });
 
@@ -648,18 +567,6 @@ Deno.test("persist MemoryStore.saveEvent sets dequeue to opposite of isEnqueue",
     assertEquals(p.loadState()[1].dequeue, true);
 });
 
-Deno.test("persist MemoryStore.saveBatch() appends all events", () => {
-    const p = new Persistency.MemoryStore();
-    p.saveBatch([
-        { queue: "q", payload: "a", enqueue: true, dequeue: false },
-        { queue: "q", payload: "b", enqueue: true, dequeue: false },
-    ]);
-    const events = p.loadState();
-    assertEquals(events.length, 2);
-    assertEquals(events[0].payload, "a");
-    assertEquals(events[1].payload, "b");
-});
-
 // ── FileStore directory and malformed line handling ──────────────────────────
 
 Deno.test("persist FileStore.saveEvent creates a missing directory", () => {
@@ -677,7 +584,6 @@ Deno.test("persist FileStore.loadState skips malformed lines", () => {
     const tmpDir = Deno.makeTempDirSync();
     const persist = new Persistency.FileStore();
     persist.dir(tmpDir);
-    persist.clear();
     persist.saveEvent("q", "kept", true);
     Deno.writeTextFileSync(
         tmpDir + "/persist.dat",
@@ -730,7 +636,6 @@ Deno.test("FileStore.loadState skips non-event JSON records", () => {
     const tmpDir = Deno.makeTempDirSync();
     const persist = new Persistency.FileStore();
     persist.dir(tmpDir);
-    persist.clear();
     const kept = JSON.stringify({ queue: "q", payload: "kept", enqueue: true, dequeue: false });
     const lines = [
         "null",
