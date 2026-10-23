@@ -17,8 +17,9 @@ function makeHandler(token = API_TOKEN, rateLimit = 100) {
 
 
 Deno.test("manager save flushes all queues to persist", () => {
-    const persist = new Persistency.FileStore;
-    persist.clear();
+    const tmpDir = Deno.makeTempDirSync();
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir);
 
     const mgr = new QueueManager(persist);
     mgr.enqueue("q1", "a");
@@ -34,11 +35,13 @@ Deno.test("manager save flushes all queues to persist", () => {
     assertEquals(events.filter((p: any) => p.queue === "q1").length, 2);
     assertEquals(events.filter((p: any) => p.queue === "q2").length, 1);
     persist.close();
+    Deno.removeSync(tmpDir, { recursive: true });
 });
 
 Deno.test("manager save overwrites previous persist data", () => {
-    const persist = new Persistency.FileStore;
-    persist.clear();
+    const tmpDir = Deno.makeTempDirSync();
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir);
 
     const mgr = new QueueManager(persist);
     mgr.enqueue("q1", "a");
@@ -50,22 +53,26 @@ Deno.test("manager save overwrites previous persist data", () => {
     const events = persist.loadState();
     assertEquals(events.length, 2);
     persist.close();
+    Deno.removeSync(tmpDir, { recursive: true });
 });
 
 Deno.test("manager save with empty queues writes nothing", () => {
-    const persist = new Persistency.FileStore;
-    persist.clear();
+    const tmpDir = Deno.makeTempDirSync();
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir);
 
     const mgr = new QueueManager(persist);
     mgr.save();
 
     assertEquals(persist.loadState(), []);
     persist.close();
+    Deno.removeSync(tmpDir, { recursive: true });
 });
 
 Deno.test("manager save preserves queue order", () => {
-    const persist = new Persistency.FileStore;
-    persist.clear();
+    const tmpDir = Deno.makeTempDirSync();
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir);
 
     const mgr = new QueueManager(persist);
     mgr.enqueue("q", "first");
@@ -78,11 +85,13 @@ Deno.test("manager save preserves queue order", () => {
     const payloads = events.map((e: any) => e.payload);
     assertEquals(payloads, ["first", "second", "third"]);
     persist.close();
+    Deno.removeSync(tmpDir, { recursive: true });
 });
 
 Deno.test("manager save then load round-trips data", () => {
-    const persist = new Persistency.FileStore;
-    persist.clear();
+    const tmpDir = Deno.makeTempDirSync();
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir);
 
     const mgr = new QueueManager(persist);
     mgr.enqueue("x", "one");
@@ -100,6 +109,7 @@ Deno.test("manager save then load round-trips data", () => {
     assertEquals(mgr2.dequeue("x"), "two");
     assertEquals(mgr2.dequeue("y"), "three");
     persist.close();
+    Deno.removeSync(tmpDir, { recursive: true });
 });
 
 async function startServer(env: Record<string, string>): Promise<{ child: Deno.ChildProcess; port: number }> {
@@ -185,8 +195,9 @@ Deno.test("manager length", () => {
 });
 
 Deno.test("manager persistency", () => {
-    const persist = new Persistency.FileStore;
-    persist.clear();
+    const tmpDir = Deno.makeTempDirSync();
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir);
     persist.saveEvent("foo", "bar", true);
     persist.saveEvent("fee", "bat", true);
     persist.saveEvent("fee", "gat", true);
@@ -203,14 +214,16 @@ Deno.test("manager persistency", () => {
     assertEquals(1, mgr.length("fee"));
     assertEquals("gat", mgr.dequeue("fee"));
     persist.close();
+    Deno.removeSync(tmpDir, { recursive: true });
 });
 
 Deno.test("json persistency", () => {
-    const persist = new Persistency.FileStore;
+    const tmpDir = Deno.makeTempDirSync();
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir);
     const mgr = new QueueManager(persist);
     const payload = "php /var/www/html/index.php";
 
-    persist.clear();
     persist.saveEvent("foo", payload, true);
 
     mgr.load();
@@ -222,28 +235,30 @@ Deno.test("json persistency", () => {
     assertEquals(1, mgr.length("foo"));
     assertEquals(payload, mgr.dequeue("foo"));
     persist.close();
+    Deno.removeSync(tmpDir, { recursive: true });
 });
 
 Deno.test("persistency", () => {
-    const persist = new Persistency.FileStore;
+    const tmpDir = Deno.makeTempDirSync();
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir);
 
-    persist.clear();
+    const load = (): string => new TextDecoder().decode(Deno.readFileSync(tmpDir + "/persist.dat"));
 
-    const load = (): string => new TextDecoder().decode(Deno.readFileSync("persist.dat"));
-
-    assertEquals("", load());
+    assertEquals(persist.loadState(), []);
 
     persist.saveEvent("foo", "bar", true);
 
     assertNotEquals("", load());
 
-    persist.clear();
     persist.close();
+    Deno.removeSync(tmpDir, { recursive: true });
 });
 
 Deno.test("concurrent enqueue writes to file", async () => {
-    const persist = new Persistency.FileStore;
-    persist.clear();
+    const tmpDir = Deno.makeTempDirSync();
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir);
 
     const mgr = new QueueManager(persist);
 
@@ -269,13 +284,14 @@ Deno.test("concurrent enqueue writes to file", async () => {
         assertEquals("test_queue", obj.queue);
     });
 
-    persist.clear();
     persist.close();
+    Deno.removeSync(tmpDir, { recursive: true });
 });
 
 Deno.test("concurrent manager operations maintain data integrity", async () => {
-    const persist = new Persistency.FileStore;
-    persist.clear();
+    const tmpDir = Deno.makeTempDirSync();
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir);
 
     const mgr = new QueueManager(persist);
 
@@ -302,8 +318,8 @@ Deno.test("concurrent manager operations maintain data integrity", async () => {
     assertEquals(5, items.length);
     assertEquals(0, mgr.length("q1"));
 
-    persist.clear();
     persist.close();
+    Deno.removeSync(tmpDir, { recursive: true });
 });
 
 Deno.test("persist operations handle I/O errors gracefully", () => {
@@ -461,8 +477,9 @@ Deno.test("queue is removed only after last item is dequeued", () => {
 });
 
 Deno.test("manager load cleans up empty queues from persistence", () => {
-    const persist = new Persistency.FileStore;
-    persist.clear();
+    const tmpDir = Deno.makeTempDirSync();
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir);
 
     persist.saveEvent("tmp", "data", true);
     persist.saveEvent("tmp", "data", false);
@@ -476,11 +493,13 @@ Deno.test("manager load cleans up empty queues from persistence", () => {
     mgr.enqueue("other", "value");
     assertEquals("value", mgr.dequeue("other"));
     persist.close();
+    Deno.removeSync(tmpDir, { recursive: true });
 });
 
 Deno.test("empty dequeue does not add entry to persistence log", () => {
-    const persist = new Persistency.FileStore;
-    persist.clear();
+    const tmpDir = Deno.makeTempDirSync();
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir);
 
     const mgr = new QueueManager(persist);
     mgr.dequeue("empty-queue");
@@ -488,13 +507,14 @@ Deno.test("empty dequeue does not add entry to persistence log", () => {
     const events = persist.loadState();
     assertEquals(events.length, 0);
 
-    persist.clear();
     persist.close();
+    Deno.removeSync(tmpDir, { recursive: true });
 });
 
 Deno.test("non-empty dequeue still adds entry to persistence log", () => {
-    const persist = new Persistency.FileStore;
-    persist.clear();
+    const tmpDir = Deno.makeTempDirSync();
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir);
 
     const mgr = new QueueManager(persist);
     mgr.enqueue("myqueue", "item1");
@@ -509,8 +529,8 @@ Deno.test("non-empty dequeue still adds entry to persistence log", () => {
     assertEquals(deqEntry.dequeue, true);
     assertEquals(deqEntry.enqueue, false);
 
-    persist.clear();
     persist.close();
+    Deno.removeSync(tmpDir, { recursive: true });
 });
 
 Deno.test("Manager<number> enqueue and dequeue numbers", () => {
@@ -611,7 +631,7 @@ Deno.test("manager persistEnabled=false skips saveEvent on enqueue", () => {
 
 Deno.test("manager load skips events with neither enqueue nor dequeue", () => {
     const persist = new Persistency.MemoryStore();
-    persist.saveBatch([
+    persist.replace([
         { queue: "q", payload: "a", enqueue: true, dequeue: false },
         { queue: "q", payload: "b", enqueue: false, dequeue: false },
     ]);

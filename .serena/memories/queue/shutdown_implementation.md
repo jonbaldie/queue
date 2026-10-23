@@ -8,7 +8,7 @@
 - Added `shutdown()` async function that:
   - Calls `server.shutdown()` to stop accepting new connections
   - Calls `mgr.save()` to snapshot queue state to persist file (when using File persistency)
-  - Calls `persist.clear()` to ensure clean exit
+  - Calls `PERSIST_ENGINE.close()` to release the persist file
   - Calls `Deno.exit(0)`
 
 ### 2. src/manager.ts

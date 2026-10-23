@@ -34,7 +34,7 @@ Fast, lightweight, persistence-optional FIFO queue service written in TypeScript
 - Constructor overloads for Queue class
 
 ## Important Notes
-- `persist.ts clear()` creates the file if absent (prevents "file not found" errors in tests)
+- `FileStore` tests use a per-test `Deno.makeTempDirSync()` directory via `dir()`; `QueueStore` has no `clear()`
 - Deno 2.x-only APIs: `URLPattern`, `Deno.serve()`
 - Bearer token auth via `Authorization: Bearer <token>` header
 - Health endpoint does NOT require auth

@@ -39,14 +39,13 @@ Old (broken): `import { parse } from "https://deno.land/std@0.119.0/flags/mod.ts
 
 Do NOT use these in code that must support Deno 1.x.
 
-## persist.ts Quirk
+## FileStore Tests
 
-The `clear()` method creates the file if absent:
-```ts
-Deno.writeFileSync(this.directory + "persist.dat", new Uint8Array());
-```
-
-This prevents "file not found" errors in tests.
+Give each `FileStore` test its own directory: `Deno.makeTempDirSync()`, then
+`store.dir(tmpDir)`, and remove the directory at the end. Without `dir()`, the
+store writes `./persist.dat` in the repository root, and tests then share it.
+`QueueStore` has no truncate method; it holds only the operations
+`QueueManager` uses.
 
 ## Mutation Testing Strategy
 
