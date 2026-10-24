@@ -1,0 +1,10 @@
+Listening on 127.0.0.1:54415
+GET http://127.0.0.1:54415/health 200 3.27ms
+GET http://127.0.0.1:54415/queues 200 1.32ms
+GET http://127.0.0.1:54415/queues 200 0.25ms
+GET http://127.0.0.1:54415/queues 200 0.24ms
+GET http://127.0.0.1:54415/queues 429 0.18ms
+GET http://127.0.0.1:54415/health 200 0.34ms
+GET http://127.0.0.1:54415/queues 200 1.43ms
+Received SIGTERM, shutting down gracefully...
+Goodbye!

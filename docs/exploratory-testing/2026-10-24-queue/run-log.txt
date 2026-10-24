@@ -1,0 +1,13 @@
+Sat Oct 24 00:35:46 UTC 2026
+2849885b490ce8dbaeaf7af0ed20138f658cdc57
+deno 2.7.6 (stable, release, aarch64-apple-darwin)
+v8 14.6.202.9-rusty
+typescript 5.9.2
+TMPDIR=/Users/jonathanbaldie/.fleet/events/scratch/59abd2264c20ff38cd3ca13ee73257859cc49a9f213c3c1e3892b0d3338264f9
+No Docker resources will be created; testing native Deno HTTP interface.
+install status=0
+Exploratory driver exit=1
+Driver observation failure: Python sendall hit BrokenPipe on preflight 413; preserve initial-driver-failure.txt and initial-j3-server.log. Repair driver to read early HTTP response after BrokenPipe, then repeat journeys from fresh data.
+Repaired exploratory driver exit=0
+Final replay with queue-count correction/retry and exact deep payload byte comparisons exit=0
+Pre-publish verification: driver syntax, report links, completed journeys, isolated-state cleanup PASS. Docker resources created=0 (native-only run).

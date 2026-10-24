@@ -15,3 +15,4 @@ evidence. Replay scripts run from the repository root.
 | 2026-10-03 | [2026-10-03-report.md](./2026-10-03-queue/2026-10-03-report.md) | None |
 | 2026-10-10 | [2026-10-10-report.md](./2026-10-10-queue/2026-10-10-report.md) | Full-disk short writes corrupt `persist.dat` (#160), failed persist writes still mutate queues (#161) |
 | 2026-10-17 | [2026-10-17-report.md](./2026-10-17-queue/2026-10-17-report.md) | README Docker `--persist` command still crashes (#174), two servers on one `PERSIST` directory (#173), aborted enqueue reported as 413 (#172) |
+| 2026-10-24 | [2026-10-24-report.md](./2026-10-24-queue/2026-10-24-report.md) | None; typed/concurrent delivery, crash recovery and ownership, payload/capacity/rate boundaries |

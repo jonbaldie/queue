@@ -1,0 +1,288 @@
+
+JOURNEY 1: publish and consume typed work across queues
+START j1 pid=50285 port=54025 persist=None config={}
+PASS public readiness: actual=(200, '{"status":"ok"}') expected=(200, '{"status":"ok"}')
+PASS auth challenge: actual=(401, b'Unauthorized') expected=(401, b'Unauthorized')
+PASS enqueue '0': actual=200 expected=200
+PASS enqueue 0: actual=200 expected=200
+PASS enqueue False: actual=200 expected=200
+PASS enqueue []: actual=200 expected=200
+PASS enqueue {}: actual=200 expected=200
+PASS enqueue {'unicode': 'café 🐈', 'nested': [None, True]}: actual=200 expected=200
+PASS enqueue 'a\x00b': actual=200 expected=200
+PASS length before HEAD: actual=(200, '7') expected=(200, '7')
+PASS HEAD dequeue body empty: actual=(200, b'') expected=(200, b'')
+PASS HEAD does not consume: actual=(200, '7') expected=(200, '7')
+PASS peek oldest: actual=(200, '"0"') expected=(200, '"0"')
+PASS typed FIFO: actual=['0', 0, False, [], {}, {'unicode': 'café 🐈', 'nested': [None, True]}, 'a\x00b'] expected=['0', 0, False, [], {}, {'unicode': 'café 🐈', 'nested': [None, True]}, 'a\x00b']
+PASS empty dequeue: actual=204 expected=204
+PASS drained queue removed: actual=(200, '[]') expected=(200, '[]')
+PASS publish worker job 0: actual=200 expected=200
+PASS publish worker job 1: actual=200 expected=200
+PASS publish worker job 2: actual=200 expected=200
+PASS publish worker job 3: actual=200 expected=200
+PASS publish worker job 4: actual=200 expected=200
+PASS publish worker job 5: actual=200 expected=200
+PASS publish worker job 6: actual=200 expected=200
+PASS publish worker job 7: actual=200 expected=200
+PASS publish worker job 8: actual=200 expected=200
+PASS publish worker job 9: actual=200 expected=200
+PASS publish worker job 10: actual=200 expected=200
+PASS publish worker job 11: actual=200 expected=200
+PASS publish worker job 12: actual=200 expected=200
+PASS publish worker job 13: actual=200 expected=200
+PASS publish worker job 14: actual=200 expected=200
+PASS publish worker job 15: actual=200 expected=200
+PASS publish worker job 16: actual=200 expected=200
+PASS publish worker job 17: actual=200 expected=200
+PASS publish worker job 18: actual=200 expected=200
+PASS publish worker job 19: actual=200 expected=200
+PASS publish worker job 20: actual=200 expected=200
+PASS publish worker job 21: actual=200 expected=200
+PASS publish worker job 22: actual=200 expected=200
+PASS publish worker job 23: actual=200 expected=200
+PASS publish worker job 24: actual=200 expected=200
+PASS publish worker job 25: actual=200 expected=200
+PASS publish worker job 26: actual=200 expected=200
+PASS publish worker job 27: actual=200 expected=200
+PASS publish worker job 28: actual=200 expected=200
+PASS publish worker job 29: actual=200 expected=200
+PASS publish worker job 30: actual=200 expected=200
+PASS publish worker job 31: actual=200 expected=200
+PASS publish worker job 32: actual=200 expected=200
+PASS publish worker job 33: actual=200 expected=200
+PASS publish worker job 34: actual=200 expected=200
+PASS publish worker job 35: actual=200 expected=200
+PASS publish worker job 36: actual=200 expected=200
+PASS publish worker job 37: actual=200 expected=200
+PASS publish worker job 38: actual=200 expected=200
+PASS publish worker job 39: actual=200 expected=200
+PASS publish worker job 40: actual=200 expected=200
+PASS publish worker job 41: actual=200 expected=200
+PASS publish worker job 42: actual=200 expected=200
+PASS publish worker job 43: actual=200 expected=200
+PASS publish worker job 44: actual=200 expected=200
+PASS publish worker job 45: actual=200 expected=200
+PASS publish worker job 46: actual=200 expected=200
+PASS publish worker job 47: actual=200 expected=200
+PASS publish worker job 48: actual=200 expected=200
+PASS publish worker job 49: actual=200 expected=200
+PASS publish worker job 50: actual=200 expected=200
+PASS publish worker job 51: actual=200 expected=200
+PASS publish worker job 52: actual=200 expected=200
+PASS publish worker job 53: actual=200 expected=200
+PASS publish worker job 54: actual=200 expected=200
+PASS publish worker job 55: actual=200 expected=200
+PASS publish worker job 56: actual=200 expected=200
+PASS publish worker job 57: actual=200 expected=200
+PASS publish worker job 58: actual=200 expected=200
+PASS publish worker job 59: actual=200 expected=200
+PASS publish worker job 60: actual=200 expected=200
+PASS publish worker job 61: actual=200 expected=200
+PASS publish worker job 62: actual=200 expected=200
+PASS publish worker job 63: actual=200 expected=200
+PASS publish worker job 64: actual=200 expected=200
+PASS publish worker job 65: actual=200 expected=200
+PASS publish worker job 66: actual=200 expected=200
+PASS publish worker job 67: actual=200 expected=200
+PASS publish worker job 68: actual=200 expected=200
+PASS publish worker job 69: actual=200 expected=200
+PASS publish worker job 70: actual=200 expected=200
+PASS publish worker job 71: actual=200 expected=200
+PASS publish worker job 72: actual=200 expected=200
+PASS publish worker job 73: actual=200 expected=200
+PASS publish worker job 74: actual=200 expected=200
+PASS publish worker job 75: actual=200 expected=200
+PASS publish worker job 76: actual=200 expected=200
+PASS publish worker job 77: actual=200 expected=200
+PASS publish worker job 78: actual=200 expected=200
+PASS publish worker job 79: actual=200 expected=200
+PASS publish worker job 80: actual=200 expected=200
+PASS publish worker job 81: actual=200 expected=200
+PASS publish worker job 82: actual=200 expected=200
+PASS publish worker job 83: actual=200 expected=200
+PASS publish worker job 84: actual=200 expected=200
+PASS publish worker job 85: actual=200 expected=200
+PASS publish worker job 86: actual=200 expected=200
+PASS publish worker job 87: actual=200 expected=200
+PASS publish worker job 88: actual=200 expected=200
+PASS publish worker job 89: actual=200 expected=200
+PASS publish worker job 90: actual=200 expected=200
+PASS publish worker job 91: actual=200 expected=200
+PASS publish worker job 92: actual=200 expected=200
+PASS publish worker job 93: actual=200 expected=200
+PASS publish worker job 94: actual=200 expected=200
+PASS publish worker job 95: actual=200 expected=200
+PASS publish worker job 96: actual=200 expected=200
+PASS publish worker job 97: actual=200 expected=200
+PASS publish worker job 98: actual=200 expected=200
+PASS publish worker job 99: actual=200 expected=200
+PASS publish worker job 100: actual=200 expected=200
+PASS publish worker job 101: actual=200 expected=200
+PASS publish worker job 102: actual=200 expected=200
+PASS publish worker job 103: actual=200 expected=200
+PASS publish worker job 104: actual=200 expected=200
+PASS publish worker job 105: actual=200 expected=200
+PASS publish worker job 106: actual=200 expected=200
+PASS publish worker job 107: actual=200 expected=200
+PASS publish worker job 108: actual=200 expected=200
+PASS publish worker job 109: actual=200 expected=200
+PASS publish worker job 110: actual=200 expected=200
+PASS publish worker job 111: actual=200 expected=200
+PASS publish worker job 112: actual=200 expected=200
+PASS publish worker job 113: actual=200 expected=200
+PASS publish worker job 114: actual=200 expected=200
+PASS publish worker job 115: actual=200 expected=200
+PASS publish worker job 116: actual=200 expected=200
+PASS publish worker job 117: actual=200 expected=200
+PASS publish worker job 118: actual=200 expected=200
+PASS publish worker job 119: actual=200 expected=200
+PASS parallel workers receive every job exactly once: actual=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119] expected=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119]
+PASS worker queue lasting effect: actual=(200, '0') expected=(200, '0')
+STOP pid=50285 status=0
+
+JOURNEY 2: restart with queued work; crash and exclusive ownership
+START j2-0-initial pid=50286 port=54299 persist=/Users/jonathanbaldie/Code-2/github.com/jonbaldie/queue/target/exploratory-2026-10-24/persist-0 config={}
+PASS persist publish: actual=200 expected=200
+PASS persist publish: actual=200 expected=200
+PASS persist publish: actual=200 expected=200
+PASS persist publish: actual=200 expected=200
+PASS persist publish: actual=200 expected=200
+PASS consume before restart: actual=(200, '{"id":0}') expected=(200, '{"id":0}')
+START j2-0-rival pid=50288 port=54308 persist=/Users/jonathanbaldie/Code-2/github.com/jonbaldie/queue/target/exploratory-2026-10-24/persist-0 config={}
+EXIT before ready: 1; j2-0-rival-server.log
+PASS second owner rejected: actual=False expected=False
+PASS second owner explains failure: actual=True expected=True
+STOP pid=50288 status=1
+STOP pid=50286 status=0
+START j2-0-restart pid=50289 port=54310 persist=/Users/jonathanbaldie/Code-2/github.com/jonbaldie/queue/target/exploratory-2026-10-24/persist-0 config={'QUEUE_DEPTH_LIMIT': 1, 'QUEUE_COUNT_LIMIT': 1}
+PASS replay retains work over lowered limit: actual=(200, '4') expected=(200, '4')
+PASS lowered limit rejects new work: actual=507 expected=507
+PASS recovered FIFO: actual=[{'id': 1}, {'id': 2}, {'id': 3}, {'id': 4}] expected=[{'id': 1}, {'id': 2}, {'id': 3}, {'id': 4}]
+PASS capacity reusable after drain: actual=200 expected=200
+STOP pid=50289 status=0
+START j2-0-final pid=50290 port=54320 persist=/Users/jonathanbaldie/Code-2/github.com/jonbaldie/queue/target/exploratory-2026-10-24/persist-0 config={}
+PASS new queue survives next restart: actual=(200, '"new-job"') expected=(200, '"new-job"')
+PASS consumed work does not reappear: actual=204 expected=204
+STOP pid=50290 status=0
+START j2-1-initial pid=50291 port=54325 persist=/Users/jonathanbaldie/Code-2/github.com/jonbaldie/queue/target/exploratory-2026-10-24/persist-1 config={}
+PASS persist publish: actual=200 expected=200
+PASS persist publish: actual=200 expected=200
+PASS persist publish: actual=200 expected=200
+PASS persist publish: actual=200 expected=200
+PASS persist publish: actual=200 expected=200
+PASS consume before restart: actual=(200, '{"id":0}') expected=(200, '{"id":0}')
+START j2-1-rival pid=50292 port=54334 persist=/Users/jonathanbaldie/Code-2/github.com/jonbaldie/queue/target/exploratory-2026-10-24/persist-1 config={}
+EXIT before ready: 1; j2-1-rival-server.log
+PASS second owner rejected: actual=False expected=False
+PASS second owner explains failure: actual=True expected=True
+STOP pid=50292 status=1
+STOP pid=50291 status=-9
+START j2-1-restart pid=50294 port=54336 persist=/Users/jonathanbaldie/Code-2/github.com/jonbaldie/queue/target/exploratory-2026-10-24/persist-1 config={'QUEUE_DEPTH_LIMIT': 1, 'QUEUE_COUNT_LIMIT': 1}
+PASS replay retains work over lowered limit: actual=(200, '4') expected=(200, '4')
+PASS lowered limit rejects new work: actual=507 expected=507
+PASS recovered FIFO: actual=[{'id': 1}, {'id': 2}, {'id': 3}, {'id': 4}] expected=[{'id': 1}, {'id': 2}, {'id': 3}, {'id': 4}]
+PASS capacity reusable after drain: actual=200 expected=200
+STOP pid=50294 status=0
+START j2-1-final pid=50295 port=54346 persist=/Users/jonathanbaldie/Code-2/github.com/jonbaldie/queue/target/exploratory-2026-10-24/persist-1 config={}
+PASS new queue survives next restart: actual=(200, '"new-job"') expected=(200, '"new-job"')
+PASS consumed work does not reappear: actual=204 expected=204
+STOP pid=50295 status=0
+
+JOURNEY 3: reject bad input, correct it, and retain accepted boundary payloads
+START j3 pid=50296 port=54351 persist=None config={'QUEUE_DEPTH_LIMIT': 2, 'QUEUE_COUNT_LIMIT': 2}
+PASS invalid JSON: actual=400 expected=400
+PASS null: actual=400 expected=400
+PASS missing payload: actual=400 expected=400
+PASS lossy integer: actual=400 expected=400
+PASS nonfinite: actual=400 expected=400
+PASS invalid UTF8: actual=400 expected=400
+PASS too deep: actual=400 expected=400
+PASS invalid input creates no queue: actual=(200, '[]') expected=(200, '[]')
+PASS 128 unicode code points: actual=200 expected=200
+PASS 129 unicode code points: actual=400 expected=400
+PASS bad escape: actual=400 expected=400
+PASS corrected payload accepted: actual=200 expected=200
+PASS second item accepted: actual=200 expected=200
+PASS depth limit: actual=507 expected=507
+PASS depth rejection leaves first item: actual=(200, 'false') expected=(200, 'false')
+PASS retry after space available: actual=200 expected=200
+PASS next FIFO: actual=(200, '0') expected=(200, '0')
+PASS retry FIFO: actual=(200, '"retry"') expected=(200, '"retry"')
+PASS create queue one: actual=200 expected=200
+PASS create queue two: actual=200 expected=200
+PASS queue count limit: actual=507 expected=507
+PASS count rejection creates no phantom queue: actual=['one', 'two'] expected=['one', 'two']
+PASS retry after queue slot released: actual=200 expected=200
+PASS retried queue payload: actual=(200, '"three"') expected=(200, '"three"')
+PASS body size 1048576: actual=1048576 expected=1048576
+PASS body size 1048576 acceptance: actual=200 expected=200
+PASS body size 1048577: actual=1048577 expected=1048577
+OBSERVATION: POST /enqueue/size upload closed early; reading response
+PASS body size 1048577 acceptance: actual=413 expected=413
+PASS oversize leaves only accepted item: actual=(200, '1') expected=(200, '1')
+PASS max size payload preserved: actual=1048562 expected=1048562
+STOP pid=50296 status=0
+START j3-depth-0 pid=50297 port=54385 persist=/Users/jonathanbaldie/Code-2/github.com/jonbaldie/queue/target/exploratory-2026-10-24/depth-0 config={}
+DEPTH repeat=0 nested_objects=1000 enqueue_status=200 response=b'Payload successfully queued onto depth1000.'
+PASS depth 1000 accepted within documented limit: actual=200 expected=200
+DEPTH peek_status=200 body_bytes=6001 sha256=6f96681c32d88a523b2804259838b4f8a24e8357740c51508eb56c4138575a00
+PASS depth 1000 peek readable: actual=200 expected=200
+PASS depth 1000 exact peek bytes: actual=True expected=True
+DEPTH repeat=0 nested_objects=2000 enqueue_status=200 response=b'Payload successfully queued onto depth2000.'
+PASS depth 2000 accepted within documented limit: actual=200 expected=200
+DEPTH peek_status=200 body_bytes=12001 sha256=8823eae33787071e6a7d77dfc32d17d72d9bf0afd5d9ad670ecc12d293961549
+PASS depth 2000 peek readable: actual=200 expected=200
+PASS depth 2000 exact peek bytes: actual=True expected=True
+DEPTH repeat=0 nested_objects=2999 enqueue_status=200 response=b'Payload successfully queued onto depth2999.'
+PASS depth 2999 accepted within documented limit: actual=200 expected=200
+DEPTH peek_status=200 body_bytes=17995 sha256=2b9e2ee27675c5945640cbd5d1f2469f94b52b50bee6ae8580f9f69887ce0d16
+PASS depth 2999 peek readable: actual=200 expected=200
+PASS depth 2999 exact peek bytes: actual=True expected=True
+STOP pid=50297 status=0
+START j3-depth-0-restart pid=50299 port=54394 persist=/Users/jonathanbaldie/Code-2/github.com/jonbaldie/queue/target/exploratory-2026-10-24/depth-0 config={}
+PASS depth server restart ready: actual=True expected=True
+PASS depth 1000 survives restart: actual=200 expected=200
+PASS depth 1000 exact recovered bytes: actual=True expected=True
+PASS depth 2000 survives restart: actual=200 expected=200
+PASS depth 2000 exact recovered bytes: actual=True expected=True
+PASS depth 2999 survives restart: actual=200 expected=200
+PASS depth 2999 exact recovered bytes: actual=True expected=True
+STOP pid=50299 status=0
+START j3-depth-1 pid=50300 port=54400 persist=/Users/jonathanbaldie/Code-2/github.com/jonbaldie/queue/target/exploratory-2026-10-24/depth-1 config={}
+DEPTH repeat=1 nested_objects=1000 enqueue_status=200 response=b'Payload successfully queued onto depth1000.'
+PASS depth 1000 accepted within documented limit: actual=200 expected=200
+DEPTH peek_status=200 body_bytes=6001 sha256=6f96681c32d88a523b2804259838b4f8a24e8357740c51508eb56c4138575a00
+PASS depth 1000 peek readable: actual=200 expected=200
+PASS depth 1000 exact peek bytes: actual=True expected=True
+DEPTH repeat=1 nested_objects=2000 enqueue_status=200 response=b'Payload successfully queued onto depth2000.'
+PASS depth 2000 accepted within documented limit: actual=200 expected=200
+DEPTH peek_status=200 body_bytes=12001 sha256=8823eae33787071e6a7d77dfc32d17d72d9bf0afd5d9ad670ecc12d293961549
+PASS depth 2000 peek readable: actual=200 expected=200
+PASS depth 2000 exact peek bytes: actual=True expected=True
+DEPTH repeat=1 nested_objects=2999 enqueue_status=200 response=b'Payload successfully queued onto depth2999.'
+PASS depth 2999 accepted within documented limit: actual=200 expected=200
+DEPTH peek_status=200 body_bytes=17995 sha256=2b9e2ee27675c5945640cbd5d1f2469f94b52b50bee6ae8580f9f69887ce0d16
+PASS depth 2999 peek readable: actual=200 expected=200
+PASS depth 2999 exact peek bytes: actual=True expected=True
+STOP pid=50300 status=0
+START j3-depth-1-restart pid=50301 port=54409 persist=/Users/jonathanbaldie/Code-2/github.com/jonbaldie/queue/target/exploratory-2026-10-24/depth-1 config={}
+PASS depth server restart ready: actual=True expected=True
+PASS depth 1000 survives restart: actual=200 expected=200
+PASS depth 1000 exact recovered bytes: actual=True expected=True
+PASS depth 2000 survives restart: actual=200 expected=200
+PASS depth 2000 exact recovered bytes: actual=True expected=True
+PASS depth 2999 survives restart: actual=200 expected=200
+PASS depth 2999 exact recovered bytes: actual=True expected=True
+STOP pid=50301 status=0
+START j3-rate pid=50302 port=54415 persist=None config={'RATE_LIMIT_REQUESTS': 3}
+PASS rate attempt 1: actual=200 expected=200
+PASS rate attempt 2: actual=200 expected=200
+PASS rate attempt 3: actual=200 expected=200
+PASS rate attempt 4: actual=429 expected=429
+PASS health remains available when limited: actual=200 expected=200
+Waiting 61 seconds for real sliding-window expiry (no clock mocking).
+PASS rate limit recovery: actual=200 expected=200
+STOP pid=50302 status=0
+FINISHED candidates=[]
+CLEANUP: all created native instances stopped; isolated state removed; Docker resources created: 0.
