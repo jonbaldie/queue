@@ -1,188 +1,142 @@
-// Regression coverage for the class of bug where `deno compile` permission
-// flags don't match what main.ts actually needs at runtime. No other CI job
-// executes the compiled artifact (the "test" job compiles it but then runs
-// `deno test`; mutation/quality jobs use `deno run`), so a broken binary can
-// ship green without these tests.
-//
-// Each test isolates one permission dimension by leaving the others
-// unrestricted, mirroring how each bug was originally diagnosed.
-
+// Exercise real binaries: the shipped build goes through the same CLI as Docker
+// and CI. Per-dimension probes widen only env access, never copy the flag list.
 import { assertEquals } from "jsr:@std/assert@1.0";
+import { compileBinary } from "../scripts/compile.ts";
 
-async function compile(permFlags: string[], outPath: string): Promise<void> {
-  const cmd = new Deno.Command(Deno.execPath(), {
-    args: ["compile", ...permFlags, "-o", outPath, "main.ts"],
-    cwd: ".",
+async function compile(output: string): Promise<void> {
+  const result = await new Deno.Command(Deno.execPath(), {
+    args: ["run", "--frozen", "--allow-run", "scripts/compile.ts", output],
     stdout: "piped",
     stderr: "piped",
-  });
-  const { code, stderr } = await cmd.output();
-  if (code !== 0) {
-    throw new Error(`compile failed: ${new TextDecoder().decode(stderr)}`);
-  }
+  }).output();
+  assertEquals(result.code, 0, new TextDecoder().decode(result.stderr));
 }
 
-// Spawns a compiled binary and waits for it to either announce it's
-// listening, or exit/crash. Returns the outcome so callers can assert on it.
-async function probeStartup(
-  binPath: string,
-  args: string[],
+async function withServer(
+  binary: string,
   env: Record<string, string>,
-): Promise<{ started: boolean; output: string }> {
-  const decoder = new TextDecoder();
-  const child = new Deno.Command(binPath, {
+  args: string[],
+  check: (url: string) => Promise<void>,
+): Promise<void> {
+  const child = new Deno.Command(binary, {
     args,
-    env,
+    env: {
+      QUEUE_API_TOKEN: "compile-test-token",
+      HOST: "127.0.0.1",
+      PORT: "0",
+      ...env,
+    },
     stdout: "piped",
     stderr: "piped",
   }).spawn();
-
-  let buf = "";
-  let started = false;
-
-  const stdoutReader = child.stdout.getReader();
-  const stderrReader = child.stderr.getReader();
-
-  const readAll = async (reader: ReadableStreamDefaultReader<Uint8Array>) => {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
-      if (buf.includes("Listening on")) {
-        started = true;
-        return;
-      }
+  let output = "";
+  let announce!: (url: string) => void;
+  const listening = new Promise<string>((resolve) => announce = resolve);
+  const read = async (stream: ReadableStream<Uint8Array>) => {
+    for await (const chunk of stream) {
+      output += new TextDecoder().decode(chunk);
+      const match = output.match(/Listening on ([^\s]+):(\d+)/);
+      if (match) announce(`http://127.0.0.1:${match[2]}`);
     }
   };
-
-  const timeout = new Promise<void>((resolve) => setTimeout(resolve, 3000));
-
-  await Promise.race([
-    Promise.all([readAll(stdoutReader), readAll(stderrReader)]),
-    timeout,
-  ]);
-
+  const readers = Promise.all([read(child.stdout), read(child.stderr)]);
+  let timer: number | undefined;
   try {
-    stdoutReader.releaseLock();
-  } catch { /* ignore */ }
-  try {
-    stderrReader.releaseLock();
-  } catch { /* ignore */ }
-  try {
-    child.kill("SIGKILL");
-  } catch { /* ignore */ }
-  try {
-    await child.status;
-  } catch { /* ignore */ }
-
-  return { started, output: buf };
+    const url = await Promise.race([
+      listening,
+      child.status.then(() => {
+        throw new Error(`Binary exited: ${output}`);
+      }),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`Startup timed out: ${output}`)),
+          10000,
+        );
+      }),
+    ]);
+    await check(url);
+  } finally {
+    clearTimeout(timer);
+    try {
+      child.kill("SIGTERM");
+    } catch { /* already exited */ }
+    const killTimer = setTimeout(() => {
+      try {
+        child.kill("SIGKILL");
+      } catch { /* already exited */ }
+    }, 5000);
+    const status = await child.status;
+    clearTimeout(killTimer);
+    await readers;
+    assertEquals(status.code, 0, output);
+  }
 }
 
-Deno.test({
-  name: "compiled binary: starts with a scoped --allow-env allowlist (#64)",
-  fn: async () => {
-    const tempDir = await Deno.makeTempDir({ prefix: "queue-compile-test-" });
-    const outPath = `${tempDir}/queue`;
-    try {
-      await compile(
-        [
-          "--allow-read",
-          "--allow-write",
-          "--allow-net",
-          "--allow-env=HOST,PORT,PERSIST,QUEUE_API_TOKEN,QUEUE_DEPTH_LIMIT,QUEUE_COUNT_LIMIT,RATE_LIMIT_REQUESTS",
-          "--allow-sys",
-        ],
-        outPath,
-      );
-      const { started, output } = await probeStartup(outPath, [], {
-        QUEUE_API_TOKEN: "compile-test-token",
-        HOST: "127.0.0.1",
-        PORT: "0",
-      });
-      assertEquals(
-        started,
-        true,
-        `binary did not report listening. Output:\n${output}`,
-      );
-    } finally {
-      await Deno.remove(tempDir, { recursive: true }).catch(() => {});
-    }
-  },
-  // Compiling a 100MB+ binary is slow; this is an integration test, not a unit test.
-  sanitizeResources: false,
-  sanitizeOps: false,
+const headers = {
+  Authorization: "Bearer compile-test-token",
+  "Content-Type": "application/json",
+};
+
+async function checkPersistence(
+  binary: string,
+  persistDir: string,
+): Promise<void> {
+  const env = { PERSIST: persistDir };
+  await withServer(binary, env, ["--persist"], async (url) => {
+    const response = await fetch(`${url}/enqueue/compiled`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ payload: { evidence: "survives-restart" } }),
+    });
+    assertEquals(response.status, 200, await response.text());
+  });
+  await withServer(binary, env, ["--persist"], async (url) => {
+    const response = await fetch(`${url}/dequeue/compiled`, { headers });
+    assertEquals(response.status, 200);
+    assertEquals(await response.json(), { evidence: "survives-restart" });
+  });
+}
+
+Deno.test("compiled binary: shipped permissions support runtime config and persistence (#64)", async () => {
+  const dir = await Deno.makeTempDir({ prefix: "queue-compile-test-" });
+  try {
+    await compile(`${dir}/queue`);
+    await checkPersistence(`${dir}/queue`, `${dir}/non-default-persist`);
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
 });
 
-Deno.test({
-  name:
-    "compiled binary: starts and persists with an arbitrary --persist dir (#65)",
-  fn: async () => {
-    const tempDir = await Deno.makeTempDir({ prefix: "queue-compile-test-" });
-    const outPath = `${tempDir}/queue`;
-    const persistDir = `${tempDir}/persist`;
-    try {
-      await compile(
-        [
-          "--allow-read",
-          "--allow-write",
-          "--allow-net",
-          "--allow-env",
-          "--allow-sys",
-        ],
-        outPath,
-      );
-      const { started, output } = await probeStartup(outPath, ["--persist"], {
-        QUEUE_API_TOKEN: "compile-test-token",
-        HOST: "127.0.0.1",
-        PORT: "0",
-        PERSIST: persistDir,
-      });
-      assertEquals(
-        started,
-        true,
-        `binary did not report listening. Output:\n${output}`,
-      );
-    } finally {
-      await Deno.remove(tempDir, { recursive: true }).catch(() => {});
-    }
-  },
-  // Compiling a 100MB+ binary is slow; this is an integration test, not a unit test.
-  sanitizeResources: false,
-  sanitizeOps: false,
+Deno.test("compiled binary: arbitrary persistence directory with unrestricted env (#65)", async () => {
+  const dir = await Deno.makeTempDir({ prefix: "queue-compile-test-" });
+  try {
+    await compileBinary(`${dir}/queue`, { env: true });
+    await checkPersistence(`${dir}/queue`, `${dir}/custom-persist`);
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
 });
 
-Deno.test({
-  name:
-    "compiled binary: binds to a runtime PORT/HOST different from build-time defaults (#68)",
-  fn: async () => {
-    const tempDir = await Deno.makeTempDir({ prefix: "queue-compile-test-" });
-    const outPath = `${tempDir}/queue`;
-    try {
-      await compile(
-        [
-          "--allow-read",
-          "--allow-write",
-          "--allow-net",
-          "--allow-env",
-          "--allow-sys",
-        ],
-        outPath,
-      );
-      const { started, output } = await probeStartup(outPath, [], {
-        QUEUE_API_TOKEN: "compile-test-token",
-        HOST: "0.0.0.0",
-        PORT: "1991",
-      });
-      assertEquals(
-        started,
-        true,
-        `binary did not report listening. Output:\n${output}`,
-      );
-    } finally {
-      await Deno.remove(tempDir, { recursive: true }).catch(() => {});
-    }
-  },
-  // Compiling a 100MB+ binary is slow; this is an integration test, not a unit test.
-  sanitizeResources: false,
-  sanitizeOps: false,
+Deno.test("compiled binary: runtime HOST/PORT with unrestricted env (#68)", async () => {
+  const dir = await Deno.makeTempDir({ prefix: "queue-compile-test-" });
+  // Reserve an available non-default port without depending on a fixed free port.
+  const listener = Deno.listen({ hostname: "127.0.0.1", port: 0 });
+  const port = listener.addr.port;
+  listener.close();
+  try {
+    await compileBinary(`${dir}/queue`, { env: true });
+    await withServer(
+      `${dir}/queue`,
+      { HOST: "0.0.0.0", PORT: String(port) },
+      [],
+      async (url) => {
+        assertEquals(new URL(url).port, String(port));
+        const response = await fetch(`${url}/health`);
+        assertEquals(response.status, 200);
+        await response.body?.cancel();
+      },
+    );
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
 });

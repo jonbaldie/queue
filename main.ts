@@ -1,7 +1,7 @@
 import * as Persistency from "./src/persist.ts";
 import QueueManager from "./src/manager.ts";
 import { createHandler } from "./src/handler.ts";
-import { parseConfig } from "./src/config.ts";
+import { ENV_VAR_NAMES, parseConfig } from "./src/config.ts";
 import type { Payload } from "./src/payload.ts";
 
 const LOG_ENCODER = new TextEncoder();
@@ -13,16 +13,7 @@ function writeLog(message: string): void {
 // Read each config var by name rather than Deno.env.toObject(), which
 // enumerates the entire process environment and therefore requires
 // unrestricted env access. A compiled binary with a scoped --allow-env
-// allowlist (see Dockerfile/CI) can only grant per-name access.
-const ENV_VAR_NAMES = [
-    "HOST",
-    "PORT",
-    "PERSIST",
-    "QUEUE_API_TOKEN",
-    "QUEUE_DEPTH_LIMIT",
-    "QUEUE_COUNT_LIMIT",
-    "RATE_LIMIT_REQUESTS",
-] as const;
+// allowlist (see scripts/compile.ts) can only grant per-name access.
 
 function readEnv(): Record<string, string | undefined> {
     const env: Record<string, string | undefined> = {};

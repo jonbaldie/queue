@@ -45,6 +45,23 @@ the `Authorization` header when making requests.
 
 Note the use of environment variables to change the listening address - these also work for the executable.
 
+## Building from source
+
+With Deno 2.7.6, build using the locked production compile operation:
+
+```sh
+deno run --frozen --allow-run scripts/compile.ts
+# Optional isolated output path:
+deno run --frozen --allow-run scripts/compile.ts /tmp/queue-test
+```
+
+Docker, CI, and the compiled-binary regression use this same operation.
+`scripts/compile.ts` owns the permissions; environment names are shared with
+runtime discovery in `src/config.ts`. Write and network permissions intentionally
+remain unrestricted to support runtime-selected persistence directories and
+HOST/PORT. Run `deno test --frozen --allow-read --allow-write --allow-net --allow-env --allow-run tests/compiled_binary_test.ts`
+to verify startup and persistence across a restart with the shipped permissions.
+
 ## Usage
 
 Once started, you interact with the server using HTTP requests.
