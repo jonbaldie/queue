@@ -1,5 +1,16 @@
 import { parseArgs } from "jsr:@std/cli@1.0/parse-args";
 
+// Shared by runtime environment discovery and the production compiler.
+export const ENV_VAR_NAMES = [
+    "HOST",
+    "PORT",
+    "PERSIST",
+    "QUEUE_API_TOKEN",
+    "QUEUE_DEPTH_LIMIT",
+    "QUEUE_COUNT_LIMIT",
+    "RATE_LIMIT_REQUESTS",
+] as const;
+
 export class ConfigError extends Error {
     constructor(message: string) {
         super(message);
