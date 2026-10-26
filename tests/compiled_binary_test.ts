@@ -30,19 +30,23 @@ async function withServer(
     stderr: "piped",
   }).spawn();
   let output = "";
-  let announce!: (url: string) => void;
-  const listening = new Promise<string>((resolve) => announce = resolve);
+  let announce!: (address: { url: string; hostname: string }) => void;
+  const listening = new Promise<{ url: string; hostname: string }>((resolve) =>
+    announce = resolve
+  );
   const read = async (stream: ReadableStream<Uint8Array>) => {
     for await (const chunk of stream) {
       output += new TextDecoder().decode(chunk);
       const match = output.match(/Listening on ([^\s]+):(\d+)/);
-      if (match) announce(`http://127.0.0.1:${match[2]}`);
+      if (match) {
+        announce({ url: `http://127.0.0.1:${match[2]}`, hostname: match[1] });
+      }
     }
   };
   const readers = Promise.all([read(child.stdout), read(child.stderr)]);
   let timer: number | undefined;
   try {
-    const url = await Promise.race([
+    const address = await Promise.race([
       listening,
       child.status.then(() => {
         throw new Error(`Binary exited: ${output}`);
@@ -54,7 +58,8 @@ async function withServer(
         );
       }),
     ]);
-    await check(url);
+    assertEquals(address.hostname, env.HOST ?? "127.0.0.1");
+    await check(address.url);
   } finally {
     clearTimeout(timer);
     try {
@@ -81,7 +86,7 @@ async function checkPersistence(
   binary: string,
   persistDir: string,
 ): Promise<void> {
-  const env = { PERSIST: persistDir };
+  const env = { HOST: "0.0.0.0", PERSIST: persistDir };
   await withServer(binary, env, ["--persist"], async (url) => {
     const response = await fetch(`${url}/enqueue/compiled`, {
       method: "POST",
