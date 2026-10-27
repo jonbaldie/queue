@@ -19,6 +19,14 @@ export class Router {
         });
     }
 
+    public head(pathname: string, handler: RouteHandler): void {
+        this.routes.push({
+            pattern: new URLPattern({ pathname }),
+            method: "HEAD",
+            handler,
+        });
+    }
+
     public post(pathname: string, handler: RouteHandler): void {
         this.routes.push({
             pattern: new URLPattern({ pathname }),
@@ -29,7 +37,7 @@ export class Router {
 
     public handle: HttpHandler = async (request: Request): Promise<Response> => {
         const url = request.url;
-        let matchedPattern = false;
+        let matchedRoute: { handler: RouteHandler; match: URLPatternResult } | undefined;
         const allowedMethods: string[] = [];
 
         for (const route of this.routes) {
@@ -38,29 +46,39 @@ export class Router {
                 continue;
             }
 
-            matchedPattern = true;
             if (!allowedMethods.includes(route.method)) {
                 allowedMethods.push(route.method);
             }
 
-            if (request.method === "HEAD" && route.method === "GET") {
-                const getResponse = await route.handler(request, match);
-                return new Response(null, {
-                    status: getResponse.status,
-                    statusText: getResponse.statusText,
-                    headers: getResponse.headers,
-                });
+            if (request.method === route.method) {
+                matchedRoute = { handler: route.handler, match };
+                break;
             }
 
-            if (request.method === route.method) {
-                return route.handler(request, match);
+            if (request.method === "HEAD" && route.method === "GET") {
+                matchedRoute ??= { handler: route.handler, match };
             }
         }
 
-        if (matchedPattern) {
+        if (matchedRoute) {
+            const response = await matchedRoute.handler(request, matchedRoute.match);
+            if (request.method === "HEAD") {
+                return new Response(null, {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: response.headers,
+                });
+            }
+            return response;
+        }
+
+        if (allowedMethods.length > 0) {
+            const advertisedMethods = allowedMethods.filter((method) =>
+                method !== "HEAD" || !allowedMethods.includes("GET")
+            );
             return new Response("Method not allowed", {
                 status: 405,
-                headers: { "Allow": allowedMethods.join(", ") },
+                headers: { "Allow": advertisedMethods.join(", ") },
             });
         }
 
