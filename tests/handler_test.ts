@@ -1,10 +1,14 @@
 import { assertEquals, assertNotEquals, assertThrows, assertRejects } from "jsr:@std/assert@1.0";
 import QueueManager, { QueueNameTooLongError } from "../src/manager.ts";
-import { createHandler } from "../src/handler.ts";
+import { createHandler as createHandlerWithLogging } from "../src/handler.ts";
 import * as Persistency from "../src/persist.ts";
 import { RateLimiter } from "../src/rate_limiter.ts";
 import { parseConfig, ConfigError } from "../src/config.ts";
 import type { Payload } from "../src/payload.ts";
+
+function createHandler(mgr: QueueManager<Payload>, token: string, rateLimit?: number) {
+    return createHandlerWithLogging(mgr, token, rateLimit, { write() {} });
+}
 
 // Shared helpers
 const API_TOKEN = "test-token";

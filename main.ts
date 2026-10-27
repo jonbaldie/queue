@@ -3,12 +3,7 @@ import QueueManager from "./src/manager.ts";
 import { createHandler } from "./src/handler.ts";
 import { ENV_VAR_NAMES, parseConfig } from "./src/config.ts";
 import type { Payload } from "./src/payload.ts";
-
-const LOG_ENCODER = new TextEncoder();
-
-function writeLog(message: string): void {
-    Deno.stdout.writeSync(LOG_ENCODER.encode(`${message}\n`));
-}
+import { DEFAULT_CONSOLE_SINK } from "./src/middleware.ts";
 
 // Read each config var by name rather than Deno.env.toObject(), which
 // enumerates the entire process environment and therefore requires
@@ -47,7 +42,7 @@ if (PERSIST_ENGINE instanceof Persistency.FileStore) {
         Deno.exit(1);
     }
 
-    writeLog("Loading in data from persist.dat...\n");
+    DEFAULT_CONSOLE_SINK.write("Loading in data from persist.dat...\n");
 
     MANAGER.load();
 }
@@ -58,23 +53,23 @@ const HANDLER = createHandler(MANAGER, CONFIG.apiToken, CONFIG.rateLimitRequests
 const SERVER = Deno.serve({
     hostname: CONFIG.host,
     port: CONFIG.port,
-    onListen: ({ hostname, port }) => writeLog(`Listening on ${hostname}:${port}`),
+    onListen: ({ hostname, port }) => DEFAULT_CONSOLE_SINK.write(`Listening on ${hostname}:${port}`),
 }, HANDLER);
 
 async function shutdown(signal: string): Promise<void> {
-    writeLog(`Received ${signal}, shutting down gracefully...`);
+    DEFAULT_CONSOLE_SINK.write(`Received ${signal}, shutting down gracefully...`);
 
     // Stop accepting new connections
     await SERVER.shutdown();
 
     // If we're using file persistency, save all current state to persistant storage
     if (PERSIST_ENGINE instanceof Persistency.FileStore) {
-        writeLog("Flushing data to persist.dat...\n");
+        DEFAULT_CONSOLE_SINK.write("Flushing data to persist.dat...\n");
         try {
             MANAGER.save();
         } catch (error) {
             // The previous persist.dat is left in place; it still holds every logged item.
-            writeLog(`Failed to flush data to persist.dat: ${error instanceof Error ? error.message : error}`);
+            DEFAULT_CONSOLE_SINK.write(`Failed to flush data to persist.dat: ${error instanceof Error ? error.message : error}`);
             PERSIST_ENGINE.close();
             Deno.exit(1);
         }
@@ -82,7 +77,7 @@ async function shutdown(signal: string): Promise<void> {
 
     PERSIST_ENGINE.close();
 
-    writeLog("Goodbye!");
+    DEFAULT_CONSOLE_SINK.write("Goodbye!");
 
     Deno.exit(0);
 }

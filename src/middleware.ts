@@ -4,6 +4,40 @@ export type HttpHandler = (request: Request, info?: Deno.ServeHandlerInfo) => Pr
 export type Middleware = (next: HttpHandler) => HttpHandler;
 
 const HEALTH_PATTERN = new URLPattern({ pathname: "/health{/}?" });
+const LOG_ENCODER = new TextEncoder();
+
+export interface LogSink {
+    write(message: string, isError?: boolean): void;
+}
+
+export const DEFAULT_CONSOLE_SINK: LogSink = {
+    write(message: string, isError = false): void {
+        const destination = isError ? Deno.stderr : Deno.stdout;
+        destination.writeSync(LOG_ENCODER.encode(`${message}\n`));
+    },
+};
+
+export function withLogging(sink: LogSink = DEFAULT_CONSOLE_SINK) {
+    return (next: HttpHandler) => async (request: Request, info?: Deno.ServeHandlerInfo): Promise<Response> => {
+        const start = performance.now();
+        try {
+            const response = await next(request, info);
+            const duration = performance.now() - start;
+            sink.write(
+                `${request.method} ${request.url} ${response.status} ${duration.toFixed(2)}ms`,
+                false,
+            );
+            return response;
+        } catch (error) {
+            const duration = performance.now() - start;
+            sink.write(
+                `${request.method} ${request.url} 500 ${duration.toFixed(2)}ms`,
+                true,
+            );
+            throw error;
+        }
+    };
+}
 
 export function withAuth(apiToken: string): Middleware {
     const trimmedToken = apiToken?.trim();

@@ -1,14 +1,12 @@
 import QueueManager, { QueueNameTooLongError } from "./manager.ts";
 import { RateLimiter } from "./rate_limiter.ts";
-import { withAuth, withRateLimit } from "./middleware.ts";
+import { type LogSink, withAuth, withLogging, withRateLimit } from "./middleware.ts";
 import { Router } from "./router.ts";
 import * as Payload from "./payload.ts";
 
 type JsonPayload = Payload.Payload;
 type RouteHandler = Parameters<Router["get"]>[1];
 type RouteMatch = Parameters<RouteHandler>[1];
-
-const LOG_ENCODER = Reflect.construct(TextEncoder, []);
 
 function extractQueueName(match: RouteMatch): { name: string } | { error: Response } {
     const raw = match.pathname.groups.queue;
@@ -146,14 +144,11 @@ function registerRoutes(router: Router, mgr: QueueManager<JsonPayload>): void {
     router.get("/length/:queue", lengthHandler(mgr));
 }
 
-function writeLog(destination: { writeSync(data: Uint8Array): number }, message: string): void {
-    destination.writeSync(LOG_ENCODER.encode(`${message}\n`));
-}
-
 export function createHandler(
     mgr: QueueManager<JsonPayload>,
     apiToken: string,
     rateLimitRequests?: number,
+    logger?: LogSink,
 ) {
     const rateLimiter = new RateLimiter(rateLimitRequests ?? 100);
     const router = new Router();
@@ -161,26 +156,5 @@ export function createHandler(
     const handlerWithAuth = withAuth(apiToken)(router.handle);
     const handlerWithRateLimit = withRateLimit(rateLimiter)(handlerWithAuth);
 
-    return async function handler(
-        request: Request,
-        info?: Deno.ServeHandlerInfo,
-    ): Promise<Response> {
-        const start = performance.now();
-        try {
-            const response = await handlerWithRateLimit(request, info);
-            const duration = performance.now() - start;
-            writeLog(
-                Deno.stdout,
-                `${request.method} ${request.url} ${response.status} ${duration.toFixed(2)}ms`,
-            );
-            return response;
-        } catch (error) {
-            const duration = performance.now() - start;
-            writeLog(
-                Deno.stderr,
-                `${request.method} ${request.url} 500 ${duration.toFixed(2)}ms`,
-            );
-            throw error;
-        }
-    };
+    return withLogging(logger)(handlerWithRateLimit);
 }
