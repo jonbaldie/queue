@@ -88,10 +88,7 @@ function dequeueHandler(mgr: QueueManager<JsonPayload>): RouteHandler {
             return queueResult.error;
         }
         try {
-            const item = request.method === "HEAD"
-                ? mgr.peek(queueResult.name)
-                : mgr.dequeue(queueResult.name);
-            return itemResponse(item);
+            return itemResponse(mgr.dequeue(queueResult.name));
         } catch (error) {
             return queueNameErrorResponse(error);
         }
@@ -144,6 +141,7 @@ function registerRoutes(router: Router, mgr: QueueManager<JsonPayload>): void {
     });
     router.post("/enqueue/:queue", enqueueHandler(mgr));
     router.get("/dequeue/:queue", dequeueHandler(mgr));
+    router.head("/dequeue/:queue", peekHandler(mgr));
     router.get("/peek/:queue", peekHandler(mgr));
     router.get("/length/:queue", lengthHandler(mgr));
 }
