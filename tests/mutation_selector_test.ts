@@ -139,6 +139,97 @@ Deno.test("selector: diff with only docs or agent guidance returns clean skip", 
   }
 });
 
+Deno.test("selector: source and test changes select only changed production files", async () => {
+  const { repoDir, runGit, cleanup } = await createTestRepo();
+  try {
+    await runGit("checkout", "-b", "feat/source-and-test");
+    await Deno.writeTextFile(join(repoDir, "src", "handler.ts"), "export const handler = { updated: true };\n");
+    await Deno.writeTextFile(join(repoDir, "tests", "handler_test.ts"), "export const t = 2;\n");
+    await runGit("add", ".");
+    await runGit("commit", "-m", "Update source and test");
+
+    const result = await runSelectorCli(repoDir, ["--target-branch", "main", "--json"]);
+    assertEquals(result.code, 0);
+    const parsed = JSON.parse(result.stdout);
+    assertEquals(parsed.mode, "selected");
+    assertEquals(parsed.paths, ["src/handler.ts"]);
+  } finally {
+    await cleanup();
+  }
+});
+
+Deno.test("selector: deleted source and test changes run the full suite", async () => {
+  const { repoDir, runGit, cleanup } = await createTestRepo();
+  try {
+    await runGit("checkout", "-b", "feat/deleted-source-and-test");
+    await runGit("rm", "src/handler.ts");
+    await Deno.writeTextFile(join(repoDir, "tests", "handler_test.ts"), "export const t = 2;\n");
+    await runGit("add", ".");
+    await runGit("commit", "-m", "Delete source and update test");
+
+    const result = await runSelectorCli(repoDir, ["--target-branch", "main", "--json"]);
+    assertEquals(result.code, 0);
+    const parsed = JSON.parse(result.stdout);
+    assertEquals(parsed.mode, "full-suite");
+    assertEquals(parsed.paths, ["src/config.ts"]);
+  } finally {
+    await cleanup();
+  }
+});
+
+Deno.test("selector: source and mutation infrastructure changes run the full suite", async () => {
+  const { repoDir, runGit, cleanup } = await createTestRepo();
+  try {
+    await runGit("checkout", "-b", "feat/source-and-infrastructure");
+    await Deno.writeTextFile(join(repoDir, "src", "handler.ts"), "export const handler = { updated: true };\n");
+    await Deno.writeTextFile(join(repoDir, "mutation", "stryker.config.json"), "{\"concurrency\": 1}\n");
+    await runGit("add", ".");
+    await runGit("commit", "-m", "Update source and mutation config");
+
+    const result = await runSelectorCli(repoDir, ["--target-branch", "main", "--json"]);
+    assertEquals(result.code, 0);
+    const parsed = JSON.parse(result.stdout);
+    assertEquals(parsed.mode, "full-suite");
+    assertEquals(parsed.paths, ["src/config.ts", "src/handler.ts"]);
+  } finally {
+    await cleanup();
+  }
+});
+
+Deno.test("selector: moving a test out of tests runs the full suite", async () => {
+  const { repoDir, runGit, cleanup } = await createTestRepo();
+  try {
+    await runGit("checkout", "-b", "test/move-test");
+    await runGit("mv", "tests/handler_test.ts", "docs/handler_test.ts");
+    await runGit("commit", "-m", "Move test out of test suite");
+
+    const result = await runSelectorCli(repoDir, ["--target-branch", "main", "--json"]);
+    assertEquals(result.code, 0);
+    const parsed = JSON.parse(result.stdout);
+    assertEquals(parsed.mode, "full-suite");
+    assertEquals(parsed.paths, ["src/config.ts", "src/handler.ts"]);
+  } finally {
+    await cleanup();
+  }
+});
+
+Deno.test("selector: moving a file into tests runs the full suite", async () => {
+  const { repoDir, runGit, cleanup } = await createTestRepo();
+  try {
+    await runGit("checkout", "-b", "test/move-into-tests");
+    await runGit("mv", "src/handler.ts", "tests/handler.ts");
+    await runGit("commit", "-m", "Move source into tests");
+
+    const result = await runSelectorCli(repoDir, ["--target-branch", "main", "--json"]);
+    assertEquals(result.code, 0);
+    const parsed = JSON.parse(result.stdout);
+    assertEquals(parsed.mode, "full-suite");
+    assertEquals(parsed.paths, ["src/config.ts"]);
+  } finally {
+    await cleanup();
+  }
+});
+
 Deno.test("selector: test-suite changes trigger full-suite mode", async () => {
   const { repoDir, runGit, cleanup } = await createTestRepo();
   try {
