@@ -111,3 +111,42 @@ Deno.test("rate limiter: sweep evicts multiple least recently active keys", () =
     assertEquals(limiter.isAllowed("b", 7), true);
     assertEquals(limiter.isAllowed("c", 8), true);
 });
+
+Deno.test("rate limiter: active and swept keys bound retention and allocation", async () => {
+    const canary = new URL("./fixtures/rate_limiter_retention.ts", import.meta.url);
+    const result = await new Deno.Command(Deno.execPath(), {
+        args: ["run", "--allow-env", "--v8-flags=--expose-gc", canary.pathname],
+        stdout: "piped",
+        stderr: "piped",
+    }).output();
+    const output = new TextDecoder().decode(result.stdout) + new TextDecoder().decode(result.stderr);
+    assertEquals(result.code, 0, output);
+});
+
+Deno.test("rate limiter: sweep expires only keys at or before cutoff and repeats on schedule", () => {
+    const limiter = new RateLimiter(1, 100, 4);
+    assertEquals(limiter.isAllowed("before", 0), true);
+    assertEquals(limiter.isAllowed("at", 1), true);
+    assertEquals(limiter.isAllowed("after", 2), true);
+    assertEquals(limiter.isAllowed("trigger", 101), true);
+    assertEquals(limiter.trackedKeysCount, 2);
+    assertEquals(limiter.isAllowed("after", 101), false);
+    assertEquals(limiter.isAllowed("trigger", 101), false);
+    assertEquals(limiter.isAllowed("next", 101), true);
+    assertEquals(limiter.trackedKeysCount, 3);
+    assertEquals(limiter.isAllowed("next", 102), false);
+    assertEquals(limiter.trackedKeysCount, 2);
+    assertEquals(limiter.isAllowed("after", 102), true);
+});
+
+Deno.test("rate limiter: window counts timestamps on both sides of the cutoff", () => {
+    const limiter = new RateLimiter(5, 100, 1000);
+    for (const now of [0, 1, 1, 2, 50]) assertEquals(limiter.isAllowed("a", now), true);
+    assertEquals(limiter.isAllowed("a", 100), true);
+    assertEquals(limiter.isAllowed("a", 100), false);
+    assertEquals(limiter.isAllowed("a", 101), true);
+    assertEquals(limiter.isAllowed("a", 101), true);
+    assertEquals(limiter.isAllowed("a", 101), false);
+    assertEquals(limiter.isAllowed("a", 102), true);
+    assertEquals(limiter.isAllowed("a", 102), false);
+});
