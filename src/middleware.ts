@@ -61,17 +61,23 @@ export function withAuth(apiToken: string): Middleware {
 }
 
 
+export function extractClientIdentifier(request: Request, info?: Deno.ServeHandlerInfo): string {
+    const remoteAddr = info?.remoteAddr && info.remoteAddr.transport === "tcp"
+        ? info.remoteAddr.hostname
+        : undefined;
+    if (remoteAddr) return remoteAddr;
+    const forwardedFor = request.headers.get("x-forwarded-for");
+    if (forwardedFor) return forwardedFor.split(",")[0].trim();
+    return "unknown";
+}
+
 export function withRateLimit(limiter: RateLimiter): Middleware {
     return (next: HttpHandler) => {
         return (request: Request, info?: Deno.ServeHandlerInfo) => {
             if (HEALTH_PATTERN.exec(request.url)) {
                 return next(request, info);
             }
-            const remoteAddr = info?.remoteAddr && info.remoteAddr.transport === "tcp"
-                ? info.remoteAddr.hostname
-                : undefined;
-
-            if (!limiter.isAllowed(request, remoteAddr)) {
+            if (!limiter.isAllowed(extractClientIdentifier(request, info))) {
                 return new Response("Too many requests", { status: 429 });
             }
             return next(request, info);

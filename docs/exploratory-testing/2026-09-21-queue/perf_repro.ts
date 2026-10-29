@@ -4,17 +4,12 @@ import { RateLimiter } from "../../../src/rate_limiter.ts";
 
 function bench(limit: number, requests: number): number {
   const limiter = new RateLimiter(limit, 60000, 1_000_000, 10_000);
-  const makeReq = () =>
-    new Request("http://localhost/length/q", {
-      headers: { "x-forwarded-for": "10.0.0.1" },
-    });
-
   // Warmup
-  for (let i = 0; i < limit; i++) limiter.isAllowed(makeReq());
+  for (let i = 0; i < limit; i++) limiter.isAllowed("10.0.0.1");
 
   const start = performance.now();
   for (let i = 0; i < requests; i++) {
-    limiter.isAllowed(makeReq()); // all denied: at limit
+    limiter.isAllowed("10.0.0.1"); // all denied: at limit
   }
   return (performance.now() - start) / requests; // ms per request
 }

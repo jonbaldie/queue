@@ -3,30 +3,24 @@ export class RateLimiter {
     private requestsPerMinute: number;
     private windowMs: number;
     private cleanupInterval: number;
-    private maxTrackedIPs: number;
+    private maxTrackedKeys: number;
     private requestCount: number = 0;
 
-    constructor(requestsPerMinute: number = 100, windowMs: number = 60000, cleanupInterval: number = 100, maxTrackedIPs: number = 10000) {
+    constructor(requestsPerMinute: number = 100, windowMs: number = 60000, cleanupInterval: number = 100, maxTrackedKeys: number = 10000) {
         this.requestsPerMinute = requestsPerMinute;
         this.windowMs = windowMs;
         this.cleanupInterval = cleanupInterval;
-        this.maxTrackedIPs = maxTrackedIPs;
+        this.maxTrackedKeys = maxTrackedKeys;
     }
 
-    private getClientIp(request: Request, remoteAddr?: string): string {
-        if (remoteAddr) {
-            return remoteAddr;
-        }
-        const forwardedFor = request.headers.get("x-forwarded-for");
-        if (forwardedFor) {
-            return forwardedFor.split(",")[0].trim();
-        }
-        return "unknown";
+    // Stored keys may include stale entries until a sweep occurs.
+    public get trackedKeysCount(): number {
+        return this.requestTimestamps.size;
     }
 
     private cleanupStaleEntries(now: number): void {
         const cutoff = now - this.windowMs;
-        for (const [ip, timestamps] of this.requestTimestamps) {
+        for (const [key, timestamps] of this.requestTimestamps) {
             // Fast path: timestamps are sorted ascending, so if the oldest
             // (first) is still fresh, all are fresh — skip without scanning.
             if (timestamps.length === 0 || timestamps[0] > cutoff) {
@@ -45,15 +39,15 @@ export class RateLimiter {
             // lo is the index of the first fresh timestamp
             if (lo === timestamps.length) {
                 // All stale
-                this.requestTimestamps.delete(ip);
+                this.requestTimestamps.delete(key);
             } else if (lo > 0) {
                 // Some stale, some fresh — keep only the fresh ones
-                this.requestTimestamps.set(ip, timestamps.slice(lo));
+                this.requestTimestamps.set(key, timestamps.slice(lo));
             }
         }
 
-        if (this.requestTimestamps.size > this.maxTrackedIPs) {
-            // Evict IPs with the oldest last-activity (max timestamp).
+        if (this.requestTimestamps.size > this.maxTrackedKeys) {
+            // Evict keys with the oldest last-activity (max timestamp).
             // Timestamps are sorted ascending, so the last element is the max —
             // O(1) per comparison instead of O(T) via Math.max(...arr).
             const entries = Array.from(this.requestTimestamps.entries());
@@ -62,7 +56,7 @@ export class RateLimiter {
                 const bMax = b[1][b[1].length - 1];
                 return aMax - bMax;
             });
-            const toEvict = this.requestTimestamps.size - this.maxTrackedIPs;
+            const toEvict = this.requestTimestamps.size - this.maxTrackedKeys;
             for (let i = 0; i < toEvict; i++) {
                 this.requestTimestamps.delete(entries[i][0]);
             }
@@ -84,20 +78,19 @@ export class RateLimiter {
         return lo;
     }
 
-    public isAllowed(request: Request, remoteAddr?: string): boolean {
-        const ip = this.getClientIp(request, remoteAddr);
-        const now = Date.now();
+    // Injected times must be nondecreasing to keep timestamps ordered.
+    public isAllowed(key: string, now: number = Date.now()): boolean {
         const cutoff = now - this.windowMs;
 
-        // Periodic cleanup of stale entries across all IPs
+        // Periodic cleanup of stale entries across all keys
         this.requestCount++;
         if (this.requestCount >= this.cleanupInterval) {
             this.requestCount = 0;
             this.cleanupStaleEntries(now);
         }
 
-        // Get or create timestamp list for this IP
-        let timestamps = this.requestTimestamps.get(ip) || [];
+        // Get or create timestamp list for this key
+        let timestamps = this.requestTimestamps.get(key) || [];
 
         // Fast path: the newest timestamp is fresh → nothing stale, O(1).
         // Otherwise binary search the first fresh timestamp — O(log n) — and
@@ -108,8 +101,8 @@ export class RateLimiter {
         const freshCount = timestamps.length - firstFresh;
 
         if (freshCount === 0) {
-            // All timestamps are stale — remove this IP entry
-            this.requestTimestamps.delete(ip);
+            // All timestamps are stale — remove this key entry
+            this.requestTimestamps.delete(key);
             timestamps = [];
         } else if (firstFresh > 0 && firstFresh * 2 >= timestamps.length) {
             // Drop the stale prefix only once it dominates the array, so the
@@ -124,7 +117,7 @@ export class RateLimiter {
 
         // Add current timestamp and save
         timestamps.push(now);
-        this.requestTimestamps.set(ip, timestamps);
+        this.requestTimestamps.set(key, timestamps);
 
         return true;
     }
