@@ -123,7 +123,6 @@ async function resolveTargetRef(
 
 function isFullSuiteTrigger(filePath: string): boolean {
   return (
-    filePath.startsWith("tests/") ||
     filePath.startsWith("mutation/") ||
     filePath.startsWith(".github/") ||
     filePath.startsWith("scripts/") ||
@@ -256,7 +255,7 @@ export async function selectMutationTargets(options: SelectorOptions = {}): Prom
       const allProd = await getAllProductionFiles(cwd);
       return {
         mode: "full-suite",
-        reason: `Full suite triggered by change to test, mutation, or workflow infrastructure: ${changedPath}`,
+        reason: `Full suite triggered by change to mutation or workflow infrastructure: ${changedPath}`,
         base: resolvedTarget,
         head: headRef,
         mergeBase: mergeBaseSha,
@@ -288,6 +287,21 @@ export async function selectMutationTargets(options: SelectorOptions = {}): Prom
       head: headRef,
       mergeBase: mergeBaseSha,
       paths: selectedPaths,
+      isFallback: false,
+    };
+  }
+
+  const testChange = changes.find((change) =>
+    change.path.startsWith("tests/") || change.oldPath?.startsWith("tests/")
+  );
+  if (testChange) {
+    return {
+      mode: "full-suite",
+      reason: `Full suite triggered by change to tests without production source changes: ${testChange.path}`,
+      base: resolvedTarget,
+      head: headRef,
+      mergeBase: mergeBaseSha,
+      paths: await getAllProductionFiles(cwd),
       isFallback: false,
     };
   }
