@@ -1,3 +1,4 @@
+import { extractClientIdentifier } from "../src/middleware.ts";
 import { assertEquals, assertNotEquals, assertThrows, assertRejects } from "jsr:@std/assert@1.0";
 import QueueManager, { QueueNameTooLongError } from "../src/manager.ts";
 import { createHandler as createHandlerWithLogging } from "../src/handler.ts";
@@ -139,6 +140,18 @@ Deno.test("limits: GET /dequeue of an unknown queue does not consume a queue slo
 });
 
 // Rate limit tests
+
+Deno.test("limits: empty TCP hostname falls back to the first forwarded address", async () => {
+    const handler = makeHandler(undefined, undefined, 1);
+    const info = { remoteAddr: { hostname: "", port: 1, transport: "tcp" as const }, completed: Promise.resolve() };
+    const request = (forwarded: string) => new Request("http://localhost/queues", {
+        headers: { ...authHeaders, "x-forwarded-for": forwarded },
+    });
+    assertEquals((await handler(request("first, proxy"), info)).status, 200);
+    assertEquals((await handler(request("first, other"), info)).status, 429);
+    assertEquals((await handler(request("second, proxy"), info)).status, 200);
+    assertEquals((await handler(new Request("http://localhost/health"), info)).status, 200);
+});
 
 Deno.test("limits: exceed rate limit returns 429", async () => {
     const RATE_LIMIT = 3; // 3 requests per minute
@@ -2342,4 +2355,29 @@ Deno.test("queue name length counts Unicode code points", async () => {
     }));
     assertEquals(rejected.status, 400);
     assertEquals(await rejected.text(), "Queue name too long");
+});
+
+Deno.test("client identifier: TCP, forwarded and fallback precedence", () => {
+    const request = new Request("http://localhost/queues", { headers: { "x-forwarded-for": " first , second" } });
+    const tcp = { remoteAddr: { hostname: "peer", port: 1, transport: "tcp" as const }, completed: Promise.resolve() };
+    assertEquals(extractClientIdentifier(request, tcp), "peer");
+    assertEquals(extractClientIdentifier(request), "first");
+    assertEquals(extractClientIdentifier(new Request("http://localhost/queues")), "unknown");
+});
+
+Deno.test("client identifier: empty TCP host, non-TCP and comma-only header preserve fallback", () => {
+    const emptyTcp = { remoteAddr: { hostname: "", port: 1, transport: "tcp" as const }, completed: Promise.resolve() };
+    const unix = { remoteAddr: { path: "/tmp/socket", transport: "unix" as const }, completed: Promise.resolve() };
+    const request = new Request("http://localhost/queues", { headers: { "x-forwarded-for": " first , second" } });
+    assertEquals(extractClientIdentifier(request, emptyTcp), "first");
+    assertEquals(extractClientIdentifier(request, unix), "first");
+    assertEquals(extractClientIdentifier(new Request("http://localhost/queues"), emptyTcp), "unknown");
+    assertEquals(extractClientIdentifier(new Request("http://localhost/queues", { headers: { "x-forwarded-for": "," } })), "");
+});
+
+Deno.test("limits: fallback and TCP hostname unknown share a bucket", async () => {
+    const handler = makeHandler(undefined, undefined, 1);
+    const info = { remoteAddr: { hostname: "unknown", port: 1, transport: "tcp" as const }, completed: Promise.resolve() };
+    assertEquals((await handler(new Request("http://localhost/queues", { headers: authHeaders }))).status, 200);
+    assertEquals((await handler(new Request("http://localhost/queues", { headers: authHeaders }), info)).status, 429);
 });
