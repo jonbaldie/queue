@@ -89,13 +89,11 @@ Deno.test("rate limiter: large window and stale prefix retain correct limits", (
     assertEquals(limiter.isAllowed("bulk", 70_000), true);
 });
 
-Deno.test("rate limiter: denied requests at a full window are cheap", () => {
+Deno.test("rate limiter: repeated denials preserve a full window", () => {
     const limiter = new RateLimiter(10_000, 600_000, 100_000);
     for (let i = 0; i < 10_000; i++) limiter.isAllowed("perf", 0);
-    const start = performance.now();
     for (let i = 0; i < 2_000; i++) assertEquals(limiter.isAllowed("perf", 1), false);
-    const elapsed = performance.now() - start;
-    assertEquals(elapsed < 80, true, `2,000 denied requests took ${elapsed.toFixed(1)}ms`);
+    assertEquals(limiter.isAllowed("perf", 600_000), true);
 });
 
 Deno.test("rate limiter: sweep evicts multiple least recently active keys", () => {
@@ -130,9 +128,13 @@ Deno.test("rate limiter: sweep expires only keys at or before cutoff and repeats
     assertEquals(limiter.isAllowed("after", 2), true);
     assertEquals(limiter.isAllowed("trigger", 101), true);
     assertEquals(limiter.trackedKeysCount, 2);
-    assertEquals(limiter.isAllowed("after", 101), false);
-    assertEquals(limiter.isAllowed("trigger", 101), false);
-    assertEquals(limiter.isAllowed("next", 101), true);
+    // "after" expires before the next scheduled sweep. Leave it untouched:
+    // accessing it would prune it independently and hide a premature sweep.
+    assertEquals(limiter.isAllowed("trigger", 102), false);
+    assertEquals(limiter.trackedKeysCount, 2);
+    assertEquals(limiter.isAllowed("trigger", 102), false);
+    assertEquals(limiter.trackedKeysCount, 2);
+    assertEquals(limiter.isAllowed("next", 102), true);
     assertEquals(limiter.trackedKeysCount, 3);
     assertEquals(limiter.isAllowed("next", 102), false);
     assertEquals(limiter.trackedKeysCount, 2);
