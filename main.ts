@@ -1,24 +1,11 @@
 import * as Persistency from "./src/persist.ts";
 import QueueManager from "./src/manager.ts";
 import { createHandler } from "./src/handler.ts";
-import { ENV_VAR_NAMES, parseConfig } from "./src/config.ts";
+import { loadConfig } from "./src/config.ts";
 import type { Payload } from "./src/payload.ts";
 import { DEFAULT_CONSOLE_SINK } from "./src/middleware.ts";
 
-// Read each config var by name rather than Deno.env.toObject(), which
-// enumerates the entire process environment and therefore requires
-// unrestricted env access. A compiled binary with a scoped --allow-env
-// allowlist (see scripts/compile.ts) can only grant per-name access.
-
-function readEnv(): Record<string, string | undefined> {
-    const env: Record<string, string | undefined> = {};
-    for (const name of ENV_VAR_NAMES) {
-        env[name] = Deno.env.get(name);
-    }
-    return env;
-}
-
-const CONFIG = parseConfig(readEnv(), Deno.args);
+const CONFIG = loadConfig(Deno.args);
 
 // Set up our persistency manager
 const PERSIST_ENGINE = CONFIG.persistEnabled

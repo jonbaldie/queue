@@ -1,5 +1,41 @@
 import { assertEquals, assertThrows } from "jsr:@std/assert@1.0";
-import { parseConfig, ConfigError } from "../src/config.ts";
+import { parseConfig, loadConfig, readEnv, ConfigError } from "../src/config.ts";
+
+Deno.test("loadConfig reads supported environment variables and parses arguments", () => {
+    const env: Record<string, string> = {
+        HOST: "0.0.0.0",
+        PORT: "4321",
+        PERSIST: "/tmp/queue-config-test",
+        QUEUE_API_TOKEN: "secret",
+        QUEUE_DEPTH_LIMIT: "12",
+        QUEUE_COUNT_LIMIT: "13",
+        RATE_LIMIT_REQUESTS: "14",
+        UNRELATED: "ignored",
+    };
+    const requested: string[] = [];
+    const getEnv = (name: string) => {
+        requested.push(name);
+        return env[name];
+    };
+    assertEquals(loadConfig(["--persist"], getEnv), {
+        host: "0.0.0.0",
+        port: 4321,
+        persistDir: "/tmp/queue-config-test",
+        apiToken: "secret",
+        queueDepthLimit: 12,
+        queueCountLimit: 13,
+        rateLimitRequests: 14,
+        persistEnabled: true,
+    });
+    assertEquals(requested, ["HOST", "PORT", "PERSIST", "QUEUE_API_TOKEN", "QUEUE_DEPTH_LIMIT", "QUEUE_COUNT_LIMIT", "RATE_LIMIT_REQUESTS"]);
+});
+
+Deno.test("loadConfig preserves validation errors and readEnv retains missing values", () => {
+    const getEnv = (name: string) => name === "PORT" ? "invalid" : undefined;
+    assertEquals(readEnv(getEnv).PORT, "invalid");
+    assertEquals(readEnv(getEnv).QUEUE_API_TOKEN, undefined);
+    assertThrows(() => loadConfig([], getEnv), ConfigError, "PORT must be a valid integer between 0 and 65535");
+});
 
 Deno.test("ConfigError - has name ConfigError", () => {
     const err = new ConfigError("test");

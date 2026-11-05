@@ -11,6 +11,18 @@ export const ENV_VAR_NAMES = [
     "RATE_LIMIT_REQUESTS",
 ] as const;
 
+export function readEnv(getEnv: (name: string) => string | undefined = Deno.env.get): Record<string, string | undefined> {
+    const env: Record<string, string | undefined> = {};
+    for (const name of ENV_VAR_NAMES) {
+        env[name] = getEnv(name);
+    }
+    return env;
+}
+
+export function loadConfig(args: string[] = Deno.args, getEnv?: (name: string) => string | undefined): Config {
+    return parseConfig(readEnv(getEnv), args);
+}
+
 export class ConfigError extends Error {
     constructor(message: string) {
         super(message);
