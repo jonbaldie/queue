@@ -1,5 +1,6 @@
 import { selectMutationTargets } from "./selector.ts";
 import { parsePositiveIntegerOptionOrExit } from "./runner_options.ts";
+import { runMutasaurusProject } from "./mutasaurus_project.ts";
 
 const THRESHOLD = 80;
 
@@ -27,17 +28,15 @@ if (selection.mode === "skip" || selection.paths.length === 0) {
   Deno.exit(0);
 }
 
-const { Mutasaurus } = await import("jsr:@mutasaurus/mutasaurus@0.1.4");
-
 const sourceFiles = selection.paths;
 console.log(`Selected targets for Mutasaurus (${sourceFiles.length}):`);
 for (const f of sourceFiles) {
   console.log(`  - ${f}`);
 }
 
-const mutasaurus = new Mutasaurus({
-  sourceFiles,
-  testFiles: [
+const results = await runMutasaurusProject({
+  targets: sourceFiles,
+  tests: [
     "./tests/config_test.ts",
     "./tests/e2e_test.ts",
     "./tests/handler_test.ts",
@@ -49,11 +48,7 @@ const mutasaurus = new Mutasaurus({
     "./tests/router_test.ts",
   ],
   workers,
-  noCheck: true,
-  silent: true,
 });
-
-const results = await mutasaurus.run(false);
 
 const fileStats: Map<string, { total: number; killed: number }> = new Map();
 for (const m of results.mutations) {
