@@ -301,13 +301,19 @@ Deno.test("runner: selected Mutasaurus targets retain unchanged project dependen
       config: [
         'import { assertEquals } from "jsr:@std/assert";',
         'import { config } from "../src/config.ts";',
-        'Deno.test("config", () => assertEquals(config(1), 2));',
+        'Deno.test("config", async () => {',
+        '  const value = config(1);',
+        '  if (value !== 2) await new Promise<void>(() => {});',
+        '  assertEquals(value, 2);',
+        '});',
       ].join("\n"),
       e2e: [
         'import { assertEquals } from "jsr:@std/assert";',
         'import { config } from "../src/config.ts";',
         'Deno.test("entrypoint", async () => {',
-        '  assertEquals(config(1), 2);',
+        '  const value = config(1);',
+        '  if (value !== 2) await new Promise<void>(() => {});',
+        '  assertEquals(value, 2);',
         '  const result = await new Deno.Command(Deno.execPath(), { args: ["run", "--allow-all", "main.ts"], cwd: ".", stdout: "piped", stderr: "piped" }).output();',
         '  assertEquals(result.code, 0, new TextDecoder().decode(result.stderr));',
         '  assertEquals(new TextDecoder().decode(result.stdout).trim(), "2");',
@@ -341,6 +347,10 @@ Deno.test("runner: selected Mutasaurus targets retain unchanged project dependen
     assertEquals(result.code, 0, output);
     assertStringIncludes(output, "Selected targets for Mutasaurus (1):\n  - src/config.ts");
     assertStringIncludes(output, "PASS src/config.ts: 100% (1/1)");
+    assertStringIncludes(
+      output,
+      "Verified 1 surviving mutations by test exit code: 1 killed, 0 timed out",
+    );
   } finally {
     await cleanup();
   }
