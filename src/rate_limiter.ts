@@ -79,7 +79,7 @@ export class RateLimiter {
     }
 
     // Injected times must be nondecreasing to keep timestamps ordered.
-    public isAllowed(key: string, now: number = Date.now()): boolean {
+    public isAllowed(key: string, now: number = performance.now()): boolean {
         const cutoff = now - this.windowMs;
 
         // Periodic cleanup of stale entries across all keys
