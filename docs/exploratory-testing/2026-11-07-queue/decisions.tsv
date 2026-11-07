@@ -1,0 +1,6 @@
+ts	phase	decision	why	evidence	result
+2026-11-07T09:33:44Z	frame	Selected three HTTP journeys on fresh origin/main worktree	Exercise delivery, recovery, and rejected inputs with isolated data	2026-11-07-report.md	scope recorded
+2026-11-07T09:33:44Z	setup	Installed Deno 2.7.6 locally and resolved the lockfile with frozen install	Keep dependencies and caches inside the worktree	2026-11-07-report.md	install passed
+2026-11-07T09:33:44Z	exercise	Reused the prior driver with a fresh state path and cleanup handler	Replay real HTTP outcomes on Linux and retain reproducible evidence	journeys.txt	three journeys passed, no candidates
+2026-11-07T09:33:44Z	triage	Filed no issue	No confirmed failure appeared in the checks	journeys.txt	no new issue
+2026-11-07T09:35:17Z	review	Recorded explicit PID and port results and repeated frozen install	Independent review found that the first teardown output and setup citation were not explicit	teardown.txt, install-recheck.txt	no registered resources remain, install passed

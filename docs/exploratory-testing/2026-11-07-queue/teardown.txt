@@ -1,0 +1,6 @@
+Checked /proc for registered PIDs: 3404258, 3404375, 3404413, 3404448, 3404477, 3404496, 3404531, 3404548, 3404568, 3404578, 3404591, 3404600, 3404609, 3404618, 3404628
+PIDs still present: []
+Checked ss -ltnH for registered ports: 52199, 50613, 46713, 41725, 37031, 36129, 36725, 50463, 47675, 38023, 43925, 37257, 55329, 60129, 57907
+Matching listeners: []
+Scratch state exists: False
+No Docker containers, images, volumes or browsers were started by this run.
