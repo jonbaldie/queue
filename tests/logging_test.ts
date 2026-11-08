@@ -130,8 +130,6 @@ Deno.test("logging: a silent sink leaves process streams empty and HTTP response
 });
 
 Deno.test("logging: records elapsed time for successful requests and failures", async () => {
-    await new Promise<void>((resolve) => setTimeout(resolve, 500));
-
     for (const shouldFail of [false, true]) {
         let message = "";
         let isError: boolean | undefined;
