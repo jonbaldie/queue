@@ -31,6 +31,15 @@ function parseLine<T>(line: string): QueueEvent<T> | undefined {
     }
 }
 
+function appendParsedLine<T>(events: QueueEvent<T>[], line: string): void {
+    if (line.length > 0) {
+        const event = parseLine<T>(line);
+        if (event) {
+            events.push(event);
+        }
+    }
+}
+
 export interface QueueStore<T = string> {
     saveEvent(queueName: string, payload: T, isEnqueue: boolean): void;
     replace(events: Array<QueueEvent<T>>): void;
@@ -242,12 +251,7 @@ export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
                             line = fragments.join("");
                             fragments = [];
                         }
-                        if (line.length > 0) {
-                            const event = parseLine<T>(line);
-                            if (event) {
-                                events.push(event);
-                            }
-                        }
+                        appendParsedLine(events, line);
                         start = idx + 1;
                         idx = decoded.indexOf("\n", start);
                     }
@@ -257,12 +261,7 @@ export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
                 }
                 fragments.push(decoder.decode());
                 const leftover = fragments.join("");
-                if (leftover.length > 0) {
-                    const event = parseLine<T>(leftover);
-                    if (event) {
-                        events.push(event);
-                    }
-                }
+                appendParsedLine(events, leftover);
                 return events;
             } finally {
                 file.unlockSync();
