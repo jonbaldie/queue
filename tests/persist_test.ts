@@ -465,6 +465,24 @@ Deno.test("FileStore.loadState reassembles multi-byte characters split across 40
     Deno.removeSync(tmpDir, { recursive: true });
 });
 
+Deno.test("FileStore.loadState preserves long records around malformed and unterminated lines", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir);
+    const first = { queue: "q", payload: "a".repeat(9000) + "é", enqueue: true, dequeue: false };
+    const last = { queue: "q", payload: "尾".repeat(4000), enqueue: true, dequeue: false };
+    try {
+        Deno.writeTextFileSync(
+            tmpDir + "/persist.dat",
+            JSON.stringify(first) + "\n\n" + "x".repeat(9000) + "\n" + JSON.stringify(last),
+        );
+        assertEquals(persist.loadState(), [first, last]);
+    } finally {
+        persist.close();
+        Deno.removeSync(tmpDir, { recursive: true });
+    }
+});
+
 Deno.test("persist MemoryStore.replace() replaces existing events", () => {
     const p = new Persistency.MemoryStore();
     p.saveEvent("q", "old", true);

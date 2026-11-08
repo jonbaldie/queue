@@ -223,32 +223,35 @@ export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
             const file = Deno.openSync(this.path, { read: true });
             file.lockSync(false);
             try {
-                // Stream-parse line by line to avoid 3x peak memory from split/filter/map
                 const events: QueueEvent<T>[] = [];
                 const decoder = new TextDecoder();
                 const chunk = new Uint8Array(4096);
-                let leftover = "";
+                let fragments: string[] = [];
                 while (true) {
                     const read = file.readSync(chunk);
                     if (!read) {
                         break;
                     }
-                    leftover += decoder.decode(chunk.subarray(0, read), { stream: true });
-                    let idx = leftover.indexOf("\n");
+                    const decoded = decoder.decode(chunk.subarray(0, read), { stream: true });
+                    let start = 0;
+                    let idx = decoded.indexOf("\n", start);
                     while (idx >= 0) {
-                        const line = leftover.slice(0, idx);
-                        leftover = leftover.slice(idx + 1);
+                        fragments.push(decoded.slice(start, idx));
+                        const line = fragments.join("");
+                        fragments = [];
                         if (line.length > 0) {
                             const event = parseLine<T>(line);
                             if (event) {
                                 events.push(event);
                             }
                         }
-                        idx = leftover.indexOf("\n");
+                        start = idx + 1;
+                        idx = decoded.indexOf("\n", start);
                     }
+                    fragments.push(decoded.slice(start));
                 }
-                // Flush decoder and process any remaining line (no trailing newline)
-                leftover += decoder.decode();
+                fragments.push(decoder.decode());
+                const leftover = fragments.join("");
                 if (leftover.length > 0) {
                     const event = parseLine<T>(leftover);
                     if (event) {
