@@ -1,4 +1,4 @@
-import { assertEquals, assertMatch, assertRejects, assertStrictEquals } from "jsr:@std/assert@1.0";
+import { assert, assertEquals, assertMatch, assertRejects, assertStrictEquals } from "jsr:@std/assert@1.0";
 import { createHandler } from "../src/handler.ts";
 import QueueManager from "../src/manager.ts";
 import { MemoryStore } from "../src/persist.ts";
@@ -127,4 +127,39 @@ Deno.test("logging: a silent sink leaves process streams empty and HTTP response
     assertEquals(result.code, 0);
     assertEquals(new TextDecoder().decode(result.stdout), "");
     assertEquals(new TextDecoder().decode(result.stderr), "");
+});
+
+Deno.test("logging: records elapsed time for successful requests and failures", async () => {
+    for (const shouldFail of [false, true]) {
+        let message = "";
+        let isError: boolean | undefined;
+        const handler = withLogging({
+            write(logMessage, logIsError) {
+                message = logMessage;
+                isError = logIsError;
+            },
+        })(async () => {
+            await new Promise<void>((resolve) => setTimeout(resolve, 50));
+            if (shouldFail) throw new Error("delayed failure");
+            return new Response("ok");
+        });
+
+        if (shouldFail) {
+            await assertRejects(
+                () => handler(new Request("http://localhost/queues")),
+                Error,
+                "delayed failure",
+            );
+        } else {
+            await handler(new Request("http://localhost/queues"));
+        }
+
+        const duration = / (\d+\.\d{2})ms$/.exec(message)?.[1];
+        assert(duration !== undefined, `Expected a logged duration: ${message}`);
+        assert(
+            Number(duration) >= 40,
+            `Expected elapsed time of at least 40ms, got ${duration}ms`,
+        );
+        assertEquals(isError, shouldFail);
+    }
 });

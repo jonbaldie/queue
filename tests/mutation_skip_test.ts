@@ -80,7 +80,9 @@ async function createMutationEngineRepo() {
     "config",
     "e2e",
     "handler",
+    "logging",
     "manager",
+    "payload",
     "persist",
     "rate_limiter",
     "router",
@@ -275,6 +277,80 @@ Deno.test("runner: mutasaurus invokes the real engine with an explicit worker co
     assertEquals(result.code, 0, `${result.stdout}\n${result.stderr}`);
     assertStringIncludes(result.stdout, "Mutasaurus workers: 1");
     assertStringIncludes(result.stdout, "Overall: 100% (1/1)");
+  } finally {
+    await cleanup();
+  }
+});
+
+Deno.test("runner: selected Mutasaurus targets retain unchanged project dependencies", async () => {
+  const { repoDir, runGit, cleanup } = await createTestRepo();
+  try {
+    await Deno.writeTextFile(
+      join(repoDir, "src", "helper.ts"),
+      "export function identity(value: number) { return value; }\n",
+    );
+    await Deno.writeTextFile(
+      join(repoDir, "src", "config.ts"),
+      'import { identity } from "./helper.ts";\nexport function config(value: number) { return identity(value); }\n',
+    );
+    await Deno.writeTextFile(
+      join(repoDir, "main.ts"),
+      'import { config } from "./src/config.ts";\nconsole.log(config(1));\n',
+    );
+    const tests: Record<string, string> = {
+      config: [
+        'import { assertEquals } from "jsr:@std/assert";',
+        'import { config } from "../src/config.ts";',
+        'Deno.test("config", async () => {',
+        '  const value = config(1);',
+        '  if (value !== 2) await new Promise<void>(() => {});',
+        '  assertEquals(value, 2);',
+        '});',
+      ].join("\n"),
+      e2e: [
+        'import { assertEquals } from "jsr:@std/assert";',
+        'import { config } from "../src/config.ts";',
+        'Deno.test("entrypoint", async () => {',
+        '  const value = config(1);',
+        '  if (value !== 2) await new Promise<void>(() => {});',
+        '  assertEquals(value, 2);',
+        '  const result = await new Deno.Command(Deno.execPath(), { args: ["run", "--allow-all", "main.ts"], cwd: ".", stdout: "piped", stderr: "piped" }).output();',
+        '  assertEquals(result.code, 0, new TextDecoder().decode(result.stderr));',
+        '  assertEquals(new TextDecoder().decode(result.stdout).trim(), "2");',
+        '});',
+      ].join("\n"),
+    };
+    for (const name of ["config", "e2e", "handler", "logging", "manager", "payload", "persist", "rate_limiter", "router"]) {
+      await Deno.writeTextFile(
+        join(repoDir, "tests", `${name}_test.ts`),
+        tests[name] ?? 'Deno.test("placeholder", () => {});\n',
+      );
+    }
+    await runGit("add", ".");
+    await runGit("commit", "-m", "Add dependency fixture");
+    await runGit("checkout", "-b", "fix/config");
+    await Deno.writeTextFile(
+      join(repoDir, "src", "config.ts"),
+      'import { identity } from "./helper.ts";\nexport function config(value: number) { return identity(value) + 1; }\n',
+    );
+    await runGit("add", "src/config.ts");
+    await runGit("commit", "-m", "Change config");
+
+    const result = await runRunnerScript(
+      join(Deno.cwd(), "mutation", "mutasaurus_ci.ts"),
+      repoDir,
+      { GITHUB_EVENT_NAME: "pull_request", GITHUB_BASE_REF: "main" },
+      ["--workers", "1"],
+      ["--node-modules-dir=auto", "--allow-ffi", "--allow-sys"],
+    );
+    const output = `${result.stdout}\n${result.stderr}`;
+    assertEquals(result.code, 0, output);
+    assertStringIncludes(output, "Selected targets for Mutasaurus (1):\n  - src/config.ts");
+    assertStringIncludes(output, "PASS src/config.ts: 100% (1/1)");
+    assertStringIncludes(
+      output,
+      "Verified 1 surviving mutations by test exit code: 1 killed, 0 timed out",
+    );
   } finally {
     await cleanup();
   }

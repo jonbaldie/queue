@@ -295,6 +295,42 @@ Deno.test("readAndValidatePayload: accepts a declared content length exactly at 
     assertEquals(result, "12345");
 });
 
+Deno.test("payload errors expose their declared names", async () => {
+    const invalid = assertThrows(
+        () => parsePayloadBody("{"),
+        InvalidPayloadError,
+    );
+    assertEquals(invalid.name, "InvalidPayloadError");
+
+    const nested = `[${"[".repeat(MAX_JSON_DEPTH)}0${"]".repeat(MAX_JSON_DEPTH)}]`;
+    const nestingError = assertThrows(
+        () => parsePayloadBody(`{"payload":${nested}}`),
+        JsonNestingTooDeepError,
+    );
+    assertEquals(nestingError.name, "JsonNestingTooDeepError");
+
+    const unsupportedNumber = assertThrows(
+        () => parsePayloadBody('{"payload":9007199254740993}'),
+        UnsupportedNumberError,
+    );
+    assertEquals(unsupportedNumber.name, "UnsupportedNumberError");
+
+    const oversized = await assertRejects(
+        () =>
+            readAndValidatePayload(
+                new ReadableStream({
+                    start(controller) {
+                        controller.enqueue(new Uint8Array(2));
+                        controller.close();
+                    },
+                }),
+                { maxBytes: 1 },
+            ),
+        PayloadTooLargeError,
+    );
+    assertEquals(oversized.name, "PayloadTooLargeError");
+});
+
 for (const contentLength of ["5", "not-a-number", "", null]) {
     Deno.test(`readAndValidatePayload: enforces streamed limit when content length is ${JSON.stringify(contentLength)}`, async () => {
         let cancelObserved = false;
