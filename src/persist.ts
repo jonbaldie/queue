@@ -236,9 +236,12 @@ export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
                     let start = 0;
                     let idx = decoded.indexOf("\n", start);
                     while (idx >= 0) {
-                        fragments.push(decoded.slice(start, idx));
-                        const line = fragments.join("");
-                        fragments = [];
+                        let line = decoded.slice(start, idx);
+                        if (fragments.length > 0) {
+                            fragments.push(line);
+                            line = fragments.join("");
+                            fragments = [];
+                        }
                         if (line.length > 0) {
                             const event = parseLine<T>(line);
                             if (event) {
@@ -248,7 +251,9 @@ export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
                         start = idx + 1;
                         idx = decoded.indexOf("\n", start);
                     }
-                    fragments.push(decoded.slice(start));
+                    if (start < decoded.length) {
+                        fragments.push(decoded.slice(start));
+                    }
                 }
                 fragments.push(decoder.decode());
                 const leftover = fragments.join("");
