@@ -31,6 +31,15 @@ function parseLine<T>(line: string): QueueEvent<T> | undefined {
     }
 }
 
+function appendParsedLine<T>(events: QueueEvent<T>[], line: string): void {
+    if (line.length > 0) {
+        const event = parseLine<T>(line);
+        if (event) {
+            events.push(event);
+        }
+    }
+}
+
 export interface QueueStore<T = string> {
     saveEvent(queueName: string, payload: T, isEnqueue: boolean): void;
     replace(events: Array<QueueEvent<T>>): void;
@@ -223,38 +232,36 @@ export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
             const file = Deno.openSync(this.path, { read: true });
             file.lockSync(false);
             try {
-                // Stream-parse line by line to avoid 3x peak memory from split/filter/map
                 const events: QueueEvent<T>[] = [];
                 const decoder = new TextDecoder();
                 const chunk = new Uint8Array(4096);
-                let leftover = "";
+                let fragments: string[] = [];
                 while (true) {
                     const read = file.readSync(chunk);
                     if (!read) {
                         break;
                     }
-                    leftover += decoder.decode(chunk.subarray(0, read), { stream: true });
-                    let idx = leftover.indexOf("\n");
+                    const decoded = decoder.decode(chunk.subarray(0, read), { stream: true });
+                    let start = 0;
+                    let idx = decoded.indexOf("\n", start);
                     while (idx >= 0) {
-                        const line = leftover.slice(0, idx);
-                        leftover = leftover.slice(idx + 1);
-                        if (line.length > 0) {
-                            const event = parseLine<T>(line);
-                            if (event) {
-                                events.push(event);
-                            }
+                        let line = decoded.slice(start, idx);
+                        if (fragments.length > 0) {
+                            fragments.push(line);
+                            line = fragments.join("");
+                            fragments = [];
                         }
-                        idx = leftover.indexOf("\n");
+                        appendParsedLine(events, line);
+                        start = idx + 1;
+                        idx = decoded.indexOf("\n", start);
+                    }
+                    if (start < decoded.length) {
+                        fragments.push(decoded.slice(start));
                     }
                 }
-                // Flush decoder and process any remaining line (no trailing newline)
-                leftover += decoder.decode();
-                if (leftover.length > 0) {
-                    const event = parseLine<T>(leftover);
-                    if (event) {
-                        events.push(event);
-                    }
-                }
+                fragments.push(decoder.decode());
+                const leftover = fragments.join("");
+                appendParsedLine(events, leftover);
                 return events;
             } finally {
                 file.unlockSync();
