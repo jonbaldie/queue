@@ -271,7 +271,7 @@ export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
     public dir(dir: string): void {
         this.closeWriteHandle();
         this.releaseOwnership();
-        this.directory = dir.replace(/\/$/, '') + "/";
+        this.directory = dir === "" ? "" : dir.replace(/\/$/, '') + "/";
     }
 
     public close(): void {
