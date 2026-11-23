@@ -236,24 +236,19 @@ export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
                 // also strip a BOM at the start of any later record.
                 const decoder = new TextDecoder("utf-8", { ignoreBOM: true });
                 const chunk = new Uint8Array(4096);
-                // Bytes of the record being assembled. Grown by doubling, so
-                // appending a chunk is amortised O(chunk) instead of re-copying
-                // the whole prefix on every read. After each newline the buffer
-                // is rewound and reused for the next record.
-                let line = new Uint8Array(8192);
+                // Fragments of the record being assembled, copied out of
+                // the read chunk (which is reused for the next read).
+                // Only the current record is buffered, never the whole
+                // file; concatenating it once it is complete is linear,
+                // unlike re-copying the growing prefix on every read.
+                let parts: Uint8Array[] = [];
                 let lineLength = 0;
                 let lineCount = 0;
                 const append = (bytes: Uint8Array): void => {
-                    if (lineLength + bytes.length > line.length) {
-                        let capacity = line.length * 2;
-                        while (capacity < lineLength + bytes.length) {
-                            capacity *= 2;
-                        }
-                        const grown = new Uint8Array(capacity);
-                        grown.set(line.subarray(0, lineLength));
-                        line = grown;
+                    if (bytes.length === 0) {
+                        return;
                     }
-                    line.set(bytes, lineLength);
+                    parts.push(bytes.slice());
                     lineLength += bytes.length;
                 };
                 const emit = (bytes: Uint8Array): void => {
@@ -271,6 +266,21 @@ export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
                         events.push(event);
                     }
                 };
+                const emitBuffered = (): void => {
+                    if (parts.length === 1) {
+                        emit(parts[0]);
+                    } else {
+                        const all = new Uint8Array(lineLength);
+                        let offset = 0;
+                        for (const part of parts) {
+                            all.set(part, offset);
+                            offset += part.length;
+                        }
+                        emit(all);
+                    }
+                    parts = [];
+                    lineLength = 0;
+                };
                 while (true) {
                     const read = file.readSync(chunk);
                     if (!read) {
@@ -285,8 +295,7 @@ export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
                             emit(view.subarray(start, newline));
                         } else {
                             append(view.subarray(start, newline));
-                            emit(line.subarray(0, lineLength));
-                            lineLength = 0;
+                            emitBuffered();
                         }
                         start = newline + 1;
                         newline = view.indexOf(0x0a, start);
@@ -297,7 +306,7 @@ export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
                 }
                 // Process any remaining record (no trailing newline)
                 if (lineLength > 0) {
-                    emit(line.subarray(0, lineLength));
+                    emitBuffered();
                 }
                 return events;
             } finally {
