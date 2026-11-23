@@ -223,37 +223,81 @@ export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
             const file = Deno.openSync(this.path, { read: true });
             file.lockSync(false);
             try {
-                // Stream-parse line by line to avoid 3x peak memory from split/filter/map
+                // Stream-parse line by line to avoid 3x peak memory from split/filter/map.
+                // Frame records in the byte domain: 0x0A can never occur inside a
+                // multi-byte UTF-8 sequence, so a record can be decoded once its
+                // terminating newline has been seen, which also reassembles
+                // characters split across reads. Only the current record is
+                // buffered, never the whole file.
                 const events: QueueEvent<T>[] = [];
-                const decoder = new TextDecoder();
+                // ignoreBOM: a byte-order mark is stripped only at the start
+                // of the file (below), matching the previous streaming
+                // decoder; decoding each record separately would otherwise
+                // also strip a BOM at the start of any later record.
+                const decoder = new TextDecoder("utf-8", { ignoreBOM: true });
                 const chunk = new Uint8Array(4096);
-                let leftover = "";
+                // Bytes of the record being assembled. Grown by doubling, so
+                // appending a chunk is amortised O(chunk) instead of re-copying
+                // the whole prefix on every read. After each newline the buffer
+                // is rewound and reused for the next record.
+                let line = new Uint8Array(8192);
+                let lineLength = 0;
+                let lineCount = 0;
+                const append = (bytes: Uint8Array): void => {
+                    if (lineLength + bytes.length > line.length) {
+                        let capacity = line.length * 2;
+                        while (capacity < lineLength + bytes.length) {
+                            capacity *= 2;
+                        }
+                        const grown = new Uint8Array(capacity);
+                        grown.set(line.subarray(0, lineLength));
+                        line = grown;
+                    }
+                    line.set(bytes, lineLength);
+                    lineLength += bytes.length;
+                };
+                const emit = (bytes: Uint8Array): void => {
+                    const isFirstRecord = lineCount === 0;
+                    lineCount++;
+                    if (bytes.length === 0) {
+                        return;
+                    }
+                    let text = decoder.decode(bytes);
+                    if (isFirstRecord && text.startsWith("\uFEFF")) {
+                        text = text.slice(1);
+                    }
+                    const event = parseLine<T>(text);
+                    if (event) {
+                        events.push(event);
+                    }
+                };
                 while (true) {
                     const read = file.readSync(chunk);
                     if (!read) {
                         break;
                     }
-                    leftover += decoder.decode(chunk.subarray(0, read), { stream: true });
-                    let idx = leftover.indexOf("\n");
-                    while (idx >= 0) {
-                        const line = leftover.slice(0, idx);
-                        leftover = leftover.slice(idx + 1);
-                        if (line.length > 0) {
-                            const event = parseLine<T>(line);
-                            if (event) {
-                                events.push(event);
-                            }
+                    const view = chunk.subarray(0, read);
+                    let start = 0;
+                    let newline = view.indexOf(0x0a, start);
+                    while (newline >= 0) {
+                        if (lineLength === 0) {
+                            // Whole record inside this chunk: decode in place.
+                            emit(view.subarray(start, newline));
+                        } else {
+                            append(view.subarray(start, newline));
+                            emit(line.subarray(0, lineLength));
+                            lineLength = 0;
                         }
-                        idx = leftover.indexOf("\n");
+                        start = newline + 1;
+                        newline = view.indexOf(0x0a, start);
+                    }
+                    if (start < view.length) {
+                        append(view.subarray(start));
                     }
                 }
-                // Flush decoder and process any remaining line (no trailing newline)
-                leftover += decoder.decode();
-                if (leftover.length > 0) {
-                    const event = parseLine<T>(leftover);
-                    if (event) {
-                        events.push(event);
-                    }
+                // Process any remaining record (no trailing newline)
+                if (lineLength > 0) {
+                    emit(line.subarray(0, lineLength));
                 }
                 return events;
             } finally {

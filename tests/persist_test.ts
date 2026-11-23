@@ -465,6 +465,183 @@ Deno.test("FileStore.loadState reassembles multi-byte characters split across 40
     Deno.removeSync(tmpDir, { recursive: true });
 });
 
+Deno.test("FileStore.loadState recovers a single record spanning many chunks", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const enc = new TextEncoder();
+    // One record far larger than the 4096-byte read chunk, followed by
+    // short records: framing of the long record must not lose or
+    // reorder the records after it.
+    const longPayload = "x".repeat(1024 * 1024);
+    const long = JSON.stringify({ queue: "q", payload: longPayload, enqueue: true, dequeue: false }) + "\n";
+    const after1 = JSON.stringify({ queue: "q", payload: "after-1", enqueue: true, dequeue: false }) + "\n";
+    const after2 = JSON.stringify({ queue: "q", payload: "after-2", enqueue: false, dequeue: true }) + "\n";
+    const before = JSON.stringify({ queue: "q", payload: "before", enqueue: true, dequeue: false }) + "\n";
+    Deno.writeFileSync(tmpDir + "/persist.dat", enc.encode(before + long + after1 + after2));
+
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir + "/");
+    const events = persist.loadState();
+    assertEquals(events.length, 4);
+    assertEquals(events[0].payload, "before");
+    assertEquals(events[1].payload, longPayload);
+    assertEquals(events[2].payload, "after-1");
+    assertEquals(events[2].enqueue, true);
+    assertEquals(events[3].payload, "after-2");
+    assertEquals(events[3].enqueue, false);
+    persist.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("FileStore.loadState handles record boundaries at chunk edges", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const enc = new TextEncoder();
+    // Build lines whose newline lands on the last byte of a chunk, the
+    // first byte of the next chunk, and the last byte of that chunk.
+    const lineOfBytes = (targetBytes: number, payloadPrefix: string) => {
+        let pad = payloadPrefix.length;
+        const lengthFor = (n: number) =>
+            enc.encode(JSON.stringify({ queue: "q", payload: payloadPrefix.padEnd(n, "A"), enqueue: true, dequeue: false }) + "\n").length;
+        while (lengthFor(pad) < targetBytes) pad++;
+        const line = JSON.stringify({ queue: "q", payload: payloadPrefix.padEnd(pad, "A"), enqueue: true, dequeue: false }) + "\n";
+        assertEquals(enc.encode(line).length, targetBytes);
+        return line;
+    };
+    const first = lineOfBytes(4096, "a"); // newline at byte 4095 (end of chunk 1)
+    const blankAtChunkStart = "\n"; // blank line at byte 4096 (start of chunk 2)
+    const second = lineOfBytes(4095, "b"); // newline at byte 8191 (end of chunk 2)
+    const third = lineOfBytes(4096, "c"); // newline at byte 12287 (end of chunk 3)
+    const tail = JSON.stringify({ queue: "q", payload: "tail", enqueue: true, dequeue: false }) + "\n";
+    const bytes = enc.encode(first + blankAtChunkStart + second + third + tail);
+    // Fixture geometry: newlines exactly on those chunk-edge offsets.
+    assertEquals(bytes[4095], 0x0a);
+    assertEquals(bytes[4096], 0x0a);
+    assertEquals(bytes[8191], 0x0a);
+    assertEquals(bytes[12287], 0x0a);
+    Deno.writeFileSync(tmpDir + "/persist.dat", bytes);
+
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir + "/");
+    const events = persist.loadState();
+    assertEquals(events.length, 4);
+    assertEquals(events[0].payload.startsWith("a"), true);
+    assertEquals(events[1].payload.startsWith("b"), true);
+    assertEquals(events[2].payload.startsWith("c"), true);
+    assertEquals(events[3].payload, "tail");
+    persist.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("FileStore.loadState recovers a long final record without a trailing newline", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const enc = new TextEncoder();
+    const first = JSON.stringify({ queue: "q", payload: "first", enqueue: true, dequeue: false }) + "\n";
+    const longPayload = "y".repeat(300 * 1024);
+    const unterminated = JSON.stringify({ queue: "q", payload: longPayload, enqueue: true, dequeue: false });
+    Deno.writeFileSync(tmpDir + "/persist.dat", enc.encode(first + unterminated));
+
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir + "/");
+    const events = persist.loadState();
+    assertEquals(events.length, 2);
+    assertEquals(events[0].payload, "first");
+    assertEquals(events[1].payload, longPayload);
+    persist.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("FileStore.loadState reassembles a four-byte character split across 4096-byte chunks", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    // Same construction as the 2-byte case: the first line is padded to
+    // 4085 bytes so the 4-byte "😀" in the second line starts at byte
+    // 4095 and straddles the read boundary.
+    const enc = new TextEncoder();
+    const encodedLength = (payload: string, pad: number) =>
+        enc.encode(JSON.stringify({ queue: "q", payload: payload.padEnd(pad, "A"), enqueue: true, dequeue: false }) + "\n").length;
+    let pad = 0;
+    while (encodedLength("x", pad) < 4085) pad++;
+    const first = JSON.stringify({ queue: "q", payload: "x".padEnd(pad, "A"), enqueue: true, dequeue: false }) + "\n";
+    assertEquals(enc.encode(first).length, 4085);
+    const second = JSON.stringify({ queue: "😀q", payload: "b", enqueue: true, dequeue: false }) + "\n";
+    Deno.writeFileSync(tmpDir + "/persist.dat", enc.encode(first + second));
+
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir + "/");
+    const events = persist.loadState();
+    assertEquals(events.length, 2);
+    assertEquals(events[0].payload, "x".padEnd(pad, "A"));
+    assertEquals(events[1].queue, "😀q");
+    assertEquals(events[1].payload, "b");
+    persist.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("FileStore.loadState skips blank, malformed and invalid lines around a long record", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const enc = new TextEncoder();
+    const longPayload = "z".repeat(128 * 1024);
+    const long = JSON.stringify({ queue: "q", payload: longPayload, enqueue: true, dequeue: false }) + "\n";
+    const kept1 = JSON.stringify({ queue: "q", payload: "kept-1", enqueue: true, dequeue: false }) + "\n";
+    const kept2 = JSON.stringify({ queue: "q", payload: "kept-2", enqueue: true, dequeue: false }) + "\n";
+    const content =
+        "\n" + // blank
+        "{not json\n" + // malformed
+        "[1,2,3]\n" + // valid JSON, not a queue event
+        kept1 +
+        long +
+        "\n" + // blank after the long record
+        JSON.stringify({ queue: "q", payload: "bad", enqueue: true, dequeue: true }) + "\n" + // invalid event shape
+        kept2 +
+        '{"queue":"q","payload":"truncated'; // truncated tail, no newline
+    Deno.writeFileSync(tmpDir + "/persist.dat", enc.encode(content));
+
+    const persist = new Persistency.FileStore();
+    persist.dir(tmpDir + "/");
+    const events = persist.loadState();
+    assertEquals(events.length, 3);
+    assertEquals(events[0].payload, "kept-1");
+    assertEquals(events[1].payload, longPayload);
+    assertEquals(events[2].payload, "kept-2");
+    persist.close();
+    Deno.removeSync(tmpDir, { recursive: true });
+});
+
+Deno.test("FileStore.loadState strips a byte-order mark only at the start of the file", () => {
+    const enc = new TextEncoder();
+    const bom = new Uint8Array([0xef, 0xbb, 0xbf]);
+    const line = (payload: string) =>
+        JSON.stringify({ queue: "q", payload, enqueue: true, dequeue: false }) + "\n";
+    const writeAndLoad = (bytes: Uint8Array): string[] => {
+        const tmpDir = Deno.makeTempDirSync();
+        try {
+            Deno.writeFileSync(tmpDir + "/persist.dat", bytes);
+            const persist = new Persistency.FileStore();
+            persist.dir(tmpDir + "/");
+            const payloads = persist.loadState().map((event) => event.payload as string);
+            persist.close();
+            return payloads;
+        } finally {
+            Deno.removeSync(tmpDir, { recursive: true });
+        }
+    };
+    // A BOM at the start of the file is stripped, so the first record
+    // is recovered like any other.
+    assertEquals(
+        writeAndLoad(new Uint8Array([...bom, ...enc.encode(line("first") + line("second"))])),
+        ["first", "second"],
+    );
+    // A BOM at the start of a later record is not stripped: that record
+    // is malformed (its line does not parse) and skipped, while the
+    // records around it are still recovered in order.
+    assertEquals(
+        writeAndLoad(new Uint8Array([
+            ...enc.encode(line("first")),
+            ...bom,
+            ...enc.encode(line("skipped") + line("third")),
+        ])),
+        ["first", "third"],
+    );
+});
+
 Deno.test("persist MemoryStore.replace() replaces existing events", () => {
     const p = new Persistency.MemoryStore();
     p.saveEvent("q", "old", true);
