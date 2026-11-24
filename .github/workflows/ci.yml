@@ -69,6 +69,7 @@ jobs:
             mutation/mutasaurus_ci.ts --workers 4
 
   mutation-stryker:
+    if: vars.QUEUE_STRYKER_ENABLED == 'true'
     name: Mutation testing (Stryker)
     needs: mutation-mutasaurus
     runs-on: ubuntu-latest
