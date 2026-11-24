@@ -282,6 +282,69 @@ Deno.test("runner: mutasaurus invokes the real engine with an explicit worker co
   }
 });
 
+Deno.test({name: "interrupting Mutasaurus releases its running test and server", ignore: Deno.build.os === "windows"}, async () => {
+  const { repoDir, cleanup } = await createMutationEngineRepo();
+  const marker = join(repoDir, "running-processes.json");
+  await Deno.writeTextFile(join(repoDir, "tests", "config_test.ts"), `
+    import { config } from "../src/config.ts";
+    Deno.test("serve", async () => {
+      if (config(1) !== 2) throw new Error("unexpected fixture result");
+      const server = new Deno.Command(Deno.execPath(), {
+        args: ["eval", "Deno.serve({hostname:'127.0.0.1',port:0}, () => new Response('ready'));"],
+        stdout: "null", stderr: "null",
+      }).spawn();
+      Deno.writeTextFileSync(${JSON.stringify(marker)}, JSON.stringify([Deno.pid, server.pid]));
+      await server.status;
+    });
+  `);
+
+  const runner = new Deno.Command(Deno.execPath(), {
+    args: ["run", "-A", "--node-modules-dir=auto", join(Deno.cwd(), "mutation", "mutasaurus_ci.ts")],
+    cwd: repoDir,
+    env: { GITHUB_EVENT_NAME: "push", TMPDIR: join(repoDir, ".git") },
+    stdout: "null",
+    stderr: "piped",
+  }).spawn();
+  const stderr = new Response(runner.stderr).text();
+  const delay = () => new Promise((resolve) => setTimeout(resolve, 50));
+  const processesExist = async (pids: number[]) =>
+    (await Promise.all(pids.map(async (pid) =>
+      (await new Deno.Command("kill", {
+        args: ["-0", String(pid)], stderr: "null",
+      }).output()).success
+    ))).some(Boolean);
+  let pids: number[] = [];
+  try {
+    for (let attempt = 0; attempt < 400; attempt++) {
+      try {
+        pids = JSON.parse(await Deno.readTextFile(marker));
+        break;
+      } catch (error) {
+        if (!(error instanceof Deno.errors.NotFound)) throw error;
+        await delay();
+      }
+    }
+    runner.kill("SIGKILL");
+    await runner.status;
+    assertEquals(pids.length, 2, await stderr);
+    for (let attempt = 0; attempt < 60 && await processesExist(pids); attempt++) {
+      await delay();
+    }
+    assertEquals(await processesExist(pids), false, "interrupted run left a process alive");
+    pids = [];
+  } finally {
+    try { runner.kill("SIGKILL"); } catch { /* already exited */ }
+    for (const pid of pids) {
+      try { Deno.kill(pid, "SIGKILL"); } catch (error) {
+        if (!(error instanceof Deno.errors.NotFound)) throw error;
+      }
+    }
+    await runner.status;
+    await stderr;
+    await cleanup();
+  }
+});
+
 Deno.test("runner: selected Mutasaurus targets retain unchanged project dependencies", async () => {
   const { repoDir, runGit, cleanup } = await createTestRepo();
   try {

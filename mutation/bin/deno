@@ -1,0 +1,31 @@
+#!/usr/bin/env python3
+"""Run a Mutasaurus test and its subprocesses in one disposable process group."""
+
+import os
+import select
+import signal
+import sys
+
+deno = os.environ.pop("QUEUE_MUTATION_DENO")
+owner = int(os.environ.pop("QUEUE_MUTATION_PID"))
+os.environ["PATH"] = os.environ["PATH"].split(os.pathsep, 1)[1]
+
+if sys.argv[1:2] == ["test"]:
+    os.setpgid(0, 0)
+    group = os.getpid()
+    if os.fork() == 0:
+        # The test can be SIGKILLed, so a separate group member owns cleanup.
+        # The group's ID stays reserved until this watcher exits.
+        output = select.poll()
+        output.register(1, 0)
+        while os.getppid() == group:
+            try:
+                os.kill(owner, 0)
+            except ProcessLookupError:
+                break
+            # Mutasaurus drops the output pipe when it terminates a timed-out worker.
+            if output.poll(100):
+                break
+        os.killpg(group, signal.SIGKILL)
+
+os.execv(deno, [deno, *sys.argv[1:]])

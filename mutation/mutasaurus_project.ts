@@ -78,7 +78,7 @@ async function verifyMutationByExitCode(
       SURVIVOR_CHECK_TIMEOUT_MS,
     );
     try {
-      const result = await new Deno.Command(Deno.execPath(), {
+      const result = await new Deno.Command(Deno.build.os === "windows" ? Deno.execPath() : "deno", {
         args: ["test", "--allow-all", "--no-check", ...tests],
         cwd: worker,
         stdout: "null",
