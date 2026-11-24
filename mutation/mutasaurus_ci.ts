@@ -1,3 +1,4 @@
+import { fromFileUrl } from "jsr:@std/path";
 import { selectMutationTargets } from "./selector.ts";
 import { parsePositiveIntegerOptionOrExit } from "./runner_options.ts";
 import { runMutasaurusProject } from "./mutasaurus_project.ts";
@@ -32,6 +33,13 @@ const sourceFiles = selection.paths;
 console.log(`Selected targets for Mutasaurus (${sourceFiles.length}):`);
 for (const f of sourceFiles) {
   console.log(`  - ${f}`);
+}
+
+if (Deno.build.os !== "windows") {
+  const workerBin = fromFileUrl(new URL("./bin", import.meta.url));
+  Deno.env.set("QUEUE_MUTATION_DENO", Deno.execPath());
+  Deno.env.set("QUEUE_MUTATION_PID", String(Deno.pid));
+  Deno.env.set("PATH", workerBin + ":" + (Deno.env.get("PATH") ?? ""));
 }
 
 const results = await runMutasaurusProject({

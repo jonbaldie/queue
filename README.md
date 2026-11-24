@@ -119,7 +119,10 @@ retain messcript's normal non-zero exit status.
 ## Local mutation testing
 
 Run only one mutation engine at a time on a shared development host. Mutasaurus
-defaults to one worker for local runs. Run Stryker with worker concurrency one:
+defaults to one worker for local runs. On macOS and Linux, its Python 3 launcher
+gives each test a separate process group so a timeout or an interrupted run
+also stops the queue servers started by that test. Run Stryker with worker
+concurrency one:
 
 ```
 deno run --allow-all --node-modules-dir=auto mutation/mutasaurus_ci.ts
