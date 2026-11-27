@@ -716,3 +716,105 @@ Deno.test("persist FileStore.claimDirectory() creates a missing PERSIST director
         Deno.removeSync(tmpDir, { recursive: true });
     }
 });
+
+// ── FileStore.loadState() long-record & chunk-boundary streaming ─────────────
+
+Deno.test("FileStore.loadState() recovers a single long record spanning many 4096-byte chunks", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const store = new Persistency.FileStore<string>();
+    store.dir(tmpDir);
+    try {
+        const longPayload = "a".repeat(64 * 1024);
+        store.saveEvent("long-q", longPayload, true);
+        store.close();
+
+        const events = store.loadState();
+        assertEquals(events.length, 1);
+        assertEquals(events[0], {
+            queue: "long-q",
+            payload: longPayload,
+            enqueue: true,
+            dequeue: false,
+        });
+    } finally {
+        store.close();
+        Deno.removeSync(tmpDir, { recursive: true });
+    }
+});
+
+Deno.test("FileStore.loadState() recovers multiple records across chunk boundaries and skips blank, malformed, and invalid lines", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const store = new Persistency.FileStore<string>();
+    store.dir(tmpDir);
+    try {
+        const enc = new TextEncoder();
+        const r1 = JSON.stringify({ queue: "q", payload: "p1-" + "x".repeat(4050), enqueue: true, dequeue: false });
+        const r2 = JSON.stringify({ queue: "q", payload: "p2-" + "y".repeat(5000), enqueue: true, dequeue: false });
+        const r3 = JSON.stringify({ queue: "q", payload: "p1-" + "x".repeat(4050), enqueue: false, dequeue: true });
+        const content = [
+            "",
+            r1,
+            "{not valid json",
+            "",
+            JSON.stringify({ queue: "q", payload: "bad-flags", enqueue: true, dequeue: true }),
+            r2,
+            JSON.stringify({ notAQueueEvent: true }),
+            r3,
+            "",
+        ].join("\n");
+        Deno.writeFileSync(tmpDir + "/persist.dat", enc.encode(content));
+
+        const events = store.loadState();
+        assertEquals(events.length, 3);
+        assertEquals(events[0].payload, "p1-" + "x".repeat(4050));
+        assertEquals(events[1].payload, "p2-" + "y".repeat(5000));
+        assertEquals(events[2].dequeue, true);
+    } finally {
+        store.close();
+        Deno.removeSync(tmpDir, { recursive: true });
+    }
+});
+
+Deno.test("FileStore.loadState() recovers a final unterminated record with multi-byte UTF-8 split across chunk boundary", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const store = new Persistency.FileStore<string>();
+    store.dir(tmpDir);
+    try {
+        const enc = new TextEncoder();
+        const prefix = '{"queue":"q","payload":"';
+        const suffix = '","enqueue":true,"dequeue":false}';
+        // Place a 2-byte UTF-8 char ("é" = 0xC3 0xA9) straddling byte 4095 / 4096, with no trailing newline.
+        const padLen = 4095 - enc.encode(prefix).length;
+        const payload = "A".repeat(padLen) + "étail";
+        const line = prefix + payload + suffix;
+        const bytes = enc.encode(line);
+        assertEquals(bytes[4095], 0xc3);
+        assertEquals(bytes[4096], 0xa9);
+        Deno.writeFileSync(tmpDir + "/persist.dat", bytes);
+
+        const events = store.loadState();
+        assertEquals(events.length, 1);
+        assertEquals(events[0].payload, payload);
+    } finally {
+        store.close();
+        Deno.removeSync(tmpDir, { recursive: true });
+    }
+});
+
+Deno.test("QueueManager.load() recovers a long record from FileStore", () => {
+    const tmpDir = Deno.makeTempDirSync();
+    const store = new Persistency.FileStore<string>();
+    store.dir(tmpDir);
+    try {
+        const longPayload = "z".repeat(32 * 1024);
+        store.saveEvent("q", longPayload, true);
+        store.close();
+
+        const mgr = new QueueManager<string>(store);
+        mgr.load();
+        assertEquals(mgr.dequeue("q"), longPayload);
+    } finally {
+        store.close();
+        Deno.removeSync(tmpDir, { recursive: true });
+    }
+});
