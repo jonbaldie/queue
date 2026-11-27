@@ -19,6 +19,19 @@ export function isQueueEvent<T>(value: unknown): value is QueueEvent<T> {
         event.enqueue !== event.dequeue;
 }
 
+function concatBytes(parts: Uint8Array[], totalLen: number, tail?: Uint8Array): Uint8Array {
+    const out = new Uint8Array(totalLen + (tail ? tail.length : 0));
+    let offset = 0;
+    for (const part of parts) {
+        out.set(part, offset);
+        offset += part.length;
+    }
+    if (tail && tail.length > 0) {
+        out.set(tail, offset);
+    }
+    return out;
+}
+
 function parseLine<T>(line: string): QueueEvent<T> | undefined {
     try {
         const event = JSON.parse(line);
@@ -223,37 +236,53 @@ export class FileStore<T extends JsonValue = string> implements QueueStore<T> {
             const file = Deno.openSync(this.path, { read: true });
             file.lockSync(false);
             try {
-                // Stream-parse line by line to avoid 3x peak memory from split/filter/map
+                // Stream-parse line by line using byte-level 0x0A framing so
+                // long records spanning many chunks are scanned in O(N) time.
                 const events: QueueEvent<T>[] = [];
                 const decoder = new TextDecoder();
                 const chunk = new Uint8Array(4096);
-                let leftover = "";
+                const pendingParts: Uint8Array[] = [];
+                let pendingLen = 0;
+
+                const emitLine = (bytes: Uint8Array) => {
+                    if (bytes.length === 0) {
+                        return;
+                    }
+                    const event = parseLine<T>(decoder.decode(bytes));
+                    if (event) {
+                        events.push(event);
+                    }
+                };
+
                 while (true) {
                     const read = file.readSync(chunk);
                     if (!read) {
                         break;
                     }
-                    leftover += decoder.decode(chunk.subarray(0, read), { stream: true });
-                    let idx = leftover.indexOf("\n");
-                    while (idx >= 0) {
-                        const line = leftover.slice(0, idx);
-                        leftover = leftover.slice(idx + 1);
-                        if (line.length > 0) {
-                            const event = parseLine<T>(line);
-                            if (event) {
-                                events.push(event);
-                            }
+                    const slice = chunk.subarray(0, read);
+                    let start = 0;
+                    while (start < slice.length) {
+                        const nl = slice.indexOf(10, start);
+                        if (nl === -1) {
+                            const tail = slice.slice(start);
+                            pendingParts.push(tail);
+                            pendingLen += tail.length;
+                            break;
                         }
-                        idx = leftover.indexOf("\n");
+                        const seg = slice.subarray(start, nl);
+                        if (pendingParts.length === 0) {
+                            emitLine(seg);
+                        } else {
+                            emitLine(concatBytes(pendingParts, pendingLen, seg));
+                            pendingParts.length = 0;
+                            pendingLen = 0;
+                        }
+                        start = nl + 1;
                     }
                 }
-                // Flush decoder and process any remaining line (no trailing newline)
-                leftover += decoder.decode();
-                if (leftover.length > 0) {
-                    const event = parseLine<T>(leftover);
-                    if (event) {
-                        events.push(event);
-                    }
+                // Process any remaining line without a trailing newline
+                if (pendingLen > 0) {
+                    emitLine(concatBytes(pendingParts, pendingLen));
                 }
                 return events;
             } finally {
